@@ -207,4 +207,5 @@ pyrightconfig.json
 .history
 .ionide
 
-# End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,git
+# End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,gitBokji/cache/
+Bokji/output_v2/seoul_walk.graphml
