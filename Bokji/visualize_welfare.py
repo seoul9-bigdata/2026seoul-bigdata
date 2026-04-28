@@ -60,14 +60,13 @@ welfare_df.columns = [
     '자치구구분','시군구코드','시군구명','시설주소',
     '전화번호','우편번호'
 ]
-welfare_df = welfare_df[welfare_df['자치구구분'] == '자치구'].copy()
 welfare_df['시설주소'] = welfare_df['시설주소'].fillna('').str.strip()
 welfare_df = welfare_df[welfare_df['시설주소'] != '']
 
 # 간략 유형 라벨
 def short_type(t):
-    if '경로당' in t:     return '경로당'
-    if '소규모' in t:     return '경로당(소규모)'
+    if '소규모' in t:   return '노인복지관(소규모)'
+    if '노인교실' in t: return '노인교실'
     return '노인복지관'
 
 welfare_df['유형_간략'] = welfare_df['시설유형'].apply(short_type)
@@ -203,14 +202,14 @@ folium.GeoJson(
 
 # 시설 타입별 색상
 TYPE_COLOR = {
-    '노인복지관':  '#1f77b4',
-    '경로당':      '#ff7f0e',
-    '경로당(소규모)': '#aec7e8'
+    '노인복지관':         '#1f77b4',
+    '노인교실':           '#ff7f0e',
+    '노인복지관(소규모)': '#aec7e8'
 }
 TYPE_ICON = {
-    '노인복지관':  'home',
-    '경로당':      'user',
-    '경로당(소규모)': 'leaf'
+    '노인복지관':         'home',
+    '노인교실':           'user',
+    '노인복지관(소규모)': 'leaf'
 }
 
 # 시설 마커 레이어 (유형별 분리)
@@ -300,7 +299,7 @@ ax.set_xlim(0, master_s['welfare_index'].max() * 1.18)
 # ── (2) 시설 수 vs 고령인구 (시설 유형별 누적 가로 막대) ────
 ax = axes[0, 1]
 ms_sorted = master.sort_values('65세이상인구', ascending=True)
-type_cols = [c for c in ['경로당','경로당(소규모)','노인복지관'] if c in ms_sorted.columns]
+type_cols = [c for c in ['노인교실', '노인복지관(소규모)', '노인복지관'] if c in ms_sorted.columns]
 palette = ['#ff7f0e','#aec7e8','#1f77b4']
 left = np.zeros(len(ms_sorted))
 for col, color in zip(type_cols, palette):
@@ -384,8 +383,8 @@ print("▣ 서울시 복지시설 분석 요약")
 print("=" * 55)
 print(f"  분석 대상 시설 수  : {len(welfare_df)}개")
 print(f"  - 노인복지관       : {(welfare_df['유형_간략']=='노인복지관').sum()}개")
-print(f"  - 경로당           : {(welfare_df['유형_간략']=='경로당').sum()}개")
-print(f"  - 경로당(소규모)   : {(welfare_df['유형_간략']=='경로당(소규모)').sum()}개")
+print(f"  - 노인교실           : {(welfare_df['유형_간략']=='노인교실').sum()}개")
+print(f"  - 노인복지관(소규모) : {(welfare_df['유형_간략']=='노인복지관(소규모)').sum()}개")
 print(f"  서울 평균 복지지수 : 1만명당 {master['welfare_index'].mean():.2f}개소")
 ms_s = master.sort_values('welfare_index', ascending=False)
 print(f"\n  복지지수 최고: {ms_s.iloc[0]['구명']} ({ms_s.iloc[0]['welfare_index']:.2f}개소/1만명)")

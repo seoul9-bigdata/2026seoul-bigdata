@@ -2,8 +2,16 @@
 서울시 노인복지 및 녹지 접근성 – 행정동 단위 시각화
 ======================================================
 출력:
-  output/park_dong_map.html     ← 행정동 녹지 접근성 지도
-  output/welfare_dong_map.html  ← 행정동 복지시설 접근성 지도
+  output/park_dong_map.html       ← 행정동 녹지 접근성 지도
+  output/welfare_dong_map.html    ← 행정동 복지시설 접근성 지도
+  output/dong_vulnerability.png   ← 행정동 TOP10 결핍 지수 바차트
+  output/dong_top5_report.csv     ← 행정동 TOP5 확충 시급 리포트
+
+개선사항:
+  - 시설 유형 라벨 실제 데이터 기준으로 수정 (노인교실·노인복지관·노인복지관(소규모))
+  - 청년/노인 보행 속도 구분 (노인 400m vs 청년 800m)
+  - Vulnerability Score 행정동 단위 산출 (보행권 박탈 노인 수 기반)
+  - TOP5 행정동 리포트 및 시각화 추가
 """
 
 import warnings; warnings.filterwarnings('ignore')
@@ -14,6 +22,8 @@ import numpy as np
 from shapely.ops import unary_union
 import folium
 import branca.colormap as bc
+import matplotlib.pyplot as plt
+import koreanize_matplotlib
 import requests
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
@@ -26,9 +36,14 @@ CACHE_FILE = os.path.join(OUTPUT_DIR, "geocode_cache.json")
 CRS_WGS84 = "EPSG:4326"
 CRS_KOREA = "EPSG:5179"
 
+# ── 보행 속도 기준 ────────────────────────────────────────────
+ELDERLY_10MIN_M = 400   # 노인 도보 10분 (2.4 km/h)
+ELDERLY_20MIN_M = 800
+YOUTH_10MIN_M   = 800   # 청년 도보 10분 (4.8 km/h)
+YOUTH_20MIN_M   = 1_600
+
 # ── 행정동 이름 정규화 (CSV ↔ GeoJSON 불일치 교정) ────────────
 DONG_NAME_MAP = {
-    # 구분점 차이 (.→·) 및 기타 이름 차이
     '종로1.2.3.4가동':  '종로1·2·3·4가동',
     '종로5.6가동':      '종로5·6가동',
     '금호2.3가동':      '금호2·3가동',
@@ -36,10 +51,8 @@ DONG_NAME_MAP = {
     '상계6.7동':        '상계6·7동',
     '중계2.3동':        '중계2·3동',
     '면목3.8동':        '면목3·8동',
-    # 강동구 이름 차이
     '상일1동': '상일제1동',
     '상일2동': '상일제2동',
-    # 동대문구 통합 처리
     '신설동':  '용신동',
     '용두동':  '용신동',
 }
@@ -89,10 +102,9 @@ for c in ['전체인구', '65세이상']:
     )
 elderly = elderly.dropna(subset=['65세이상'])
 elderly['동명_norm'] = elderly['동명'].apply(norm_dong)
-elderly['동_key'] = elderly['구명'] + '_' + elderly['동명_norm']
+elderly['동_key']    = elderly['구명'] + '_' + elderly['동명_norm']
 elderly_dong = elderly[['동_key', '구명', '동명', '전체인구', '65세이상']].copy()
 elderly_dong.rename(columns={'65세이상': '65세이상인구'}, inplace=True)
-# 동_key 중복 시 합산 (신설동+용두동 → 용신동)
 elderly_dong = elderly_dong.groupby('동_key').agg(
     구명=('구명', 'first'),
     동명=('동명', 'first'),
@@ -112,17 +124,19 @@ welfare_df.columns = [
     '자치구구분','시군구코드','시군구명','시설주소',
     '전화번호','우편번호'
 ]
-welfare_df = welfare_df[welfare_df['자치구구분'] == '자치구'].copy()
+# 자치구구분 컬럼은 전부 '자치구' 단일값 — 필터 생략
 welfare_df['시설주소'] = welfare_df['시설주소'].fillna('').str.strip()
 welfare_df = welfare_df[welfare_df['시설주소'] != '']
 
+# 실제 데이터 유형: 노인교실 / 노인복지관 / 노인복지관(소규모)
 def short_type(t):
-    if '소규모' in t: return '경로당(소규모)'
-    if '경로당' in t: return '경로당'
+    if '소규모' in t:   return '노인복지관(소규모)'
+    if '노인교실' in t: return '노인교실'
     return '노인복지관'
 
 welfare_df['유형_간략'] = welfare_df['시설유형'].apply(short_type)
 print(f"  복지시설 {len(welfare_df)}개 로드")
+print(f"  유형 분포: {welfare_df['유형_간략'].value_counts().to_dict()}")
 
 # ── 공원 ──────────────────────────────────────────────────────
 parks_raw = pd.read_excel(
@@ -135,9 +149,10 @@ parks_raw.columns = [
     'X_GRS80','Y_GRS80','X_WGS84','Y_WGS84','바로가기'
 ]
 SEOUL_GU = dong_gdf['구명'].unique().tolist()
+
 def parse_area(v):
-    m = re.search(r'[\d,]+\.?\d*', str(v).replace(',',''))
-    return float(m.group().replace(',','')) if m else np.nan
+    m = re.search(r'[\d,]+\.?\d*', str(v).replace(',', ''))
+    return float(m.group().replace(',', '')) if m else np.nan
 
 parks_raw['면적_m2'] = parks_raw['면적'].apply(parse_area)
 parks_df = parks_raw[parks_raw['지역'].isin(SEOUL_GU)].dropna(
@@ -156,14 +171,15 @@ print(f"  공원 {len(parks_gdf)}개 로드")
 # 2. 복지시설 지오코딩 (Nominatim + 캐시)
 # ============================================================
 print("\n" + "=" * 60)
-print("2. 복지시설 지오코딩 (Nominatim)")
+print("2. 복지시설 지오코딩 (Nominatim + 캐시)")
 print("=" * 60)
 
 cache = {}
 if os.path.exists(CACHE_FILE):
     with open(CACHE_FILE, 'r', encoding='utf-8') as f:
         cache = json.load(f)
-    print(f"  캐시 로드: {len(cache)}건")
+    print(f"  캐시 로드: {len(cache)}건 "
+          f"(성공 {sum(1 for v in cache.values() if v.get('lat'))}건)")
 
 geolocator = Nominatim(user_agent="seoul_welfare_analysis_v2")
 geocode     = RateLimiter(geolocator.geocode, min_delay_seconds=1.2)
@@ -177,19 +193,16 @@ for i, row in welfare_df.iterrows():
         lngs.append(cache[addr]['lng'])
         continue
 
-    # 괄호 안 동명 + 구명 으로 단순화 시도 → 원본 주소 순으로 fallback
     def try_geocode(query):
         try:
-            loc = geocode(query, language='ko', timeout=10)
-            return loc
+            return geocode(query, language='ko', timeout=10)
         except:
             return None
 
     loc = try_geocode(addr)
     if loc is None:
-        # fallback: "서울특별시 XX구 YY로/길 N"  (주소 앞 부분만)
         short = re.sub(r'\s*\(.*?\)', '', addr).strip()
-        loc = try_geocode(short)
+        loc   = try_geocode(short)
 
     if loc:
         cache[addr] = {'lat': loc.latitude, 'lng': loc.longitude}
@@ -200,13 +213,10 @@ for i, row in welfare_df.iterrows():
         lats.append(None)
         lngs.append(None)
         miss += 1
-        print(f"  [실패] {addr[:60]}")
 
-    # 진행 상황 표시
     done = i - welfare_df.index[0] + 1
-    total = len(welfare_df)
-    if done % 20 == 0 or done == total:
-        print(f"  진행: {done}/{total}  실패: {miss}")
+    if done % 20 == 0 or done == len(welfare_df):
+        print(f"  진행: {done}/{len(welfare_df)}  실패: {miss}")
 
 with open(CACHE_FILE, 'w', encoding='utf-8') as f:
     json.dump(cache, f, ensure_ascii=False, indent=2)
@@ -214,7 +224,7 @@ with open(CACHE_FILE, 'w', encoding='utf-8') as f:
 welfare_df = welfare_df.copy()
 welfare_df['lat'] = lats
 welfare_df['lng'] = lngs
-welfare_ok = welfare_df.dropna(subset=['lat', 'lng']).copy()
+welfare_ok  = welfare_df.dropna(subset=['lat', 'lng']).copy()
 welfare_gdf = gpd.GeoDataFrame(
     welfare_ok,
     geometry=gpd.points_from_xy(welfare_ok['lng'], welfare_ok['lat']),
@@ -230,8 +240,8 @@ print("\n" + "=" * 60)
 print("3. 행정동 단위 공간 집계")
 print("=" * 60)
 
-dong_korea   = dong_gdf.to_crs(CRS_KOREA)
-parks_korea  = parks_gdf.to_crs(CRS_KOREA)
+dong_korea    = dong_gdf.to_crs(CRS_KOREA)
+parks_korea   = parks_gdf.to_crs(CRS_KOREA)
 welfare_korea = welfare_gdf.to_crs(CRS_KOREA)
 
 # ── 공원 → 행정동 spatial join ────────────────────────────────
@@ -257,12 +267,12 @@ welfare_join = gpd.sjoin(
 welfare_dong = welfare_join.groupby('동_key').agg(
     시설수=('시설명', 'count'),
     노인복지관=('유형_간략', lambda x: (x == '노인복지관').sum()),
-    경로당=('유형_간략', lambda x: (x == '경로당').sum()),
-    경로당소규모=('유형_간략', lambda x: (x == '경로당(소규모)').sum()),
+    노인교실=('유형_간략', lambda x: (x == '노인교실').sum()),
+    노인복지관소규모=('유형_간략', lambda x: (x == '노인복지관(소규모)').sum()),
 ).reset_index()
 print(f"  복지시설-행정동 join: {len(welfare_join[welfare_join['동_key'].notna()])}개 매칭")
 
-# ── 보행권 커버리지 (400m / 800m) ────────────────────────────
+# ── 보행권 커버리지 (노인/청년 기준 각각) ─────────────────────
 def calc_coverage(facility_gdf_k, dong_k, radius):
     """각 행정동에서 시설 버퍼가 덮는 비율(%)"""
     rows = []
@@ -281,12 +291,12 @@ def calc_coverage(facility_gdf_k, dong_k, radius):
     return pd.DataFrame(rows)
 
 print("  공원 보행권 커버리지 계산 중...")
-park_cov400 = calc_coverage(parks_korea, dong_korea, 400)
-park_cov800 = calc_coverage(parks_korea, dong_korea, 800)
+park_cov_elder = calc_coverage(parks_korea, dong_korea, ELDERLY_10MIN_M)
+park_cov_youth = calc_coverage(parks_korea, dong_korea, YOUTH_10MIN_M)
 
 print("  복지시설 보행권 커버리지 계산 중...")
-welf_cov400 = calc_coverage(welfare_korea, dong_korea, 400)
-welf_cov800 = calc_coverage(welfare_korea, dong_korea, 800)
+welf_cov_elder = calc_coverage(welfare_korea, dong_korea, ELDERLY_10MIN_M)
+welf_cov_youth = calc_coverage(welfare_korea, dong_korea, YOUTH_10MIN_M)
 
 # ── 마스터 데이터프레임 ───────────────────────────────────────
 master = (
@@ -294,15 +304,18 @@ master = (
     .merge(elderly_dong[['동_key', '전체인구', '65세이상인구', '고령화율']], on='동_key', how='left')
     .merge(park_dong, on='동_key', how='left')
     .merge(welfare_dong, on='동_key', how='left')
-    .merge(park_cov400, on='동_key', how='left')
-    .merge(park_cov800, on='동_key', how='left')
-    .merge(welf_cov400.rename(columns={'cov_400': 'welf_cov_400'}), on='동_key', how='left')
-    .merge(welf_cov800.rename(columns={'cov_800': 'welf_cov_800'}), on='동_key', how='left')
+    .merge(park_cov_elder.rename(columns={f'cov_{ELDERLY_10MIN_M}': 'park_cov_elder'}),
+           on='동_key', how='left')
+    .merge(park_cov_youth.rename(columns={f'cov_{YOUTH_10MIN_M}': 'park_cov_youth'}),
+           on='동_key', how='left')
+    .merge(welf_cov_elder.rename(columns={f'cov_{ELDERLY_10MIN_M}': 'welf_cov_elder'}),
+           on='동_key', how='left')
+    .merge(welf_cov_youth.rename(columns={f'cov_{YOUTH_10MIN_M}': 'welf_cov_youth'}),
+           on='동_key', how='left')
 )
 
-# 결측치 채우기
-fill0 = ['공원수','공원면적_m2','시설수','노인복지관','경로당','경로당소규모',
-         'cov_400','cov_800','welf_cov_400','welf_cov_800']
+fill0 = ['공원수', '공원면적_m2', '시설수', '노인복지관', '노인교실', '노인복지관소규모',
+         'park_cov_elder', 'park_cov_youth', 'welf_cov_elder', 'welf_cov_youth']
 for c in fill0:
     if c in master.columns:
         master[c] = master[c].fillna(0)
@@ -315,8 +328,34 @@ master['green_index']   = np.where(
 )
 master['welfare_index'] = np.where(
     master['65세이상인구'] > 0,
-    (master['시설수'] / master['65세이상인구'] * 10000).round(3), 0
+    (master['시설수'] / master['65세이상인구'] * 10_000).round(3), 0
 )
+
+# 속도 격차 (청년 - 노인)
+master['welf_속도격차'] = (master['welf_cov_youth'] - master['welf_cov_elder']).round(2)
+master['park_속도격차'] = (master['park_cov_youth'] - master['park_cov_elder']).round(2)
+
+# 영향 노인 수 (보행권 박탈 노인 수, 노인 기준)
+master['welf_박탈노인'] = (
+    master['65세이상인구'] * (1 - master['welf_cov_elder'] / 100)
+).round(0)
+master['park_박탈노인'] = (
+    master['65세이상인구'] * (1 - master['park_cov_elder'] / 100)
+).round(0)
+
+# Vulnerability Score (고령화율 제거, 보행권 박탈 노인 수 기반)
+m_valid = master[master['65세이상인구'] > 0].copy()
+
+def minmax(s):
+    mn, mx = s.min(), s.max()
+    return (s - mn) / (mx - mn) if mx > mn else pd.Series(0.0, index=s.index)
+
+norm_w = minmax(m_valid['welf_박탈노인'])
+norm_p = minmax(m_valid['park_박탈노인'])
+m_valid['vulnerability_score'] = (norm_w * 0.50 + norm_p * 0.50).round(4)
+
+master = master.merge(m_valid[['동_key', 'vulnerability_score']], on='동_key', how='left')
+master['vulnerability_score'] = master['vulnerability_score'].fillna(0)
 
 master_gdf = gpd.GeoDataFrame(master, geometry='geometry', crs=CRS_WGS84)
 print(f"  마스터 GDF 완성: {len(master_gdf)}개 행정동")
@@ -332,65 +371,53 @@ print("=" * 60)
 m_park = folium.Map(location=[37.5665, 126.9780], zoom_start=11,
                     tiles='CartoDB positron')
 
-# 녹지 보행권 커버리지(400m) Choropleth ──────────────────────
-# 데이터가 없는 동(65세이상=0) 구분
-master_gdf['cov_400_disp'] = master_gdf['cov_400'].fillna(0)
-
 colormap_green = bc.LinearColormap(
-    ['#f7fcf5','#74c476','#006d2c'],
+    ['#f7fcf5', '#74c476', '#006d2c'],
     vmin=0, vmax=100,
-    caption='공원 400m 보행권 커버리지 (%)'
+    caption=f'공원 보행권 커버리지 – 노인 {ELDERLY_10MIN_M}m (%)'
 )
 colormap_green.add_to(m_park)
 
-style_park = folium.GeoJson(
-    master_gdf[['동_key','구명','동명','cov_400_disp','cov_800',
-                '공원수','공원면적_m2','green_index','65세이상인구','geometry']].to_json(),
+folium.GeoJson(
+    master_gdf[['동_key', '구명', '동명', 'park_cov_elder', 'park_cov_youth',
+                '공원수', '공원면적_m2', 'green_index', '65세이상인구', 'park_속도격차',
+                'geometry']].to_json(),
     style_function=lambda feat: {
-        'fillColor': colormap_green(
-            feat['properties'].get('cov_400_disp') or 0
-        ),
-        'color': '#555',
-        'weight': 0.6,
-        'fillOpacity': 0.75
+        'fillColor': colormap_green(feat['properties'].get('park_cov_elder') or 0),
+        'color': '#555', 'weight': 0.6, 'fillOpacity': 0.75
     },
     tooltip=folium.GeoJsonTooltip(
-        fields=['구명','동명','cov_400_disp','cov_800',
-                '공원수','공원면적_m2','green_index','65세이상인구'],
-        aliases=['자치구','행정동','400m커버(%)','800m커버(%)',
-                 '공원수(개)','공원면적(㎡)','녹지지수(㎡/인)','65세이상인구'],
+        fields=['구명', '동명', 'park_cov_elder', 'park_cov_youth',
+                '공원수', '공원면적_m2', 'green_index', '65세이상인구', 'park_속도격차'],
+        aliases=['자치구', '행정동',
+                 f'공원커버(노인{ELDERLY_10MIN_M}m,%)', f'공원커버(청년{YOUTH_10MIN_M}m,%)',
+                 '공원수(개)', '공원면적(㎡)', '녹지지수(㎡/인)', '65세이상인구',
+                 '속도격차(청-노,%p)'],
         localize=True
     ),
-    name='행정동 녹지 커버리지 (Choropleth)'
-)
-style_park.add_to(m_park)
+    name='행정동 녹지 커버리지 (노인 기준)'
+).add_to(m_park)
 
-# 공원 마커 ───────────────────────────────────────────────────
 park_layer = folium.FeatureGroup(name='공원 위치 (버블=면적)')
 for _, row in parks_df.iterrows():
     r = max(4, min(25, np.sqrt(row['면적_m2']) / 50))
     folium.CircleMarker(
         location=[row['Y_WGS84'], row['X_WGS84']],
-        radius=r,
-        color='#1a5e22', weight=1,
+        radius=r, color='#1a5e22', weight=1,
         fill=True, fill_color='#2ca02c', fill_opacity=0.75,
         tooltip=f"<b>{row['공원명']}</b><br>면적: {row['면적_m2']:,.0f}㎡",
-        popup=(f"<b>{row['공원명']}</b><br>"
-               f"면적: {row['면적_m2']:,.0f}㎡<br>"
-               f"지역: {row['지역']}<br>"
-               f"주소: {row['공원주소']}")
+        popup=f"<b>{row['공원명']}</b><br>면적: {row['면적_m2']:,.0f}㎡<br>지역: {row['지역']}"
     ).add_to(park_layer)
 park_layer.add_to(m_park)
 
-# 400m / 800m 버퍼 (면적 상위 10개 공원) ─────────────────────
-buf400_layer = folium.FeatureGroup(name='공원 400m 버퍼 (상위10)', show=False)
-buf800_layer = folium.FeatureGroup(name='공원 800m 버퍼 (상위10)', show=False)
-top10_parks  = parks_gdf.nlargest(10, '면적_m2').to_crs(CRS_KOREA)
+top10_parks = parks_gdf.nlargest(10, '면적_m2').to_crs(CRS_KOREA)
+elder_buf_layer = folium.FeatureGroup(name=f'공원 노인 보행권 ({ELDERLY_10MIN_M}m)', show=False)
+youth_buf_layer = folium.FeatureGroup(name=f'공원 청년 보행권 ({YOUTH_10MIN_M}m)', show=False)
 
 for _, row in top10_parks.iterrows():
     for lyr, rad, col, op in [
-        (buf400_layer, 400, '#2ca02c', 0.20),
-        (buf800_layer, 800, '#98df8a', 0.12)
+        (elder_buf_layer, ELDERLY_10MIN_M, '#d62728', 0.20),
+        (youth_buf_layer, YOUTH_10MIN_M,   '#2ca02c', 0.12),
     ]:
         buf = gpd.GeoDataFrame(
             geometry=[row.geometry.buffer(rad)], crs=CRS_KOREA
@@ -400,11 +427,11 @@ for _, row in top10_parks.iterrows():
             style_function=lambda x, c=col, o=op: {
                 'fillColor': c, 'color': c, 'weight': 1, 'fillOpacity': o
             },
-            tooltip=f"{row['공원명']} {rad}m"
+            tooltip=f"{row['공원명']} {'노인' if rad==ELDERLY_10MIN_M else '청년'} 10분"
         ).add_to(lyr)
 
-buf400_layer.add_to(m_park)
-buf800_layer.add_to(m_park)
+elder_buf_layer.add_to(m_park)
+youth_buf_layer.add_to(m_park)
 folium.LayerControl(collapsed=False).add_to(m_park)
 
 park_map_path = os.path.join(OUTPUT_DIR, 'park_dong_map.html')
@@ -422,55 +449,52 @@ print("=" * 60)
 m_welf = folium.Map(location=[37.5665, 126.9780], zoom_start=11,
                     tiles='CartoDB positron')
 
-# 복지시설 지수 Choropleth ─────────────────────────────────────
-colormap_blue = bc.LinearColormap(
-    ['#f7fbff','#6baed6','#08306b'],
-    vmin=0, vmax=master_gdf['welfare_index'].quantile(0.95),
-    caption='복지시설 지수 (65세이상 1만명당 시설 수)'
+# Vulnerability Score 기반 Choropleth
+vuln_max = master_gdf['vulnerability_score'].quantile(0.95)
+colormap_red = bc.LinearColormap(
+    ['#fff5f0', '#fc9272', '#a50f15'],
+    vmin=0, vmax=max(vuln_max, 0.01),
+    caption='복지 결핍 지수 (보행권 박탈 노인 수 기반)'
 )
-colormap_blue.add_to(m_welf)
+colormap_red.add_to(m_welf)
+master_gdf['vuln_disp'] = master_gdf['vulnerability_score'].clip(upper=vuln_max)
 
-master_gdf['welf_disp'] = master_gdf['welfare_index'].clip(
-    upper=master_gdf['welfare_index'].quantile(0.95)
-)
-
-style_welf = folium.GeoJson(
-    master_gdf[['동_key','구명','동명','welfare_index','welf_disp',
-                '시설수','노인복지관','경로당','경로당소규모',
-                'welf_cov_400','welf_cov_800','65세이상인구','고령화율',
-                'geometry']].to_json(),
+folium.GeoJson(
+    master_gdf[['동_key', '구명', '동명', 'vulnerability_score', 'vuln_disp',
+                'welfare_index', '시설수', '노인복지관', '노인교실', '노인복지관소규모',
+                'welf_cov_elder', 'welf_cov_youth', 'welf_박탈노인', 'welf_속도격차',
+                '65세이상인구', '고령화율', 'geometry']].to_json(),
     style_function=lambda feat: {
-        'fillColor': colormap_blue(
-            feat['properties'].get('welf_disp') or 0
-        ),
-        'color': '#555',
-        'weight': 0.6,
-        'fillOpacity': 0.75
+        'fillColor': colormap_red(feat['properties'].get('vuln_disp') or 0),
+        'color': '#555', 'weight': 0.6, 'fillOpacity': 0.75
     },
     tooltip=folium.GeoJsonTooltip(
-        fields=['구명','동명','welfare_index','시설수',
-                '노인복지관','경로당','경로당소규모',
-                'welf_cov_400','welf_cov_800','65세이상인구','고령화율'],
-        aliases=['자치구','행정동','복지지수(1만명당)','총시설수',
-                 '노인복지관','경로당','경로당(소규모)',
-                 '400m커버(%)','800m커버(%)','65세이상인구','고령화율(%)'],
+        fields=['구명', '동명', 'vulnerability_score', '시설수',
+                '노인복지관', '노인교실', '노인복지관소규모',
+                'welf_cov_elder', 'welf_cov_youth', 'welf_박탈노인', 'welf_속도격차',
+                '65세이상인구', '고령화율'],
+        aliases=['자치구', '행정동', '결핍지수', '총시설수',
+                 '노인복지관', '노인교실', '노인복지관(소규모)',
+                 f'복지커버(노인{ELDERLY_10MIN_M}m,%)', f'복지커버(청년{YOUTH_10MIN_M}m,%)',
+                 '박탈노인(명)', '속도격차(청-노,%p)',
+                 '65세이상인구', '고령화율(%)'],
         localize=True
     ),
-    name='행정동 복지시설 지수 (Choropleth)'
-)
-style_welf.add_to(m_welf)
+    name='행정동 복지 결핍 지수 (Choropleth)'
+).add_to(m_welf)
 
-# 시설 유형별 마커 ─────────────────────────────────────────────
+# 시설 유형별 마커
 TYPE_STYLE = {
-    '노인복지관':     {'color': '#1f77b4', 'radius': 9,  'icon': '🏛'},
-    '경로당':         {'color': '#ff7f0e', 'radius': 6,  'icon': '🏠'},
-    '경로당(소규모)': {'color': '#aec7e8', 'radius': 5,  'icon': '🍃'},
+    '노인복지관':      {'color': '#1f77b4', 'radius': 9},
+    '노인교실':        {'color': '#ff7f0e', 'radius': 6},
+    '노인복지관(소규모)': {'color': '#aec7e8', 'radius': 5},
 }
 for wtype, style in TYPE_STYLE.items():
     layer = folium.FeatureGroup(name=f'시설: {wtype}')
     sub = welfare_gdf[welfare_gdf['유형_간략'] == wtype]
     for _, row in sub.iterrows():
-        if row.geometry is None: continue
+        if row.geometry is None:
+            continue
         folium.CircleMarker(
             location=[row.geometry.y, row.geometry.x],
             radius=style['radius'],
@@ -478,21 +502,19 @@ for wtype, style in TYPE_STYLE.items():
             fill=True, fill_color=style['color'], fill_opacity=0.85,
             tooltip=f"<b>{row['시설명']}</b><br>{wtype}<br>{row['시군구명']}",
             popup=(f"<b>{row['시설명']}</b><br>"
-                   f"유형: {wtype}<br>"
-                   f"구: {row['시군구명']}<br>"
-                   f"주소: {row['시설주소']}")
+                   f"유형: {wtype}<br>구: {row['시군구명']}<br>주소: {row['시설주소']}")
         ).add_to(layer)
     layer.add_to(m_welf)
 
-# 노인복지관 400m / 800m 버퍼 ─────────────────────────────────
-wc_layer_400 = folium.FeatureGroup(name='노인복지관 400m 버퍼', show=False)
-wc_layer_800 = folium.FeatureGroup(name='노인복지관 800m 버퍼', show=False)
+# 노인복지관 버퍼 (노인/청년 구분)
+wc_elder_layer = folium.FeatureGroup(name=f'노인복지관 노인 보행권 ({ELDERLY_10MIN_M}m)', show=False)
+wc_youth_layer = folium.FeatureGroup(name=f'노인복지관 청년 보행권 ({YOUTH_10MIN_M}m)', show=False)
 wc_korea = welfare_gdf[welfare_gdf['유형_간략'] == '노인복지관'].to_crs(CRS_KOREA)
 
 for _, row in wc_korea.iterrows():
     for lyr, rad, col, op in [
-        (wc_layer_400, 400, '#1f77b4', 0.18),
-        (wc_layer_800, 800, '#aec7e8', 0.10)
+        (wc_elder_layer, ELDERLY_10MIN_M, '#d62728', 0.18),
+        (wc_youth_layer, YOUTH_10MIN_M,   '#1f77b4', 0.10),
     ]:
         buf = gpd.GeoDataFrame(
             geometry=[row.geometry.buffer(rad)], crs=CRS_KOREA
@@ -502,11 +524,11 @@ for _, row in wc_korea.iterrows():
             style_function=lambda x, c=col, o=op: {
                 'fillColor': c, 'color': c, 'weight': 1, 'fillOpacity': o
             },
-            tooltip=f"{row['시설명']} {rad}m"
+            tooltip=f"{row['시설명']} {'노인' if rad==ELDERLY_10MIN_M else '청년'} 10분"
         ).add_to(lyr)
 
-wc_layer_400.add_to(m_welf)
-wc_layer_800.add_to(m_welf)
+wc_elder_layer.add_to(m_welf)
+wc_youth_layer.add_to(m_welf)
 folium.LayerControl(collapsed=False).add_to(m_welf)
 
 welf_map_path = os.path.join(OUTPUT_DIR, 'welfare_dong_map.html')
@@ -515,36 +537,93 @@ print(f"  복지 지도 저장: {welf_map_path}")
 
 
 # ============================================================
-# 5. 요약 리포트 출력
+# 5. 행정동 단위 Vulnerability TOP10 바차트 + TOP5 리포트
 # ============================================================
 print("\n" + "=" * 60)
-print("5. 행정동 단위 분석 요약")
+print("5. 행정동 단위 결핍 지수 리포트")
 print("=" * 60)
 
 m_valid = master_gdf[master_gdf['65세이상인구'] > 0].copy()
+top10_dong = m_valid.nlargest(10, 'vulnerability_score')[
+    ['구명', '동명', 'vulnerability_score', '65세이상인구',
+     'welf_cov_elder', 'park_cov_elder', 'welf_박탈노인', 'park_박탈노인',
+     'welf_속도격차', 'park_속도격차', '시설수']
+].reset_index(drop=True)
 
-# 녹지 사각지대 (400m 커버리지 0%, 65세이상인구 >0)
-blind_park = m_valid[m_valid['cov_400'] == 0]
-print(f"\n  ▣ 공원 400m 보행권 완전 사각지대: {len(blind_park)}개 행정동")
-for _, r in blind_park.nlargest(5, '65세이상인구').iterrows():
-    print(f"    - {r['구명']} {r['동명']}: 65세이상 {r['65세이상인구']:.0f}명")
+# ── 바차트 ──────────────────────────────────────────────────
+fig, axes = plt.subplots(1, 2, figsize=(22, 8))
+fig.suptitle('서울시 행정동 단위 복지 결핍 지수 TOP 10\n(보행권 박탈 노인 수 기반)',
+             fontsize=14, fontweight='bold')
 
-# 복지시설 없는 행정동
-blind_welf = m_valid[m_valid['시설수'] == 0]
-print(f"\n  ▣ 복지시설 0개 행정동: {len(blind_welf)}개")
-for _, r in blind_welf.nlargest(5, '65세이상인구').iterrows():
-    print(f"    - {r['구명']} {r['동명']}: 65세이상 {r['65세이상인구']:.0f}명")
+labels = top10_dong.apply(lambda r: f"{r['구명']}\n{r['동명']}", axis=1)
 
-# 고령화율 상위 10개 동
-print(f"\n  ▣ 고령화율 상위 10개 행정동:")
-for _, r in m_valid.nlargest(10, '고령화율').iterrows():
-    print(f"    {r['구명']:7s} {r['동명']:12s}  "
-          f"고령화율 {r['고령화율']:.1f}%  "
-          f"복지지수 {r['welfare_index']:.2f}  "
-          f"공원커버 {r['cov_400']:.1f}%")
+# 결핍 지수 바차트
+colors_v = ['#a50f15' if v > 0.7 else '#d62728' if v > 0.4 else '#ff7f0e'
+            for v in top10_dong['vulnerability_score']]
+bars = axes[0].barh(labels[::-1], top10_dong['vulnerability_score'][::-1], color=colors_v[::-1])
+axes[0].set_title('결핍 지수 (Vulnerability Score)', fontsize=12, fontweight='bold')
+axes[0].set_xlabel('결핍 지수 (0~1)')
+for bar, val in zip(bars, top10_dong['vulnerability_score'][::-1]):
+    axes[0].text(bar.get_width() + 0.01, bar.get_y() + bar.get_height()/2,
+                 f'{val:.3f}', va='center', fontsize=9)
+axes[0].set_xlim(0, 1.1)
+
+# 박탈 노인 수 이중 바 (복지 vs 공원)
+y  = np.arange(len(top10_dong))
+h  = 0.35
+axes[1].barh(y + h/2, top10_dong['welf_박탈노인'][::-1], h,
+             label='복지시설 박탈', color='#d62728', alpha=0.85)
+axes[1].barh(y - h/2, top10_dong['park_박탈노인'][::-1], h,
+             label='공원 박탈', color='#ff7f0e', alpha=0.85)
+axes[1].set_yticks(y)
+axes[1].set_yticklabels(labels[::-1], fontsize=9)
+axes[1].set_xlabel('보행권 박탈 노인 수 (명, 노인 기준)')
+axes[1].set_title('보행권 박탈 노인 수\n(노인 도보 10분 기준)', fontsize=12, fontweight='bold')
+axes[1].legend(fontsize=10)
+
+plt.tight_layout()
+vuln_chart_path = os.path.join(OUTPUT_DIR, 'dong_vulnerability.png')
+plt.savefig(vuln_chart_path, dpi=150, bbox_inches='tight')
+plt.close()
+print(f"  결핍 지수 차트 저장: {vuln_chart_path}")
+
+# ── TOP5 콘솔 리포트 ────────────────────────────────────────
+top5 = top10_dong.head(5)
+print("\n" + "=" * 70)
+print("▣ 복지시설 확충이 가장 시급한 행정동 TOP 5")
+print(f"   (보행 속도 기준: 노인 {ELDERLY_10MIN_M}m / 청년 {YOUTH_10MIN_M}m)")
+print("=" * 70)
+for rank, row in top5.iterrows():
+    print(f"\n  [{rank+1}위] {row['구명']} {row['동명']}")
+    print(f"    - 결핍 지수           : {row['vulnerability_score']:.4f}")
+    print(f"    - 65세이상 인구       : {row['65세이상인구']:,.0f}명")
+    print(f"    - 복지 보행권 커버(노인): {row['welf_cov_elder']:.1f}%  "
+          f"(청년-노인 격차: {row['welf_속도격차']:.1f}%p)")
+    print(f"    - 공원 보행권 커버(노인): {row['park_cov_elder']:.1f}%  "
+          f"(청년-노인 격차: {row['park_속도격차']:.1f}%p)")
+    print(f"    - 복지 박탈 노인 수   : {row['welf_박탈노인']:,.0f}명")
+    print(f"    - 공원 박탈 노인 수   : {row['park_박탈노인']:,.0f}명")
+    print(f"    - 시설 수             : {row['시설수']:.0f}개")
+
+# ── TOP5 CSV 저장 ────────────────────────────────────────────
+top5_path = os.path.join(OUTPUT_DIR, 'dong_top5_report.csv')
+top5.to_csv(top5_path, index=False, encoding='utf-8-sig')
+
+# ── 전체 동 분석 결과 저장 ──────────────────────────────────
+all_dong_path = os.path.join(OUTPUT_DIR, 'dong_vulnerability_all.csv')
+m_valid.sort_values('vulnerability_score', ascending=False)[[
+    '구명', '동명', 'vulnerability_score', '65세이상인구',
+    'welf_cov_elder', 'park_cov_elder',
+    'welf_박탈노인', 'park_박탈노인',
+    'welf_속도격차', 'park_속도격차',
+    'welfare_index', 'green_index', '시설수'
+]].to_csv(all_dong_path, index=False, encoding='utf-8-sig')
 
 print("\n" + "=" * 60)
 print("완료!")
-print(f"  park_dong_map.html    → {park_map_path}")
-print(f"  welfare_dong_map.html → {welf_map_path}")
+print(f"  park_dong_map.html      → {park_map_path}")
+print(f"  welfare_dong_map.html   → {welf_map_path}")
+print(f"  dong_vulnerability.png  → {vuln_chart_path}")
+print(f"  dong_top5_report.csv    → {top5_path}")
+print(f"  dong_vulnerability_all.csv → {all_dong_path}")
 print("=" * 60)
