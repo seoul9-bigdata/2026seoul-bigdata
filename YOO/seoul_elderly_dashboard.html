@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>서울 노인 trip 분석 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, 'Apple SD Gothic Neo', 'Pretendard', system-ui, sans-serif;
+  background: #f5f7fa;
+  color: #2c3e50;
+  line-height: 1.5;
+}
+header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white; padding: 24px 32px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.1);
+}
+header h1 { font-size: 22px; font-weight: 700; }
+header .sub { font-size: 13px; opacity: .85; margin-top: 4px; }
+.tabs {
+  display: flex; gap: 4px; padding: 0 32px; background: white;
+  border-bottom: 1px solid #e1e4e8; position: sticky; top: 0; z-index: 100;
+}
+.tab {
+  padding: 14px 20px; cursor: pointer; font-weight: 500;
+  border-bottom: 3px solid transparent; color: #5a6c7d; user-select: none;
+  transition: all .15s;
+}
+.tab:hover { color: #2c3e50; background: #f8fafc; }
+.tab.active { color: #667eea; border-bottom-color: #667eea; }
+.section { display: none; padding: 24px 32px; max-width: 1400px; margin: 0 auto; }
+.section.active { display: block; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; }
+.card {
+  background: white; border-radius: 12px; padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid #e1e4e8;
+}
+.card h3 { font-size: 15px; margin-bottom: 12px; color: #2c3e50; font-weight: 600; }
+.card .desc { font-size: 12px; color: #7a8693; margin-bottom: 14px; }
+.chart-wrap { position: relative; height: 320px; }
+.chart-wrap.tall { height: 420px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #eef1f4; }
+th { background: #f8fafc; font-weight: 600; color: #5a6c7d; font-size: 11px; text-transform: uppercase; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.badge {
+  display: inline-block; padding: 2px 8px; font-size: 11px;
+  background: #ecf0fb; color: #667eea; border-radius: 4px; font-weight: 500;
+}
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.kpi {
+  background: white; padding: 16px 20px; border-radius: 10px;
+  border: 1px solid #e1e4e8; box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+.kpi .label { font-size: 12px; color: #7a8693; }
+.kpi .value { font-size: 24px; font-weight: 700; color: #2c3e50; margin-top: 4px; }
+.kpi .delta { font-size: 11px; color: #5a6c7d; margin-top: 2px; }
+</style>
+</head>
+<body>
+<header>
+<h1>🚸 서울 노인 trip 분석 대시보드</h1>
+<div class="sub">elderly_card_trips · 2026-02-22(일) · 노인 342,976명 / 505,754 trips</div>
+</header>
+
+<div class="tabs">
+<div class="tab active" data-tab="od">📍 OD 흐름</div>
+<div class="tab" data-tab="time">🕐 시간대 활동</div>
+<div class="tab" data-tab="route">🚌 노선·운영사</div>
+</div>
+
+<!-- OD -->
+<div class="section active" id="sec-od">
+<div class="kpi-row">
+<div class="kpi"><div class="label">총 OD 페어 (서울 출발)</div><div class="value" id="kpi-od-total"></div></div>
+<div class="kpi"><div class="label">총 trip</div><div class="value" id="kpi-od-trip"></div></div>
+<div class="kpi"><div class="label">자족 비율 평균</div><div class="value" id="kpi-od-self"></div></div>
+</div>
+<div class="grid">
+<div class="card">
+<h3>TOP 20 OD 페어 (출발구 → 도착구)</h3>
+<div class="desc">노인이 가장 많이 다니는 구→구 흐름</div>
+<div class="chart-wrap tall"><canvas id="chart-od-top"></canvas></div>
+</div>
+<div class="card">
+<h3>구별 자족 vs 출타 (자기 구 내 이동 비율)</h3>
+<div class="desc">자족비율 = 같은 구 내 이동 / 전체 trip</div>
+<div class="chart-wrap tall"><canvas id="chart-self"></canvas></div>
+</div>
+<div class="card" style="grid-column: 1 / -1;">
+<h3>구별 노인 trip 발생량 + 비율</h3>
+<table id="tbl-summary">
+<thead><tr><th>구</th><th class="num">전체 trip</th><th class="num">자기 구내</th><th class="num">서울 외</th><th class="num">자족 %</th><th class="num">서울외 %</th></tr></thead>
+<tbody></tbody></table>
+</div>
+</div>
+</div>
+
+<!-- 시간대 -->
+<div class="section" id="sec-time">
+<div class="grid">
+<div class="card">
+<h3>시간대별 노인 승차 trip 수</h3>
+<div class="desc">언제 가장 많이 외출/이동하는가</div>
+<div class="chart-wrap"><canvas id="chart-hour-trip"></canvas></div>
+</div>
+<div class="card">
+<h3>시간대별 평균 이동거리</h3>
+<div class="chart-wrap"><canvas id="chart-hour-dist"></canvas></div>
+</div>
+<div class="card">
+<h3>시간대별 평균 승차 시간</h3>
+<div class="chart-wrap"><canvas id="chart-hour-bridge"></canvas></div>
+</div>
+<div class="card">
+<h3>시간대별 평균 환승 횟수</h3>
+<div class="chart-wrap"><canvas id="chart-hour-trnf"></canvas></div>
+</div>
+<div class="card" style="grid-column: 1 / -1;">
+<h3>시간대 × 환승 유형별 평균 환승 시간(초)</h3>
+<div class="desc">BB=버스→버스 / BT=버스→지하철 / TB=지하철→버스 / TT=지하철→지하철</div>
+<div class="chart-wrap tall"><canvas id="chart-transfer-pivot"></canvas></div>
+</div>
+<div class="card">
+<h3>첫 승차 시간 분포 (외출 시작)</h3>
+<div class="chart-wrap"><canvas id="chart-first-ride"></canvas></div>
+</div>
+<div class="card">
+<h3>일일 trip 횟수 분포</h3>
+<div class="chart-wrap"><canvas id="chart-trip-cnt"></canvas></div>
+</div>
+</div>
+</div>
+
+<!-- 노선 -->
+<div class="section" id="sec-route">
+<div class="grid">
+<div class="card">
+<h3>교통수단 분류별 노인 이용 비중</h3>
+<div class="chart-wrap"><canvas id="chart-by-kind"></canvas></div>
+</div>
+<div class="card">
+<h3>운영주체별 노인 trip TOP 15</h3>
+<div class="chart-wrap tall"><canvas id="chart-op-dist"></canvas></div>
+</div>
+<div class="card" style="grid-column: 1 / -1;">
+<h3>노선별 노인 trip TOP 20</h3>
+<div class="chart-wrap tall"><canvas id="chart-rte-top"></canvas></div>
+</div>
+<div class="card" style="grid-column: 1 / -1;">
+<h3>TOP 30 노선 표</h3>
+<table id="tbl-rte">
+<thead><tr><th>노선번호</th><th>노선명</th><th class="num">노인 trip</th><th class="num">고유 노인</th><th class="num">평균거리(m)</th><th class="num">평균승차분</th><th>운영주체</th></tr></thead>
+<tbody></tbody></table>
+</div>
+</div>
+</div>
+
+<script>
+const DATA = {"od_top": [{"ride_nm": "강남구", "goff_nm": "강남구", "goff_ctpv": "11", "trip_cnt": 142383}, {"ride_nm": "강북구", "goff_nm": "강북구", "goff_ctpv": "11", "trip_cnt": 91174}, {"ride_nm": "동대문구", "goff_nm": "동대문구", "goff_ctpv": "11", "trip_cnt": 86796}, {"ride_nm": "송파구", "goff_nm": "남양주시", "goff_ctpv": "41", "trip_cnt": 69351}, {"ride_nm": "성북구", "goff_nm": "성북구", "goff_ctpv": "11", "trip_cnt": 69272}, {"ride_nm": "종로구", "goff_nm": "종로구", "goff_ctpv": "11", "trip_cnt": 68499}, {"ride_nm": "관악구", "goff_nm": "관악구", "goff_ctpv": "11", "trip_cnt": 68334}, {"ride_nm": "중구", "goff_nm": "중구", "goff_ctpv": "11", "trip_cnt": 65971}, {"ride_nm": "송파구", "goff_nm": "송파구", "goff_ctpv": "11", "trip_cnt": 64122}, {"ride_nm": "송파구", "goff_nm": "포천시", "goff_ctpv": "41", "trip_cnt": 46980}, {"ride_nm": "은평구", "goff_nm": "은평구", "goff_ctpv": "11", "trip_cnt": 46123}, {"ride_nm": "서초구", "goff_nm": "서초구", "goff_ctpv": "11", "trip_cnt": 45523}, {"ride_nm": "중랑구", "goff_nm": "중랑구", "goff_ctpv": "11", "trip_cnt": 44311}, {"ride_nm": "구로구", "goff_nm": "구로구", "goff_ctpv": "11", "trip_cnt": 41410}, {"ride_nm": "서대문구", "goff_nm": "서대문구", "goff_ctpv": "11", "trip_cnt": 40509}, {"ride_nm": "중구", "goff_nm": "종로구", "goff_ctpv": "11", "trip_cnt": 40495}, {"ride_nm": "영등포구", "goff_nm": "영등포구", "goff_ctpv": "11", "trip_cnt": 40242}, {"ride_nm": "동작구", "goff_nm": "동작구", "goff_ctpv": "11", "trip_cnt": 38630}, {"ride_nm": "양천구", "goff_nm": "양천구", "goff_ctpv": "11", "trip_cnt": 38538}, {"ride_nm": "강서구", "goff_nm": "강서구", "goff_ctpv": "11", "trip_cnt": 36999}], "summary": [{"ride_nm": "송파구", "전체trip": 274367, "자기구내": 64122, "서울외": 194112, "자족비율": 23.4, "서울외비율": 70.7}, {"ride_nm": "동대문구", "전체trip": 226301, "자기구내": 86796, "서울외": 15321, "자족비율": 38.4, "서울외비율": 6.8}, {"ride_nm": "종로구", "전체trip": 211303, "자기구내": 68499, "서울외": 7631, "자족비율": 32.4, "서울외비율": 3.6}, {"ride_nm": "강남구", "전체trip": 209384, "자기구내": 142383, "서울외": 10257, "자족비율": 68.0, "서울외비율": 4.9}, {"ride_nm": "중구", "전체trip": 189061, "자기구내": 65971, "서울외": 25634, "자족비율": 34.9, "서울외비율": 13.6}, {"ride_nm": "강북구", "전체trip": 163419, "자기구내": 91174, "서울외": 3168, "자족비율": 55.8, "서울외비율": 1.9}, {"ride_nm": "성북구", "전체trip": 146191, "자기구내": 69272, "서울외": 3628, "자족비율": 47.4, "서울외비율": 2.5}, {"ride_nm": "관악구", "전체trip": 133487, "자기구내": 68334, "서울외": 14633, "자족비율": 51.2, "서울외비율": 11.0}, {"ride_nm": "서초구", "전체trip": 125427, "자기구내": 45523, "서울외": 37643, "자족비율": 36.3, "서울외비율": 30.0}, {"ride_nm": "서대문구", "전체trip": 105276, "자기구내": 40509, "서울외": 4853, "자족비율": 38.5, "서울외비율": 4.6}, {"ride_nm": "동작구", "전체trip": 96506, "자기구내": 38630, "서울외": 18057, "자족비율": 40.0, "서울외비율": 18.7}, {"ride_nm": "중랑구", "전체trip": 93883, "자기구내": 44311, "서울외": 16450, "자족비율": 47.2, "서울외비율": 17.5}, {"ride_nm": "영등포구", "전체trip": 91863, "자기구내": 40242, "서울외": 12203, "자족비율": 43.8, "서울외비율": 13.3}, {"ride_nm": "구로구", "전체trip": 81737, "자기구내": 41410, "서울외": 11874, "자족비율": 50.7, "서울외비율": 14.5}, {"ride_nm": "마포구", "전체trip": 76295, "자기구내": 25048, "서울외": 5241, "자족비율": 32.8, "서울외비율": 6.9}, {"ride_nm": "은평구", "전체trip": 75360, "자기구내": 46123, "서울외": 10995, "자족비율": 61.2, "서울외비율": 14.6}, {"ride_nm": "용산구", "전체trip": 71772, "자기구내": 15423, "서울외": 5893, "자족비율": 21.5, "서울외비율": 8.2}, {"ride_nm": "강서구", "전체trip": 69117, "자기구내": 36999, "서울외": 8101, "자족비율": 53.5, "서울외비율": 11.7}, {"ride_nm": "금천구", "전체trip": 65241, "자기구내": 19616, "서울외": 10869, "자족비율": 30.1, "서울외비율": 16.7}, {"ride_nm": "양천구", "전체trip": 60401, "자기구내": 38538, "서울외": 2516, "자족비율": 63.8, "서울외비율": 4.2}, {"ride_nm": "도봉구", "전체trip": 50290, "자기구내": 24886, "서울외": 6904, "자족비율": 49.5, "서울외비율": 13.7}, {"ride_nm": "노원구", "전체trip": 43855, "자기구내": 22658, "서울외": 9972, "자족비율": 51.7, "서울외비율": 22.7}, {"ride_nm": "강동구", "전체trip": 31983, "자기구내": 18291, "서울외": 7833, "자족비율": 57.2, "서울외비율": 24.5}, {"ride_nm": "광진구", "전체trip": 26308, "자기구내": 9123, "서울외": 9158, "자족비율": 34.7, "서울외비율": 34.8}, {"ride_nm": "성동구", "전체trip": 25844, "자기구내": 8693, "서울외": 376, "자족비율": 33.6, "서울외비율": 1.5}], "by_hour": [{"hour": "00", "trip_cnt": 314, "고유노인": 298, "평균거리_m": 6111.0, "평균승차분": 12.3, "평균환승횟수": 0.06}, {"hour": "01", "trip_cnt": 38, "고유노인": 36, "평균거리_m": 7189.0, "평균승차분": 13.2, "평균환승횟수": 0.0}, {"hour": "02", "trip_cnt": 34, "고유노인": 31, "평균거리_m": 6118.0, "평균승차분": 19.8, "평균환승횟수": 0.12}, {"hour": "03", "trip_cnt": 78, "고유노인": 75, "평균거리_m": 6540.0, "평균승차분": 18.6, "평균환승횟수": 0.1}, {"hour": "04", "trip_cnt": 586, "고유노인": 535, "평균거리_m": 8252.0, "평균승차분": 23.6, "평균환승횟수": 0.11}, {"hour": "05", "trip_cnt": 8321, "고유노인": 8091, "평균거리_m": 9890.0, "평균승차분": 27.0, "평균환승횟수": 0.03}, {"hour": "06", "trip_cnt": 10421, "고유노인": 10111, "평균거리_m": 9311.0, "평균승차분": 24.3, "평균환승횟수": 0.03}, {"hour": "07", "trip_cnt": 11320, "고유노인": 10953, "평균거리_m": 9238.0, "평균승차분": 23.7, "평균환승횟수": 0.02}, {"hour": "08", "trip_cnt": 19528, "고유노인": 18782, "평균거리_m": 8599.0, "평균승차분": 22.5, "평균환승횟수": 0.02}, {"hour": "09", "trip_cnt": 28156, "고유노인": 26896, "평균거리_m": 7924.0, "평균승차분": 21.6, "평균환승횟수": 0.02}, {"hour": "10", "trip_cnt": 34311, "고유노인": 32615, "평균거리_m": 7061.0, "평균승차분": 20.3, "평균환승횟수": 0.02}, {"hour": "11", "trip_cnt": 33164, "고유노인": 31602, "평균거리_m": 7204.0, "평균승차분": 20.4, "평균환승횟수": 0.02}, {"hour": "12", "trip_cnt": 40096, "고유노인": 37848, "평균거리_m": 7172.0, "평균승차분": 20.3, "평균환승횟수": 0.02}, {"hour": "13", "trip_cnt": 42403, "고유노인": 39988, "평균거리_m": 7332.0, "평균승차분": 20.4, "평균환승횟수": 0.02}, {"hour": "14", "trip_cnt": 42257, "고유노인": 39770, "평균거리_m": 7420.0, "평균승차분": 20.4, "평균환승횟수": 0.02}, {"hour": "15", "trip_cnt": 42927, "고유노인": 40490, "평균거리_m": 7648.0, "평균승차분": 20.8, "평균환승횟수": 0.02}, {"hour": "16", "trip_cnt": 41526, "고유노인": 39143, "평균거리_m": 7589.0, "평균승차분": 20.4, "평균환승횟수": 0.02}, {"hour": "17", "trip_cnt": 37669, "고유노인": 35505, "평균거리_m": 7371.0, "평균승차분": 20.1, "평균환승횟수": 0.02}, {"hour": "18", "trip_cnt": 31379, "고유노인": 29594, "평균거리_m": 7333.0, "평균승차분": 20.1, "평균환승횟수": 0.02}, {"hour": "19", "trip_cnt": 25896, "고유노인": 24589, "평균거리_m": 7682.0, "평균승차분": 20.5, "평균환승횟수": 0.02}, {"hour": "20", "trip_cnt": 21612, "고유노인": 20566, "평균거리_m": 8002.0, "평균승차분": 20.8, "평균환승횟수": 0.02}, {"hour": "21", "trip_cnt": 17332, "고유노인": 16559, "평균거리_m": 7915.0, "평균승차분": 20.8, "평균환승횟수": 0.02}, {"hour": "22", "trip_cnt": 11075, "고유노인": 10529, "평균거리_m": 7479.0, "평균승차분": 20.0, "평균환승횟수": 0.02}, {"hour": "23", "trip_cnt": 5311, "고유노인": 5122, "평균거리_m": 6329.0, "평균승차분": 17.8, "평균환승횟수": 0.02}], "transfer_pivot": {"hours": ["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"], "BB": [850.0, 1181.0, 1304.0, 1084.0, 684.0, 645.0, 540.0, 449.0, 489.0, 571.0, 642.0, 661.0, 649.0, 650.0, 670.0, 675.0, 671.0, 650.0, 619.0, 589.0, 672.0, 809.0, 757.0, 755.0], "BT": [519.0, 1154.0, null, null, 922.0, 393.0, 269.0, 284.0, 317.0, 361.0, 406.0, 432.0, 438.0, 450.0, 472.0, 481.0, 473.0, 448.0, 427.0, 409.0, 583.0, 607.0, 547.0, 482.0], "TB": [904.0, 1463.0, 3679.0, null, 918.0, 449.0, 491.0, 464.0, 503.0, 567.0, 639.0, 683.0, 688.0, 697.0, 727.0, 742.0, 749.0, 745.0, 738.0, 732.0, 685.0, 970.0, 907.0, 854.0], "TT": [203.0, 93.0, 37.0, null, 162.0, 219.0, 347.0, 333.0, 378.0, 368.0, 365.0, 350.0, 343.0, 335.0, 330.0, 331.0, 324.0, 320.0, 311.0, 304.0, 287.0, 281.0, 267.0, 238.0]}, "first_ride_dist": {"00": 171, "01": 19, "02": 17, "03": 40, "04": 535, "05": 8041, "06": 9896, "07": 10576, "08": 17856, "09": 24816, "10": 28737, "11": 26052, "12": 30745, "13": 30326, "14": 28016, "15": 27017, "16": 24317, "17": 20710, "18": 16283, "19": 12977, "20": 10565, "21": 8153, "22": 4803, "23": 2308}, "trip_cnt_dist": {"1": 234896, "2": 72621, "3": 23220, "4": 7910, "5": 2695, "6": 1022, "7": 379, "8": 134, "9": 57, "10": 21}, "by_kind": [{"분류": "도시철도", "trip_cnt": 430535, "고유노인": 299722, "평균거리_m": 8251.0, "평균승차분": 22.2}, {"분류": "버스(시내)", "trip_cnt": 53365, "고유노인": 39851, "평균거리_m": 2373.0, "평균승차분": 10.5}, {"분류": "도시철도/경전철", "trip_cnt": 18181, "고유노인": 13915, "평균거리_m": 6444.0, "평균승차분": 17.4}, {"분류": "광역/마을버스", "trip_cnt": 3640, "고유노인": 3279, "평균거리_m": 15332.0, "평균승차분": 24.7}, {"분류": "기타", "trip_cnt": 33, "고유노인": 30, "평균거리_m": 27077.0, "평균승차분": 31.0}], "op_dist": [{"code": "201", "운영주체": "서울교통공사(1-4)", "trip_cnt": 208645, "노선수": 5, "고유노인": 152831}, {"code": "203", "운영주체": "서울교통공사(5-8)", "trip_cnt": 146569, "노선수": 4, "고유노인": 110437}, {"code": "202", "운영주체": "한국철도공사", "trip_cnt": 52025, "노선수": 8, "고유노인": 42251}, {"code": "105", "운영주체": "마을버스(105)", "trip_cnt": 19306, "노선수": 241, "고유노인": 15218}, {"code": "205", "운영주체": "9호선", "trip_cnt": 17943, "노선수": 1, "고유노인": 14339}, {"code": "115", "운영주체": "간선버스", "trip_cnt": 16517, "노선수": 129, "고유노인": 13696}, {"code": "120", "운영주체": "지선버스(120)", "trip_cnt": 16320, "노선수": 205, "고유노인": 13473}, {"code": "235", "운영주체": "우이신설경전철", "trip_cnt": 9870, "노선수": 1, "고유노인": 7241}, {"code": "237", "운영주체": "남서울경전철", "trip_cnt": 5826, "노선수": 1, "고유노인": 4652}, {"code": "208", "운영주체": "신분당선", "trip_cnt": 3197, "노선수": 1, "고유노인": 2748}, {"code": "206", "운영주체": "공항철도", "trip_cnt": 2156, "노선수": 1, "고유노인": 1789}, {"code": "500", "운영주체": "경기일반버스(500)-초승거리비례제", "trip_cnt": 1381, "노선수": 96, "고유노인": 1277}, {"code": "210", "운영주체": "새서울철도", "trip_cnt": 1294, "노선수": 1, "고유노인": 1122}, {"code": "533", "운영주체": "경기좌석(533)", "trip_cnt": 1124, "노선수": 144, "고유노인": 1016}, {"code": "290", "운영주체": "수도권광역급행철도에이", "trip_cnt": 1117, "노선수": 1, "고유노인": 841}], "rte_top": [{"rte_id": "002", "노선번호": NaN, "노선명": NaN, "지하철노선명": "2호선", "노인trip": 76763, "고유노인": 57534, "평균거리_m": 8502.0, "평균승차분": 22.3, "운영주체코드": "201", "표시명": "2호선"}, {"rte_id": "11110018", "노선번호": "147", "노선명": "147번(월계동도곡동)", "지하철노선명": NaN, "노인trip": 59685, "고유노인": 462, "평균거리_m": 2597.0, "평균승차분": 11.5, "운영주체코드": "115", "표시명": "147번(월계동도곡동)"}, {"rte_id": "11110014", "노선번호": "143", "노선명": "143번(정릉개포동)", "지하철노선명": NaN, "노인trip": 56658, "고유노인": 443, "평균거리_m": 2649.0, "평균승차분": 10.6, "운영주체코드": "115", "표시명": "143번(정릉개포동)"}, {"rte_id": "205", "노선번호": NaN, "노선명": NaN, "지하철노선명": "5호선", "노인trip": 56334, "고유노인": 42832, "평균거리_m": 7348.0, "평균승차분": 21.2, "운영주체코드": "203", "표시명": "5호선"}, {"rte_id": "207", "노선번호": NaN, "노선명": NaN, "지하철노선명": "7호선", "노인trip": 46502, "고유노인": 36255, "평균거리_m": 7291.0, "평균승차분": 20.8, "운영주체코드": "203", "표시명": "7호선"}, {"rte_id": "003", "노선번호": NaN, "노선명": NaN, "지하철노선명": "3호선", "노인trip": 46210, "고유노인": 36071, "평균거리_m": 8286.0, "평균승차분": 22.0, "운영주체코드": "201", "표시명": "3호선"}, {"rte_id": "004", "노선번호": NaN, "노선명": NaN, "지하철노선명": "4호선", "노인trip": 46158, "고유노인": 35016, "평균거리_m": 8005.0, "평균승차분": 21.3, "운영주체코드": "201", "표시명": "4호선"}, {"rte_id": "11110336", "노선번호": "421", "노선명": "421번(염곡동옥수동)", "지하철노선명": NaN, "노인trip": 42636, "고유노인": 319, "평균거리_m": 2087.0, "평균승차분": 10.0, "운영주체코드": "115", "표시명": "421번(염곡동옥수동)"}, {"rte_id": "11110953", "노선번호": "202", "노선명": "202번(불암동후암동)", "지하철노선명": NaN, "노인trip": 40479, "고유노인": 281, "평균거리_m": 3707.0, "평균승차분": 14.3, "운영주체코드": "115", "표시명": "202번(불암동후암동)"}, {"rte_id": "11110354", "노선번호": "7212", "노선명": "7212번(은평차고지극동그린아파트앞)", "지하철노선명": NaN, "노인trip": 40183, "고유노인": 254, "평균거리_m": 2083.0, "평균승차분": 9.5, "운영주체코드": "120", "표시명": "7212번(은평차고지극동그린아파트앞)"}, {"rte_id": "11110013", "노선번호": "142", "노선명": "142번(도봉동고속터미널)", "지하철노선명": NaN, "노인trip": 36994, "고유노인": 322, "평균거리_m": 2853.0, "평균승차분": 11.1, "운영주체코드": "115", "표시명": "142번(도봉동고속터미널)"}, {"rte_id": "11110032", "노선번호": "262", "노선명": "262번(중랑공영차고지여의도)", "지하철노선명": NaN, "노인trip": 35742, "고유노인": 223, "평균거리_m": 2581.0, "평균승차분": 11.5, "운영주체코드": "115", "표시명": "262번(중랑공영차고지여의도)"}, {"rte_id": "11110035", "노선번호": "272", "노선명": "272번(면목동남가좌동)", "지하철노선명": NaN, "노인trip": 34752, "고유노인": 323, "평균거리_m": 3514.0, "평균승차분": 14.1, "운영주체코드": "115", "표시명": "272번(면목동남가좌동)"}, {"rte_id": "11110046", "노선번호": "402", "노선명": "402번(장지공영차고지시청)", "지하철노선명": NaN, "노인trip": 34540, "고유노인": 267, "평균거리_m": 2672.0, "평균승차분": 10.1, "운영주체코드": "115", "표시명": "402번(장지공영차고지시청)"}, {"rte_id": "11110010", "노선번호": "130", "노선명": "130번(우이동길동)", "지하철노선명": NaN, "노인trip": 34539, "고유노인": 366, "평균거리_m": 4000.0, "평균승차분": 14.5, "운영주체코드": "115", "표시명": "130번(우이동길동)"}, {"rte_id": "11111002", "노선번호": "4318", "노선명": "4318번(남태령역천호역)", "지하철노선명": NaN, "노인trip": 33660, "고유노인": 271, "평균거리_m": 2446.0, "평균승차분": 9.8, "운영주체코드": "120", "표시명": "4318번(남태령역천호역)"}, {"rte_id": "11110049", "노선번호": "420", "노선명": "420번(개포동답십리역)", "지하철노선명": NaN, "노인trip": 33210, "고유노인": 331, "평균거리_m": 2781.0, "평균승차분": 11.3, "운영주체코드": "115", "표시명": "420번(개포동답십리역)"}, {"rte_id": "001", "노선번호": NaN, "노선명": NaN, "지하철노선명": "1호선", "노인trip": 32863, "고유노인": 26436, "평균거리_m": 10059.0, "평균승차분": 24.4, "운영주체코드": "201", "표시명": "1호선"}, {"rte_id": "11110249", "노선번호": "5524", "노선명": "5524번(난곡차고지중앙대학)", "지하철노선명": NaN, "노인trip": 32336, "고유노인": 293, "평균거리_m": 2022.0, "평균승차분": 9.7, "운영주체코드": "120", "표시명": "5524번(난곡차고지중앙대학)"}, {"rte_id": "11110068", "노선번호": "720", "노선명": "720번(기자촌답십리)", "지하철노선명": NaN, "노인trip": 31746, "고유노인": 259, "평균거리_m": 3372.0, "평균승차분": 14.8, "운영주체코드": "115", "표시명": "720번(기자촌답십리)"}]};
+
+// 탭 전환
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('sec-' + t.dataset.tab).classList.add('active');
+  });
+});
+
+// 색상 팔레트
+const PALETTE = ['#667eea','#764ba2','#f093fb','#f5576c','#4facfe','#43e97b','#38f9d7','#fa709a','#fee140','#feca57'];
+
+// === OD 섹션 ===
+const odTopLabels = DATA.od_top.map(d => `${d.ride_nm}→${d.goff_nm}`);
+const odTopValues = DATA.od_top.map(d => d.trip_cnt);
+new Chart(document.getElementById('chart-od-top'), {
+  type: 'bar',
+  data: { labels: odTopLabels, datasets: [{ label: 'Trip 수', data: odTopValues, backgroundColor: '#667eea' }] },
+  options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { y: { ticks: { font: { size: 11 } } } } }
+});
+
+const summarySorted = [...DATA.summary].sort((a,b) => b.전체trip - a.전체trip);
+new Chart(document.getElementById('chart-self'), {
+  type: 'bar',
+  data: {
+    labels: summarySorted.map(d => d.ride_nm),
+    datasets: [
+      { label: '자족 %', data: summarySorted.map(d => d.자족비율), backgroundColor: '#43e97b' },
+      { label: '서울외 %', data: summarySorted.map(d => d.서울외비율), backgroundColor: '#f5576c' }
+    ]
+  },
+  options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+});
+
+const tblSummary = document.querySelector('#tbl-summary tbody');
+summarySorted.forEach(d => {
+  tblSummary.insertAdjacentHTML('beforeend',
+    `<tr><td>${d.ride_nm}</td>` +
+    `<td class="num">${d.전체trip.toLocaleString()}</td>` +
+    `<td class="num">${d.자기구내.toLocaleString()}</td>` +
+    `<td class="num">${d.서울외.toLocaleString()}</td>` +
+    `<td class="num"><span class="badge">${d.자족비율}%</span></td>` +
+    `<td class="num">${d.서울외비율}%</td></tr>`);
+});
+
+document.getElementById('kpi-od-total').textContent = DATA.summary.length + ' (구) / 페어 ' + DATA.od_top.length + '+';
+document.getElementById('kpi-od-trip').textContent = summarySorted.reduce((s,d) => s + d.전체trip, 0).toLocaleString();
+const avgSelf = (summarySorted.reduce((s,d) => s + d.자족비율, 0) / summarySorted.length).toFixed(1);
+document.getElementById('kpi-od-self').textContent = avgSelf + '%';
+
+// === 시간대 섹션 ===
+const hours = DATA.by_hour.map(d => d.hour + '시');
+function hourChart(canvasId, key, color, label) {
+  new Chart(document.getElementById(canvasId), {
+    type: 'line',
+    data: { labels: hours, datasets: [{ label: label, data: DATA.by_hour.map(d => d[key]),
+      borderColor: color, backgroundColor: color + '33', fill: true, tension: .35 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } } }
+  });
+}
+hourChart('chart-hour-trip', 'trip_cnt', '#667eea', 'Trip 수');
+hourChart('chart-hour-dist', '평균거리_m', '#f5576c', '평균 거리(m)');
+hourChart('chart-hour-bridge', '평균승차분', '#43e97b', '평균 승차(분)');
+hourChart('chart-hour-trnf', '평균환승횟수', '#feca57', '평균 환승 횟수');
+
+// 환승 pivot
+const pv = DATA.transfer_pivot;
+new Chart(document.getElementById('chart-transfer-pivot'), {
+  type: 'line',
+  data: { labels: pv.hours.map(h => h + '시'), datasets: [
+    { label: 'BB (버스→버스)',  data: pv.BB, borderColor: '#667eea', backgroundColor: 'transparent', tension: .3 },
+    { label: 'BT (버스→지하철)', data: pv.BT, borderColor: '#f5576c', backgroundColor: 'transparent', tension: .3 },
+    { label: 'TB (지하철→버스)', data: pv.TB, borderColor: '#43e97b', backgroundColor: 'transparent', tension: .3 },
+    { label: 'TT (지하철→지하철)',data: pv.TT, borderColor: '#feca57', backgroundColor: 'transparent', tension: .3 }
+  ] },
+  options: { responsive: true, maintainAspectRatio: false,
+    scales: { y: { title: { display: true, text: '환승시간(초)' } } } }
+});
+
+// 첫 승차 / 일일 trip
+const fr = DATA.first_ride_dist;
+new Chart(document.getElementById('chart-first-ride'), {
+  type: 'bar',
+  data: { labels: Object.keys(fr).map(h => h+'시'),
+    datasets: [{ label: '인원', data: Object.values(fr), backgroundColor: '#764ba2' }] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+});
+
+const tc = DATA.trip_cnt_dist;
+new Chart(document.getElementById('chart-trip-cnt'), {
+  type: 'bar',
+  data: { labels: Object.keys(tc).map(n => n+'회'),
+    datasets: [{ label: '카드 수', data: Object.values(tc), backgroundColor: '#4facfe' }] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+});
+
+// === 노선 섹션 ===
+new Chart(document.getElementById('chart-by-kind'), {
+  type: 'doughnut',
+  data: { labels: DATA.by_kind.map(d => d.분류),
+    datasets: [{ data: DATA.by_kind.map(d => d.trip_cnt),
+      backgroundColor: PALETTE.slice(0, DATA.by_kind.length) }] },
+  options: { responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom' } } }
+});
+
+new Chart(document.getElementById('chart-op-dist'), {
+  type: 'bar',
+  data: { labels: DATA.op_dist.map(d => d.운영주체 || ('코드 ' + d.code)),
+    datasets: [{ label: 'Trip 수', data: DATA.op_dist.map(d => d.trip_cnt), backgroundColor: '#764ba2' }] },
+  options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } } }
+});
+
+new Chart(document.getElementById('chart-rte-top'), {
+  type: 'bar',
+  data: { labels: DATA.rte_top.map(d => (d.노선번호 || d.표시명 || d.rte_id) + ' / ' + (d.표시명 || '')),
+    datasets: [{ label: 'Trip 수', data: DATA.rte_top.map(d => d.노인trip), backgroundColor: '#43e97b' }] },
+  options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { y: { ticks: { font: { size: 10 } } } } }
+});
+
+const tblRte = document.querySelector('#tbl-rte tbody');
+DATA.rte_top.forEach(d => {
+  tblRte.insertAdjacentHTML('beforeend',
+    `<tr><td>${d.노선번호 || '-'}</td>` +
+    `<td>${d.표시명 || d.rte_id}</td>` +
+    `<td class="num">${d.노인trip.toLocaleString()}</td>` +
+    `<td class="num">${d.고유노인.toLocaleString()}</td>` +
+    `<td class="num">${Number(d.평균거리_m).toLocaleString()}</td>` +
+    `<td class="num">${d.평균승차분}</td>` +
+    `<td><span class="badge">${d.운영주체코드}</span></td></tr>`);
+});
+</script>
+</body>
+</html>

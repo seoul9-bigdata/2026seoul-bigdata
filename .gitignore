@@ -210,3 +210,12 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,gitBokji/cache/
 Bokji/output_v2/seoul_walk.graphml
+
+# === YOO branch 추가 ===
+.DS_Store
+.claude/
+.idea/
+uv.lock
+
+# 원본 DB는 너무 커서 .gz로만 push (gunzip으로 풀어 사용)
+YOO/data/seoul.duckdb
