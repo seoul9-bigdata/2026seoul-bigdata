@@ -219,3 +219,4 @@ uv.lock
 
 # 원본 DB는 너무 커서 .gz로만 push (gunzip으로 풀어 사용)
 YOO/data/seoul.duckdb
+prompt.md
