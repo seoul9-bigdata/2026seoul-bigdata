@@ -17,7 +17,8 @@
 | 공공데이터포털 | `monthly_transfer_accessibility` | 정류소별 환승 시간·인원 (2025-10) |
 | TAAS | 서울시 노인 보행 사고 (2024) | 도로공단 GIS 시스템 크롤링 (좌표 EPSG:5179→4326 변환) |
 | 카카오맵 | 정류소·지하철역 좌표 매칭 | 정류소명 · 시도 prefix 기반 검색 |
-| 서울 열린데이터광장 | 동작구 횡단보도 (파일럿 단계) | 신호 유무·녹색신호 시간·연장 |
+| 서울 열린데이터광장 | 동작구 횡단보도 (파일럿) | 신호 유무·녹색신호 시간·연장 |
+| 공공데이터포털 | 서울 25구 횡단보도 (`서울특별시_자치구_횡단보도_20260320.csv`, 40,281건) | 좌표·신호유무·음향신호기·고원식·작동식 (시간·연장 데이터 없음) |
 
 ## 디렉토리 구조
 
@@ -28,6 +29,7 @@ prototype-seoul/
 │   ├── raw/                          # TAAS 원본 JSON
 │   └── processed/                    # TAAS CSV (lat/lon 변환 후)
 ├── 서울특별시_동작구_횡단보도_*.csv  # 동작구 파일럿 횡단보도
+├── 서울특별시_자치구_횡단보도_*.csv  # 서울 25구 전체 횡단보도 (40,281건, 신호·음향·고원식)
 │
 ├── 데이터 수집 노트북 (DuckDB 적재)
 │   ├── data_ingestion.ipynb          # 마스터/레퍼런스 (biz, trfc_mns, card_type, user_type)
@@ -44,13 +46,15 @@ prototype-seoul/
 ├── 분석·시각화 노트북
 │   ├── prototype.ipynb               # 동작구 파일럿 (사고 + 횡단보도)
 │   ├── seoul_elderly_viz.ipynb       # 서울 25구 결합 분석 (사고+이용+환승)
-│   └── analysis_extra.ipynb          # OD·시간대·노선 분석 + Chart.js 대시보드
+│   ├── analysis_extra.ipynb          # OD·시간대·노선 분석 + Chart.js 대시보드
+│   └── crosswalk_safety.ipynb        # 서울 25구 신호 없는 횡단보도 × 노인 사고
 │
 ├── 산출물 (HTML)
 │   ├── kakao_map.html                # 동작구 파일럿 지도
 │   ├── seoul_elderly_map.html        # 서울 25구 종합 위험 지도
 │   ├── seoul_elderly_od_flow.html    # 노인 OD 흐름선 (곡선·색상·필터)
-│   └── seoul_elderly_dashboard.html  # Chart.js 인터랙티브 대시보드 (3탭)
+│   ├── seoul_elderly_dashboard.html  # Chart.js 인터랙티브 대시보드 (3탭)
+│   └── crosswalk_safety_map.html     # 신호 없는 횡단보도 + 노인 사고 지도
 │
 └── 산출물 (PNG)
     ├── elderly_time_pattern.png
@@ -128,6 +132,7 @@ python3 -m http.server 8000
 9. `kakao_geocode.ipynb` — 좌표 매칭 (수도권 ~36K, ~1.5시간)
 10. `prototype.ipynb` — TAAS 사고 크롤링 (서울 전체 2024년)
 11. (분석) `seoul_elderly_viz.ipynb` / `analysis_extra.ipynb` 차례로 실행
+12. (분석) `crosswalk_safety.ipynb` — 서울 25구 횡단보도 CSV + TAAS 사고 결합 (DuckDB 불필요, CSV 2개만 있으면 실행)
 
 ## 주요 분석 결과 (2026-02-22 일요일 기준)
 
@@ -149,13 +154,18 @@ python3 -m http.server 8000
 ### 정류소 종합 위험도 (Z-score 합산)
 - 노인 이용 ↑ × 환승 시간 ↑ × 주변 사고 ↑ — 정책 우선 개선 후보 정류소 식별
 
+### 신호 없는 횡단보도 × 노인 사고 (`crosswalk_safety.ipynb`)
+- 서울 25구 횡단보도 40,281건 중 **보행등 없음** 비율을 자치구별로 집계
+- TAAS 노인 사고 1,963건과 BallTree 공간 결합 — 사고 50m / 100m 반경 내 신호 없는 횡단보도 존재 비율
+- 인프라 결핍도(신호 + 음향신호기 + 고원식 z-score 합) vs 사고 산점도 — 정책 우선 자치구 식별
+
 ## 한계 및 향후 작업
 
 - ⚠️ 카드 trip 데이터: **2026-02-22 일요일 단일 일자** — 평일 추가 수집 시 주말/평일 비교 가능
 - ⚠️ 공공데이터 API: 서울만 합성데이터 제공, 인천·대전·대구 등 미제공
 - ⚠️ 동명이정류소(예: "관악구보훈회관"이 DB는 금천구·실제는 관악구) — `find_stop_coords_loose`로 일부 보정
 - ⚠️ TAAS 사고와 카드 trip 시간 단위 불일치 (1년 vs 1일) → 정량 인과 추론보다 **상관 패턴**으로 해석
-- 🔜 횡단보도 데이터 서울 25구 전체 수집 (현재 동작구만)
+- ⚠️ 25구 횡단보도 데이터: 신호 *유무*만 있고 **녹색신호 시간/연장은 없음** (동작구 파일럿 CSV에만 존재)
 - 🔜 평일 카드 trip 1일 추가 수집 → 주말/평일 비교
 - 🔜 정류소 ARS 번호 + 차로 종류(중앙/일반) 매칭 — 서울 열린데이터광장 CSV 기반
 
@@ -164,3 +174,4 @@ python3 -m http.server 8000
 - **`seoul_elderly_dashboard.html`** — Chart.js 3탭 대시보드 (OD·시간대·노선)
 - **`seoul_elderly_map.html`** — 카카오맵 종합 위험 지도 (사고·이용·환승·결합)
 - **`seoul_elderly_od_flow.html`** — 노인 OD 흐름선 (곡선·색상 그라디언트·슬라이더 필터)
+- **`crosswalk_safety_map.html`** — 신호 없는 횡단보도 + 노인 사고 (자치구 필터)
