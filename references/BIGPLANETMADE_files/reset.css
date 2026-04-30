@@ -1,0 +1,289 @@
+@charset "utf-8";
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sanchez:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Abhaya+Libre:wght@400;500;600;700;800&display=swap');
+
+/*reset*/
+body,div,dl,dt,dd,ul,ol,li,h1,h2,h3,h4,h5,h6,pre,code,form,fieldset,legend,textarea,p,blockquote,th,td,input,select,textarea,button,span{margin:0;padding:0; box-sizing:border-box !important; word-wrap:break-word; word-break:keep-all;}
+html, body {outline:none;}
+body {overflow-x:hidden;}
+a:link {text-decoration:none;}
+a:visited {text-decoration:none;}
+a:hover {text-decoration:none; }
+a:active {text-decoration:none;}
+img{border:0px;}
+li{list-style: none; word-wrap:break-word; word-break:keep-all;}
+table{border-collapse:collapse;width:100%;}
+address,caption,cite,code,dfn,em,var,h1,h2,h3,h4,h5,h6 {font-style:normal;font-weight:normal;}
+caption,legend,caption *,legend *{position:absolute; left:-10000px; line-height:0; font-size:0;}
+fieldset{border:solid 0px black;padding:0;}
+button{border:none; background:none; cursor:pointer; outline:none;}
+div {box-sizing:border-box !important; word-wrap:break-word; word-break:keep-all;}
+dt, dd {word-wrap:break-word; word-break:keep-all;}
+section {box-sizing:border-box;}
+
+body,a,[type=text], [type=password], [type=file], [type=email], [type=number], [type=tel], [type=date], [type=month], select,h1, h2, h3, h4, h5, h6, pre,textarea, button{
+font-family: "Pretendard"; font-size:18px; color:#3E3A39; font-weight:400; outline:0; line-height:1.7; letter-spacing:0.3px; box-sizing:border-box !important;}
+
+/*float 해제*/
+.hid{display:none;}
+.br {display:block;}
+
+
+:root {
+
+	--max-w : 1700px;
+	--wid-w : 1920px;
+    --swid-w : 1440px;
+	--conts-w : 1280px;
+	--vh : 100vh;
+	--nvh : calc(var(--vh, 1vh) * 100);
+
+	--key-color : #655398;
+    --primary-color : #9980E1;
+    --black : #000;
+    --white : #fff;
+	--red : #CE3838;
+    --font-white : #fcfcfc;
+
+	--Poppins : 'Poppins', sans-serif;
+	--Roboto : 'Roboto', sans-serif;
+	--Montserrat : 'Montserrat', sans-serif;
+	--NanumSquare : 'NanumSquare', sans-serif;
+	--Archivo : 'Archivo', sans-serif;
+	--KoPubWorld : 'KoPubWorld';
+	--Sanchez : "Sanchez", serif;
+	--NotoKR : "Noto Sans KR", sans-serif;
+    --AbhayaLibre : "Abhaya Libre", serif;
+    --Pretendard : "Pretendard";
+
+	--font-14 : 14px;
+	--font-16 : 16px;
+	--font-18 : 18px;
+	--font-20 : 20px;
+	--font-22 : 22px;
+	--font-24 : 24px;
+	--font-26 : 26px;
+	--font-28 : 28px;
+	--font-30 : 30px;
+	--font-32 : 32px;
+	--font-36 : 36px;
+	--font-40 : 40px;
+	--font-50 : 50px;
+	--font-54 : 54px;
+	--font-60 : 60px;
+	--font-72 : 72px;
+
+	--gap-8 : 8px;
+	--gap-16 : 16px;
+	--gap-24 : 24px;
+	--gap-32 : 32px;
+	--gap-40 : 40px;
+	--gap-50 : 50px;
+	--gap-60 : 60px;
+	--gap-80 : 80px;
+	--gap-100 : 100px;
+	--gap-120 : 120px;
+	--gap-140 : 140px;
+	--gap-160 : 160px;
+	--gap-200 : 200px;
+
+	--radius-8 : 8px;
+	--radius-16 : 16px;
+	--radius-20 : 20px;
+	--radius-24 : 24px;
+	--radius-32 : 32px;
+
+    --headerH : 100px;
+    --footerH : var(--footer);
+
+    --tlt-28 : 28px;
+    --tlt-50 : 50px;
+    --conts-18 : 18px;
+    --conts-20 : 20px;
+    --conts-24 : 24px;
+
+    --gradient-line : linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.6) 50%, rgba(255, 255, 255, 0) 100%);
+    --gradient-line-2 : linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.2) 3%, rgba(255, 255, 255, 0.2) 97%, rgba(255, 255, 255, 0) 100%);
+	--gradient-line-3 : linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0) 100%);
+    --gradient-color-line : linear-gradient(90deg, rgba(153, 128, 225, 0) 0%, rgba(153, 128, 225, 1) 50%, rgba(153, 128, 225, 0) 100%);
+
+    --gradient-line-white-h : linear-gradient(90deg,rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.8) 13%, rgba(255, 255, 255, 0.8) 88%, rgba(255, 255, 255, 0) 100%);
+    --gradient-line-white-v : linear-gradient(0deg,rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.8) 13%, rgba(255, 255, 255, 0.8) 88%, rgba(255, 255, 255, 0) 100%);
+    
+    --color-line-h : linear-gradient(90deg,rgba(153, 128, 225, 1) 0%, rgba(153, 128, 225, 0) 100%);
+    --color-line-v : linear-gradient(180deg,rgba(153, 128, 225, 1) 0%, rgba(153, 128, 225, 0) 100%);
+
+    --white-line-h : linear-gradient(90deg,rgba(255, 255, 225, 1) 0%, rgba(255, 255, 225, 0) 100%);
+    --white-line-v : linear-gradient(180deg,rgba(255, 255, 225, 1) 0%, rgba(255, 255, 225, 0) 100%);
+
+    --gradient-bg-white : linear-gradient(0deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 1) 100%);
+
+}
+
+@media screen and (max-width: 1280px) {
+	:root {
+		--gap-100 : 80px;
+		--gap-120 : 80px;
+		--gap-140 : 100px;
+		--gap-160 : 140px;
+		--gap-200 : 160px;
+
+        --tlt-28 : 24px;
+        --tlt-50 : 46px;
+        --conts-18 : 16px;
+        --conts-20 : 18px;
+        --conts-24 : 22px;
+	}
+}
+
+@media screen and (max-width: 1024px) {
+	:root {
+		--font-18 : 16px;
+		--font-20 : 18px;
+		--font-22 : 20px;
+		--font-26 : 24px;
+		--font-28 : 26px;
+		--font-30 : 28px;
+		--font-32 : 28px;
+		--font-36 : 34px;
+		--font-40 : 36px;
+		--font-50 : 42px;
+		--font-54 : 48px;
+		--font-60 : 52px;
+		--font-72 : 62px;
+
+		--gap-32 : 28px;
+		--gap-40 : 36px;
+		--gap-50 : 42px;
+		--gap-60 : 54px;
+		--gap-80 : 70px;
+		--gap-140 : 80px;
+		--gap-160 : 120px;
+		--gap-200 : 140px;
+
+        --tlt-28 : 24px;
+        --tlt-50 : 42px;
+	}
+}
+
+@media screen and (max-width: 768px) {
+	:root {
+		--font-14 : 12px;
+		--font-16 : 14px;
+		--font-18 : 15px;
+		--font-20 : 18px;
+		--font-22 : 18px;
+		--font-24 : 20px;
+		--font-26 : 22px;
+		--font-28 : 22px;
+		--font-30 : 24px;
+		--font-32 : 24px;
+		--font-36 : 28px;
+		--font-40 : 32px;
+		--font-50 : 36px;
+		--font-54 : 40px;
+		--font-60 : 42px;
+		--font-72 : 50px;
+
+		--gap-16 : 14px;
+		--gap-24 : 22px;
+		--gap-32 : 26px;
+		--gap-40 : 32px;
+		--gap-50 : 36px;
+		--gap-60 : 48px;
+		--gap-80 : 60px;
+		--gap-100 : 60px;
+		--gap-120 : 60px;
+		--gap-140 : 60px;
+		--gap-160 : 100px;
+		--gap-200 : 120px;
+
+		--radius-16 : 12px;
+		--radius-20 : 15px;
+		--radius-24 : 18px;
+		--radius-32 : 26px;
+
+        --headerH : 80px;
+
+        --tlt-28 : 22px;
+        --tlt-50 : 38px;
+        --conts-18 : 14px;
+        --conts-20 : 16px;
+        --conts-24 : 20px;
+	}
+}
+
+@media screen and (max-width: 648px) {
+    :root {
+        --tlt-50 : 34px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+	:root {
+		--font-14 : 11px;
+		--font-16 : 13px;
+		--font-18 : 14px;
+		--font-20 : 16px;
+		--font-22 : 16px;
+		--font-24 : 17px;
+		--font-26 : 18px;
+		--font-28 : 18px;
+		--font-30 : 20px;
+		--font-32 : 20px;
+		--font-36 : 22px;
+		--font-40 : 24px;
+		--font-50 : 32px;
+		--font-54 : 32px;
+		--font-60 : 36px;
+		--font-72 : 42px;
+
+		--gap-8 : 5px;	
+		--gap-16 : 10px;
+		--gap-24 : 18px;
+		--gap-32 : 22px;
+		--gap-40 : 24px;
+		--gap-50 : 28px;
+		--gap-60 : 32px;
+		--gap-80 : 40px;
+		--gap-100 : 40px;
+		--gap-120 : 40px;
+		--gap-140 : 40px;
+		--gap-160 : 80px;
+		--gap-200 : 100px;
+
+		--radius-8 : 4px;
+		--radius-16 : 6px;
+		--radius-20 : 10px;
+		--radius-24 : 12px;
+		--radius-32 : 16px;
+
+        --headerH : 70px;
+
+        --tlt-28 : 18px;
+        --tlt-50 : 30px;
+        --conts-18 : 12px;
+        --conts-20 : 13px;
+        --conts-24 : 17px;
+	}
+}
+
+
+@media screen and (max-width: 1024px){}
+
+@media screen and (max-width: 768px){
+	body,a,[type=text], [type=password], [type=file], [type=email], [type=number], [type=tel],select,h1, h2, h3, h4, h5, h6, pre,textarea, button{font-size:16px;}
+}
+
+@media screen and (max-width: 480px){
+	body,a,[type=text], [type=password], [type=file], [type=email], [type=number], [type=tel],select,h1, h2, h3, h4, h5, h6, pre,textarea, button{font-size:14px;}
+}

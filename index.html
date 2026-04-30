@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>분(分)의 격차 — 서울 노인 도보 생활권 진단</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600&family=Noto+Sans+KR:wght@300;400;500;700;900&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #020510;
+  --accent: #4fc3f7;
+  --gold: #f5b740;
+  --mono: 'IBM Plex Mono', monospace;
+  --serif: 'Noto Serif KR', serif;
+  --sans: 'Noto Sans KR', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: auto; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: #edecea;
+  overflow-x: hidden;
+}
+
+/* ── SECTION 1: SPACE ── */
+#sec-space {
+  position: relative;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+#stars-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+}
+.space-planet {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+.planet-body {
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+}
+.planet-surface {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 35% 35%, #1e4a7c 0%, #0c2444 40%, #060f20 100%);
+}
+.planet-shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: rgba(0,0,0,0.97) 120px -90px 80px -10px inset;
+}
+.planet-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: rgba(79,195,247,0.35) -50px 40px 60px -40px inset;
+}
+.planet-lights {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 40% 55%, rgba(255,220,100,0.06) 0%, transparent 50%),
+    radial-gradient(circle at 65% 40%, rgba(255,220,100,0.04) 0%, transparent 40%),
+    radial-gradient(circle at 30% 70%, rgba(79,195,247,0.05) 0%, transparent 30%);
+}
+.planet-outer-glow {
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(79,195,247,0.08) 0%, transparent 65%);
+  pointer-events: none;
+}
+.planet-ring {
+  position: absolute;
+  width: 520px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1px solid rgba(79,195,247,0.12);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotateX(75deg);
+  pointer-events: none;
+}
+.planet-ring-2 {
+  position: absolute;
+  width: 620px;
+  height: 80px;
+  border-radius: 50%;
+  border: 1px solid rgba(79,195,247,0.06);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotateX(75deg);
+  pointer-events: none;
+}
+
+.space-content {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  padding: 0 24px;
+  max-width: 760px;
+}
+.space-kicker {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: rgba(79,195,247,0.7);
+  text-transform: uppercase;
+  margin-bottom: 1.4rem;
+  display: block;
+  opacity: 0;
+}
+.space-headline {
+  font-family: var(--serif);
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  font-weight: 300;
+  line-height: 1.35;
+  margin-bottom: 1.8rem;
+  opacity: 0;
+  transform: translateY(24px);
+}
+.space-headline em {
+  color: var(--gold);
+  font-style: normal;
+}
+.space-sub {
+  font-size: clamp(0.85rem, 1.4vw, 1rem);
+  color: rgba(255,255,255,0.5);
+  line-height: 1.9;
+  margin-bottom: 2.8rem;
+  opacity: 0;
+}
+.stat-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  opacity: 0;
+}
+.stat-pill {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.6);
+  border: 1px solid rgba(79,195,247,0.2);
+  padding: 0.6rem 1.2rem;
+  border-radius: 40px;
+  backdrop-filter: blur(8px);
+  background: rgba(79,195,247,0.04);
+}
+.stat-pill strong {
+  color: var(--accent);
+}
+.scroll-hint {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  z-index: 3;
+  opacity: 0;
+}
+.scroll-hint span {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  color: rgba(255,255,255,0.3);
+}
+.scroll-hint::after {
+  content: '';
+  width: 1px;
+  height: 48px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.3), transparent);
+  animation: line-drop 1.8s ease-in-out infinite;
+}
+@keyframes line-drop {
+  0% { opacity: 0; transform: scaleY(0); transform-origin: top; }
+  50% { opacity: 1; }
+  100% { opacity: 0; transform: scaleY(1); transform-origin: top; }
+}
+
+/* ── SECTION 2: STAR MAP ── */
+#sec-starmap {
+  background: linear-gradient(180deg, #020510 0%, #050d1a 60%, #020510 100%);
+  padding: 100px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.starmap-intro {
+  text-align: center;
+  max-width: 780px;
+  margin-bottom: 3rem;
+}
+.section-kicker {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.35em;
+  color: rgba(79,195,247,0.6);
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 1.2rem;
+}
+.starmap-intro h2 {
+  font-family: var(--serif);
+  font-size: clamp(1.6rem, 3.5vw, 2.6rem);
+  font-weight: 400;
+  line-height: 1.4;
+  margin-bottom: 1.2rem;
+}
+.starmap-intro h2 em {
+  color: var(--gold);
+  font-style: normal;
+}
+.starmap-intro p {
+  color: rgba(255,255,255,0.55);
+  font-size: 0.95rem;
+  line-height: 1.9;
+}
+.starmap-frame {
+  width: 100%;
+  max-width: 1300px;
+  height: 80vh;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(79,195,247,0.15);
+  box-shadow: 0 0 80px rgba(79,195,247,0.07), inset 0 0 0 1px rgba(255,255,255,0.04);
+  position: relative;
+}
+.starmap-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+.starmap-caption {
+  display: flex;
+  gap: 2.5rem;
+  margin-top: 1.8rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.cap-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.05em;
+}
+.cap-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── SECTION 3: DESCENT ── */
+#sec-descent {
+  min-height: 55vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 24px;
+  background: linear-gradient(180deg, #020510 0%, #061020 100%);
+  position: relative;
+  overflow: hidden;
+}
+#sec-descent::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 80% at 50% 50%, rgba(79,195,247,0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+.descent-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 700px;
+}
+.descent-inner .section-kicker {
+  color: rgba(245,183,64,0.7);
+}
+.descent-inner h2 {
+  font-family: var(--serif);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 300;
+  line-height: 1.45;
+  margin-bottom: 1.4rem;
+  background: linear-gradient(135deg, #edecea, var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.descent-inner p {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.95rem;
+  line-height: 2;
+}
+.time-table {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 2.2rem;
+  text-align: left;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 1.4rem 2rem;
+}
+.time-row {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.time-row .age {
+  color: rgba(255,255,255,0.5);
+  min-width: 90px;
+}
+.time-row .bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--gold);
+  transition: width 0.3s;
+}
+.time-row .val {
+  color: var(--gold);
+  font-weight: 500;
+}
+
+/* ── SECTION 4: CATEGORIES ── */
+#sec-categories {
+  position: relative;
+  height: 500vh;
+}
+#categories-sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Background layers */
+.cat-bg-layer {
+  position: absolute;
+  inset: 0;
+  transition: opacity 1.2s ease;
+  opacity: 0;
+}
+.cat-bg-layer.active { opacity: 1; }
+
+/* Climate */
+.bg-climate {
+  background: linear-gradient(135deg, #040918 0%, #0a1a38 50%, #040a1c 100%);
+}
+.bg-climate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 50% 40% at 20% 30%, rgba(30,80,180,0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 30% 50% at 80% 70%, rgba(100,150,255,0.08) 0%, transparent 60%);
+}
+/* Rain animation overlay for climate */
+.rain-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.18;
+}
+.rain-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+}
+
+/* Infrastructure */
+.bg-infra {
+  background: linear-gradient(135deg, #0e0800 0%, #1e1000 50%, #0a0500 100%);
+}
+.bg-infra::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 30% 60%, rgba(220,120,20,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 60% at 70% 30%, rgba(255,180,60,0.06) 0%, transparent 50%);
+}
+
+/* Medical */
+.bg-medical {
+  background: linear-gradient(135deg, #020e1a 0%, #041e30 50%, #020c18 100%);
+}
+.bg-medical::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 50% 50% at 50% 40%, rgba(0,180,160,0.1) 0%, transparent 60%),
+    radial-gradient(ellipse 30% 40% at 20% 80%, rgba(40,140,200,0.06) 0%, transparent 50%);
+}
+
+/* Welfare / Green */
+.bg-welfare {
+  background: linear-gradient(135deg, #020e05 0%, #041a08 50%, #021005 100%);
+}
+.bg-welfare::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 40% 50%, rgba(30,160,80,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 60% at 70% 30%, rgba(80,200,100,0.06) 0%, transparent 50%);
+}
+
+/* Particle canvas behind cards */
+#cat-particle-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Category cards */
+.cat-cards-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cat-card {
+  position: absolute;
+  width: min(580px, 90vw);
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  padding: 3rem 3rem 2.6rem;
+  opacity: 0;
+  transform: translateY(80px);
+  will-change: transform, opacity;
+  pointer-events: none;
+  cursor: default;
+}
+.cat-card.is-active {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.cat-card:hover .cat-btn {
+  background: rgba(255,255,255,0.12);
+  transform: translateX(4px);
+}
+
+.cat-card-climate {
+  background: rgba(10,25,60,0.55);
+}
+.cat-card-infra {
+  background: rgba(30,16,4,0.55);
+}
+.cat-card-medical {
+  background: rgba(4,20,32,0.55);
+}
+.cat-card-welfare {
+  background: rgba(4,16,8,0.55);
+}
+
+.cat-domain-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: rgba(255,255,255,0.4);
+  display: block;
+  margin-bottom: 1rem;
+}
+.cat-icon {
+  font-size: 2.6rem;
+  margin-bottom: 1.2rem;
+  display: block;
+  line-height: 1;
+}
+.cat-card h2 {
+  font-family: var(--serif);
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 400;
+  margin-bottom: 0.8rem;
+  line-height: 1.2;
+}
+.cat-card .cat-stat {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 1.2rem;
+  letter-spacing: 0.05em;
+}
+.cat-card p {
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.65);
+  line-height: 1.85;
+  margin-bottom: 2rem;
+}
+.cat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  color: rgba(255,255,255,0.8);
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 0.7rem 1.4rem;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  text-decoration: none;
+  transition: background 0.2s, transform 0.2s;
+}
+.cat-progress {
+  position: absolute;
+  bottom: 3.5rem;
+  right: 3rem;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.cat-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  transition: background 0.3s, transform 0.3s;
+}
+.cat-dot.active {
+  background: white;
+  transform: scale(1.4);
+}
+
+/* Section label overlay for category */
+.cat-section-label {
+  position: absolute;
+  top: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: rgba(255,255,255,0.25);
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+}
+.cat-count-display {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  gap: 10px;
+}
+
+/* ── SECTION 5: CONCLUSION ── */
+#sec-conclusion {
+  background: linear-gradient(180deg, #040c18 0%, #020510 100%);
+  padding: 100px 24px 120px;
+}
+.conclusion-wrap {
+  max-width: 1300px;
+  margin: 0 auto;
+}
+.conclusion-header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+.conclusion-header h2 {
+  font-family: var(--serif);
+  font-size: clamp(1.8rem, 3.5vw, 3rem);
+  font-weight: 300;
+  line-height: 1.35;
+  margin-bottom: 1rem;
+}
+.conclusion-header h2 em {
+  color: var(--gold);
+  font-style: normal;
+}
+.conclusion-header p {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.9rem;
+  line-height: 1.9;
+  max-width: 660px;
+  margin: 0 auto;
+}
+
+/* Key stats row */
+.key-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 60px;
+}
+.key-stat-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px;
+  padding: 1.6rem;
+  text-align: center;
+}
+.key-stat-box .ks-num {
+  font-family: var(--mono);
+  font-size: 2.2rem;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+.key-stat-box .ks-label {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.5;
+}
+
+/* Heatmap */
+.heatmap-section {
+  margin-bottom: 60px;
+}
+.heatmap-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+.heatmap-container {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.02);
+}
+.heatmap-table {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: collapse;
+}
+.heatmap-table thead th {
+  padding: 1rem 0.6rem;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.4);
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  white-space: nowrap;
+}
+.heatmap-table thead th:first-child {
+  text-align: left;
+  padding-left: 1.4rem;
+}
+.heatmap-table tbody tr:hover {
+  background: rgba(255,255,255,0.025);
+}
+.heatmap-table tbody td {
+  padding: 0.5rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.heatmap-table tbody td:first-child {
+  text-align: left;
+  padding-left: 1.4rem;
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+  white-space: nowrap;
+  font-family: var(--sans);
+}
+.heatmap-table tbody td:last-child {
+  padding-right: 1.2rem;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.score-cell {
+  width: 52px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  transition: transform 0.15s;
+}
+.score-cell:hover {
+  transform: scale(1.12);
+}
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  font-family: var(--mono);
+  font-size: 10px;
+  margin-right: 0.5rem;
+  font-weight: 500;
+}
+
+/* Insights grid */
+.insights-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 60px;
+}
+@media (max-width: 720px) {
+  .insights-grid { grid-template-columns: 1fr; }
+}
+.insight-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+  padding: 2rem;
+}
+.insight-card h3 {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 1.2rem;
+  text-transform: uppercase;
+}
+.district-rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.dr-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 13px;
+}
+.dr-name {
+  min-width: 56px;
+  color: rgba(255,255,255,0.75);
+}
+.dr-bar-wrap {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.dr-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s ease;
+}
+.dr-score {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* Dashboard links */
+.dashboard-links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.2rem;
+  margin-top: 60px;
+}
+.dash-link-card {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 2.2rem 2rem;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: transform 0.25s, border-color 0.25s, background 0.25s;
+  position: relative;
+  overflow: hidden;
+}
+.dash-link-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.dash-link-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255,255,255,0.2);
+}
+.dash-link-card:hover::before {
+  opacity: 1;
+}
+.dash-link-card.climate { background: rgba(10,25,60,0.4); }
+.dash-link-card.climate:hover { background: rgba(10,25,80,0.6); }
+.dash-link-card.infra { background: rgba(30,16,4,0.4); }
+.dash-link-card.infra:hover { background: rgba(40,20,5,0.6); }
+.dash-link-card.medical { background: rgba(4,20,32,0.4); }
+.dash-link-card.medical:hover { background: rgba(5,25,42,0.6); }
+.dash-link-card.welfare { background: rgba(4,16,8,0.4); }
+.dash-link-card.welfare:hover { background: rgba(5,22,10,0.6); }
+.dl-icon {
+  font-size: 2.2rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+.dl-domain {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  color: rgba(255,255,255,0.35);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+.dl-title {
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  font-weight: 400;
+  margin-bottom: 0.8rem;
+  line-height: 1.3;
+}
+.dl-desc {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.7;
+}
+.dl-arrow {
+  position: absolute;
+  bottom: 1.8rem;
+  right: 1.8rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(255,255,255,0.25);
+  transition: color 0.2s, transform 0.2s;
+}
+.dash-link-card:hover .dl-arrow {
+  color: rgba(255,255,255,0.6);
+  transform: translate(3px, -3px);
+}
+
+/* Footer */
+footer {
+  background: #020510;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 3rem 24px;
+  text-align: center;
+}
+footer p {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(255,255,255,0.2);
+  line-height: 2;
+  letter-spacing: 0.05em;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ SECTION 1: SPACE ═══ -->
+<section id="sec-space">
+  <canvas id="stars-canvas"></canvas>
+
+  <!-- Seoul "planet" (centered behind text) -->
+  <div class="space-planet" id="space-planet" style="transform:translate(-50%,-50%);position:absolute;top:50%;left:50%;">
+    <div class="planet-ring-2"></div>
+    <div class="planet-ring"></div>
+    <div class="planet-outer-glow"></div>
+    <div class="planet-body">
+      <div class="planet-surface"></div>
+      <div class="planet-lights"></div>
+      <div class="planet-glow"></div>
+      <div class="planet-shadow"></div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="space-content">
+    <span class="space-kicker">서울 2040 도시기본계획 · 도보 30분 생활권</span>
+    <h1 class="space-headline">
+      "걸어서 30분"<br>
+      <em>이 약속은 누구의 시간으로</em><br>
+      만들어졌는가?
+    </h1>
+    <p class="space-sub">
+      서울시는 도보 30분 생활권을 핵심 비전으로 내걸었다.<br>
+      그러나 그 30분은 청장년층(1.1~1.4m/s)의 시간이다.<br>
+      2040년, 서울 인구의 32%는 65세 이상 노인이 된다.
+    </p>
+    <div class="stat-row">
+      <div class="stat-pill">노인 보행속도 <strong>0.78m/s</strong></div>
+      <div class="stat-pill">청년 30분권 도달 <strong>최대 60분</strong></div>
+      <div class="stat-pill">2040 노인 인구 <strong>32%</strong></div>
+    </div>
+  </div>
+
+  <div class="scroll-hint">
+    <span>SCROLL</span>
+  </div>
+</section>
+
+<!-- ═══ SECTION 2: STAR MAP ═══ -->
+<section id="sec-starmap">
+  <div class="starmap-intro">
+    <span class="section-kicker">서론 · 별자리 지도</span>
+    <h2>
+      노인의 서울은 <em>더 작다</em><br>
+      — 생활 시설이 닿지 않는 거리를 별자리로 그리다
+    </h2>
+    <p>
+      같은 위치에 살아도, 노인에게 닿는 서울의 반경은 청년의 절반이다.<br>
+      아래 지도는 청년 30분권과 노인 30분권이 만들어내는 접근 격차를<br>
+      서울 전체에 걸쳐 동 단위로 시각화한 것이다.
+    </p>
+  </div>
+
+  <div class="starmap-frame">
+    <iframe
+      src="outputs_SHIM/260429/outputs/infra_별자리지도_v5.html"
+      title="서울 노인 보행권 별자리 지도"
+      loading="lazy"
+      sandbox="allow-scripts allow-same-origin"
+    ></iframe>
+  </div>
+
+  <div class="starmap-caption">
+    <div class="cap-item">
+      <div class="cap-dot" style="background:#5aadff;"></div>
+      청년 30분권 도달 가능 시설
+    </div>
+    <div class="cap-item">
+      <div class="cap-dot" style="background:#ff5f5f;"></div>
+      노인 도보권 미달 — 격차 발생 시설
+    </div>
+    <div class="cap-item">
+      <div class="cap-dot" style="background:#f5b740;"></div>
+      격차 경계 구간
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 3: DESCENT ═══ -->
+<section id="sec-descent">
+  <div class="descent-inner">
+    <span class="section-kicker">본론 · 5개 생활 도메인</span>
+    <h2>
+      같은 지도 위, 다른 시간<br>
+      서울을 5개 도메인으로 다시 측정한다
+    </h2>
+    <p>
+      청년이 30분에 닿는 거리를 노인은 얼마나 걸려야 닿는가.<br>
+      기후 재난·생활 인프라·의료·복지와 녹지 4개 분야에서<br>
+      그 <strong style="color:var(--gold);">분(分)의 격차</strong>를 추적했다.
+    </p>
+    <div class="time-table">
+      <div class="time-row">
+        <span class="age">65~74세</span>
+        <div class="bar" style="width:70px;"></div>
+        <span class="val">약 35분</span>
+      </div>
+      <div class="time-row">
+        <span class="age">75~84세</span>
+        <div class="bar" style="width:105px;"></div>
+        <span class="val">약 45분</span>
+      </div>
+      <div class="time-row">
+        <span class="age">85세 이상</span>
+        <div class="bar" style="width:160px;"></div>
+        <span class="val">약 60분</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.2);margin-top:0.4rem;">
+        * 청년 30분권 시설에 도달하는 데 노인이 소요하는 시간
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 4: CATEGORIES (SCROLL) ═══ -->
+<div id="sec-categories">
+  <div id="categories-sticky">
+
+    <!-- Background layers -->
+    <div class="cat-bg-layer bg-climate active" id="bg-0"></div>
+    <div class="cat-bg-layer bg-infra" id="bg-1"></div>
+    <div class="cat-bg-layer bg-medical" id="bg-2"></div>
+    <div class="cat-bg-layer bg-welfare" id="bg-3"></div>
+
+    <!-- Section label -->
+    <div class="cat-section-label">본론 — 4개 대시보드</div>
+
+    <!-- Progress dots -->
+    <div class="cat-count-display">
+      <div class="cat-dot active" id="dot-0"></div>
+      <div class="cat-dot" id="dot-1"></div>
+      <div class="cat-dot" id="dot-2"></div>
+      <div class="cat-dot" id="dot-3"></div>
+    </div>
+
+    <!-- Cards container -->
+    <div class="cat-cards-wrap">
+
+      <!-- Card 0: Climate -->
+      <div class="cat-card cat-card-climate" id="cat-0">
+        <span class="cat-domain-tag">D5 · CLIMATE DISASTER</span>
+        <span class="cat-icon">🌡</span>
+        <h2 style="color:#7ec8e3;">기후 재난</h2>
+        <p class="cat-stat">무더위쉼터 · 한파쉼터 접근성 분석 — 김성령</p>
+        <p>
+          폭염과 한파는 노인에게 생존의 문제다.<br>
+          이미 거동이 불편한 독거노인에게, 위기의 순간<br>
+          쉼터는 과연 닿을 수 있는 거리에 있는가?
+        </p>
+        <a href="outputs-KIM/260430_submit/16_climate_shelter_dashboard.html" class="cat-btn" target="_blank">
+          대시보드 보기 →
+        </a>
+      </div>
+
+      <!-- Card 1: Infrastructure -->
+      <div class="cat-card cat-card-infra" id="cat-1">
+        <span class="cat-domain-tag">D2 · DAILY INFRASTRUCTURE</span>
+        <span class="cat-icon">🏪</span>
+        <h2 style="color:#f5b740;">생활 인프라</h2>
+        <p class="cat-stat">전통시장 · 슈퍼마켓 · 은행 · 주민센터 분석 — 심재현</p>
+        <p>
+          일상의 쇼핑, 금융 업무, 행정 처리—<br>
+          노인이 이 모든 것을 걸어서 해결할 수 있는 동네는<br>
+          서울에 얼마나 존재하는가?
+        </p>
+        <a href="outputs_SHIM/260429/outputs/infra_dashboard_v5.html" class="cat-btn" target="_blank">
+          대시보드 보기 →
+        </a>
+      </div>
+
+      <!-- Card 2: Medical -->
+      <div class="cat-card cat-card-medical" id="cat-2">
+        <span class="cat-domain-tag">D3 · HEALTHCARE ACCESS</span>
+        <span class="cat-icon">🏥</span>
+        <h2 style="color:#3ecfa0;">의료 접근성</h2>
+        <p class="cat-stat">1차 진료기관 · 약국 · 보건소 분석 — 이정태</p>
+        <p>
+          노인의 만성질환 관리는 꾸준한 접근에 달려 있다.<br>
+          동네에서 걸어서 병원과 약국을 오갈 수 있는<br>
+          가능성은 구마다 얼마나 다른가?
+        </p>
+        <a href="medical_LEE/outputs/medical_dashboard.html" class="cat-btn" target="_blank">
+          대시보드 보기 →
+        </a>
+      </div>
+
+      <!-- Card 3: Welfare / Green -->
+      <div class="cat-card cat-card-welfare" id="cat-3">
+        <span class="cat-domain-tag">D4 · WELFARE & GREEN SPACE</span>
+        <span class="cat-icon">🌳</span>
+        <h2 style="color:#6adb7a;">복지·녹지</h2>
+        <p class="cat-stat">경로당 · 노인복지관 · 공원 분석 — 양석준</p>
+        <p>
+          일상의 돌봄과 여가는 삶의 질을 결정한다.<br>
+          경로당과 공원을 걸어서 이용할 수 있는 노인은<br>
+          서울 전체의 몇 퍼센트인가?
+        </p>
+        <a href="Bokji/output_v3/infra_dashboard_bokji.html" class="cat-btn" target="_blank">
+          대시보드 보기 →
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SECTION 5: CONCLUSION ═══ -->
+<section id="sec-conclusion">
+  <div class="conclusion-wrap">
+    <div class="conclusion-header">
+      <span class="section-kicker">결론 · 종합 진단</span>
+      <h2>서울 25개 구, <em>노인 도보 생활권</em> 종합 성적표</h2>
+      <p>
+        기후·인프라·의료·복지 4개 도메인의 노인 도보 접근성을 종합한 결과,<br>
+        서울의 구들은 뚜렷한 격차를 드러낸다.
+        어떤 구가 취약하고, 무엇이 문제인가.
+      </p>
+    </div>
+
+    <!-- Key stats -->
+    <div class="key-stats" id="key-stats">
+      <div class="key-stat-box">
+        <strong class="ks-num" style="color:#ff5f5f;">강북구</strong>
+        <span class="ks-label">종합 최하위<br>4개 도메인 모두 취약</span>
+      </div>
+      <div class="key-stat-box">
+        <strong class="ks-num" style="color:#ff8c42;">도봉구</strong>
+        <span class="ks-label">2위 취약<br>복지·기후 쉼터 심각</span>
+      </div>
+      <div class="key-stat-box">
+        <strong class="ks-num" style="color:#ffd54f;">관악구</strong>
+        <span class="ks-label">경사지 취약<br>실제 보행 난이도 급상승</span>
+      </div>
+      <div class="key-stat-box">
+        <strong class="ks-num" style="color:#66bb6a;">서초구</strong>
+        <span class="ks-label">종합 최우수<br>4개 도메인 균형 달성</span>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="heatmap-section">
+      <p class="heatmap-title">구별 도메인 접근성 점수 (0–100 · 높을수록 노인 도보권 양호)</p>
+      <div class="heatmap-container">
+        <table class="heatmap-table" id="heatmap-table">
+          <thead>
+            <tr>
+              <th>자치구</th>
+              <th>🌡 기후쉼터</th>
+              <th>🏪 생활인프라</th>
+              <th>🏥 의료</th>
+              <th>🌳 복지·녹지</th>
+              <th>종합</th>
+            </tr>
+          </thead>
+          <tbody id="heatmap-body">
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:2rem;justify-content:center;margin-top:1rem;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:0.5rem;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.4);">
+          <div style="width:40px;height:12px;border-radius:3px;background:linear-gradient(to right,#c62828,#ef9a9a,#a5d6a7,#2e7d32);"></div>
+          낮음 → 높음
+        </div>
+      </div>
+    </div>
+
+    <!-- Insights -->
+    <div class="insights-grid">
+      <div class="insight-card">
+        <h3>🔴 접근성 하위 5개 구</h3>
+        <div class="district-rank-list" id="worst-list"></div>
+      </div>
+      <div class="insight-card">
+        <h3>🟢 접근성 상위 5개 구</h3>
+        <div class="district-rank-list" id="best-list"></div>
+      </div>
+    </div>
+
+    <!-- Domain-level insights -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:60px;">
+      <div class="insight-card" style="border-left:3px solid #7ec8e3;">
+        <h3>기후 쉼터</h3>
+        <p style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.8;margin-top:0.6rem;">
+          북·동북권(강북·도봉·성북)에서 쉼터 접근성이 낮음. 경사지가 많아 실질 보행 시간이 크게 늘어남.
+        </p>
+      </div>
+      <div class="insight-card" style="border-left:3px solid #f5b740;">
+        <h3>생활 인프라</h3>
+        <p style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.8;margin-top:0.6rem;">
+          중구·강남구·서초구는 상업 밀도가 높아 우수. 외곽·단독주택 밀집 지역은 전통시장 접근 취약.
+        </p>
+      </div>
+      <div class="insight-card" style="border-left:3px solid #3ecfa0;">
+        <h3>의료 접근성</h3>
+        <p style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.8;margin-top:0.6rem;">
+          중구·서초·강남은 1차 의료기관 밀집. 강북·금천·관악은 노인 보행 반경 내 의원 수 부족.
+        </p>
+      </div>
+      <div class="insight-card" style="border-left:3px solid #6adb7a;">
+        <h3>복지·녹지</h3>
+        <p style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.8;margin-top:0.6rem;">
+          종로·중구는 공원 면적 부족. 노원·은평은 공원은 있으나 경로당 접근성 편차가 큼.
+        </p>
+      </div>
+    </div>
+
+    <!-- Policy insight -->
+    <div style="background:rgba(245,183,64,0.06);border:1px solid rgba(245,183,64,0.2);border-radius:16px;padding:2.5rem;margin-bottom:60px;text-align:center;">
+      <p style="font-family:var(--serif);font-size:1.3rem;font-weight:300;line-height:1.8;color:rgba(255,255,255,0.85);">
+        "동 단위 시설 수로 정책을 설계하는 한,<br>
+        이 격차는 보이지 않는다."
+      </p>
+      <p style="font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.3);margin-top:1rem;letter-spacing:0.1em;">
+        — 물리적 거리가 아닌, 노인의 시간으로 다시 측정한 서울
+      </p>
+    </div>
+
+    <!-- Links to individual dashboards -->
+    <div>
+      <p class="heatmap-title" style="margin-bottom:1.8rem;">개별 대시보드 바로가기</p>
+      <div class="dashboard-links-grid">
+        <a href="outputs-KIM/260430_submit/16_climate_shelter_dashboard.html" class="dash-link-card climate" target="_blank">
+          <span class="dl-icon">🌡</span>
+          <div class="dl-domain">D5 · Climate</div>
+          <div class="dl-title">기후 재난<br>쉼터 접근성</div>
+          <p class="dl-desc">무더위·한파쉼터 노인 도보 접근성 분석. 위기 상황에서의 생존 반경 시각화.</p>
+          <span class="dl-arrow">↗</span>
+        </a>
+        <a href="outputs_SHIM/260429/outputs/infra_dashboard_v5.html" class="dash-link-card infra" target="_blank">
+          <span class="dl-icon">🏪</span>
+          <div class="dl-domain">D2 · Infrastructure</div>
+          <div class="dl-title">생활 인프라<br>일상 접근성</div>
+          <p class="dl-desc">전통시장·슈퍼·은행·주민센터. 일상 생활권 내 시설 도보 도달 가능성.</p>
+          <span class="dl-arrow">↗</span>
+        </a>
+        <a href="medical_LEE/outputs/medical_dashboard.html" class="dash-link-card medical" target="_blank">
+          <span class="dl-icon">🏥</span>
+          <div class="dl-domain">D3 · Healthcare</div>
+          <div class="dl-title">의료 접근성<br>만성질환 관리</div>
+          <p class="dl-desc">1차 진료기관·약국·보건소. 노인 만성질환 관리를 위한 의료 접근 격차.</p>
+          <span class="dl-arrow">↗</span>
+        </a>
+        <a href="Bokji/output_v3/infra_dashboard_bokji.html" class="dash-link-card welfare" target="_blank">
+          <span class="dl-icon">🌳</span>
+          <div class="dl-domain">D4 · Welfare & Green</div>
+          <div class="dl-title">복지·녹지<br>돌봄과 여가</div>
+          <p class="dl-desc">경로당·노인복지관·공원. 노인의 사회적 연결과 일상 여가 접근 실태.</p>
+          <span class="dl-arrow">↗</span>
+        </a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <p>
+    서울 노인 도보 생활권 진단 프로젝트 · 2026<br>
+    유호준 · 심재현 · 이정태 · 양석준 · 김성령<br>
+    <span style="color:rgba(255,255,255,0.1);">데이터 기반 생활밀착형 행정 모델 지원 연구</span>
+  </p>
+</footer>
+
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+/* ── STARS CANVAS ── */
+(function initStars() {
+  const canvas = document.getElementById('stars-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, stars = [];
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  for (let i = 0; i < 300; i++) {
+    stars.push({
+      x: Math.random(),
+      y: Math.random(),
+      r: Math.random() * 1.4 + 0.2,
+      a: Math.random(),
+      da: (Math.random() - 0.5) * 0.008,
+      speed: Math.random() * 0.00008 + 0.00002,
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    for (const s of stars) {
+      s.a += s.da;
+      if (s.a > 1) { s.a = 1; s.da = -Math.abs(s.da); }
+      if (s.a < 0.1) { s.a = 0.1; s.da = Math.abs(s.da); }
+      s.y -= s.speed;
+      if (s.y < 0) s.y = 1;
+      ctx.beginPath();
+      ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${s.a})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ── SPACE SECTION INTRO ANIMATION ── */
+window.addEventListener('load', () => {
+  gsap.timeline({ delay: 0.3 })
+    .to('.space-kicker', { opacity: 1, y: 0, duration: 0.9, ease: 'power2.out' })
+    .to('.space-headline', { opacity: 1, y: 0, duration: 1, ease: 'power2.out' }, '-=0.4')
+    .to('.space-sub', { opacity: 1, duration: 0.8, ease: 'power2.out' }, '-=0.3')
+    .to('.stat-row', { opacity: 1, duration: 0.7, ease: 'power2.out' }, '-=0.2')
+    .to('.scroll-hint', { opacity: 1, duration: 0.6 }, '-=0.2');
+
+  // Planet subtle float
+  gsap.to('#space-planet', {
+    y: -12,
+    duration: 3.5,
+    ease: 'sine.inOut',
+    yoyo: true,
+    repeat: -1,
+  });
+});
+
+/* ── PLANET PARALLAX ON SCROLL ── */
+ScrollTrigger.create({
+  trigger: '#sec-space',
+  start: 'top top',
+  end: 'bottom top',
+  scrub: 1,
+  onUpdate(self) {
+    const p = self.progress;
+    gsap.set('#space-planet', { scale: 1 - p * 0.4, opacity: 1 - p * 1.5 });
+    gsap.set('.space-content', { y: p * -60, opacity: 1 - p * 1.8 });
+  }
+});
+
+/* ── SCROLL-IN ANIMATIONS FOR LATER SECTIONS ── */
+gsap.utils.toArray('.starmap-intro, .starmap-frame, .descent-inner, .conclusion-header').forEach(el => {
+  gsap.from(el, {
+    opacity: 0,
+    y: 40,
+    duration: 1,
+    ease: 'power2.out',
+    scrollTrigger: { trigger: el, start: 'top 80%', once: true }
+  });
+});
+
+/* ── CATEGORY SCROLL SECTION ── */
+(function initCategories() {
+  const wrapper = document.getElementById('sec-categories');
+  const cards = [0,1,2,3].map(i => document.getElementById('cat-' + i));
+  const bgs = [0,1,2,3].map(i => document.getElementById('bg-' + i));
+  const dots = [0,1,2,3].map(i => document.getElementById('dot-' + i));
+  let currentIndex = -1;
+
+  function setActive(index) {
+    if (index === currentIndex) return;
+    currentIndex = index;
+
+    // Backgrounds
+    bgs.forEach((bg, i) => {
+      bg.classList.toggle('active', i === index);
+    });
+
+    // Dots
+    dots.forEach((dot, i) => {
+      dot.classList.toggle('active', i === index);
+    });
+  }
+
+  function updateCards(progress) {
+    // Each card occupies 25% of the scroll space
+    // With small ramp in/out for transition
+    cards.forEach((card, i) => {
+      const start = i * 0.25;
+      const end = start + 0.25;
+      const mid = (start + end) / 2;
+
+      if (progress < start - 0.04 || progress > end + 0.04) {
+        gsap.set(card, { opacity: 0, y: 80, pointerEvents: 'none' });
+        card.classList.remove('is-active');
+        return;
+      }
+
+      // Normalize progress within this card's window
+      const localP = (progress - start) / (end - start);
+
+      let opacity, y;
+      if (localP < 0.15) {
+        opacity = localP / 0.15;
+        y = (1 - opacity) * 70;
+      } else if (localP > 0.85) {
+        opacity = 1 - (localP - 0.85) / 0.15;
+        y = -(1 - opacity) * 40;
+      } else {
+        opacity = 1;
+        y = 0;
+      }
+
+      gsap.set(card, { opacity, y, pointerEvents: opacity > 0.5 ? 'auto' : 'none' });
+      card.classList.toggle('is-active', opacity > 0.7);
+
+      if (progress >= start + 0.08 && progress <= end - 0.08) {
+        setActive(i);
+      }
+    });
+
+    // Edge: determine active bg by closest card center
+    const cardIdx = Math.min(3, Math.floor(progress * 4));
+    setActive(cardIdx);
+  }
+
+  ScrollTrigger.create({
+    trigger: wrapper,
+    start: 'top top',
+    end: 'bottom bottom',
+    scrub: 0.5,
+    onUpdate(self) {
+      updateCards(self.progress);
+    },
+    onEnter() { updateCards(0); },
+  });
+
+  // Initialize
+  gsap.set(cards, { opacity: 0, y: 80 });
+})();
+
+/* ── HEATMAP DATA ── */
+const districtData = [
+  { name: '강남구', scores: [72, 85, 88, 75] },
+  { name: '강동구', scores: [65, 70, 68, 63] },
+  { name: '강북구', scores: [42, 55, 52, 47] },
+  { name: '강서구', scores: [60, 65, 63, 61] },
+  { name: '관악구', scores: [45, 58, 60, 48] },
+  { name: '광진구', scores: [60, 68, 68, 62] },
+  { name: '구로구', scores: [55, 63, 60, 55] },
+  { name: '금천구', scores: [50, 60, 57, 52] },
+  { name: '노원구', scores: [55, 65, 62, 52] },
+  { name: '도봉구', scores: [45, 52, 53, 45] },
+  { name: '동대문구', scores: [62, 70, 70, 58] },
+  { name: '동작구', scores: [62, 68, 70, 65] },
+  { name: '마포구', scores: [72, 78, 75, 65] },
+  { name: '서대문구', scores: [53, 65, 68, 50] },
+  { name: '서초구', scores: [78, 82, 85, 75] },
+  { name: '성동구', scores: [68, 74, 72, 65] },
+  { name: '성북구', scores: [48, 60, 62, 52] },
+  { name: '송파구', scores: [72, 78, 75, 70] },
+  { name: '양천구', scores: [65, 70, 70, 68] },
+  { name: '영등포구', scores: [68, 72, 73, 60] },
+  { name: '용산구', scores: [70, 72, 75, 60] },
+  { name: '은평구', scores: [50, 63, 60, 55] },
+  { name: '종로구', scores: [62, 71, 78, 55] },
+  { name: '중구',   scores: [65, 80, 85, 50] },
+  { name: '중랑구', scores: [52, 62, 60, 55] },
+];
+
+function scoreToColor(score) {
+  // red (low) → yellow (mid) → green (high)
+  const t = (score - 40) / 50; // 0 at 40, 1 at 90
+  const clamped = Math.max(0, Math.min(1, t));
+  if (clamped < 0.5) {
+    // red → yellow
+    const f = clamped * 2;
+    const r = 220;
+    const g = Math.round(60 + f * 150);
+    const b = Math.round(60 * (1 - f));
+    return { bg: `rgba(${r},${g},${b},0.22)`, text: `rgb(${r},${g},${b})` };
+  } else {
+    // yellow → green
+    const f = (clamped - 0.5) * 2;
+    const r = Math.round(220 * (1 - f));
+    const g = Math.round(210 + f * 30);
+    const b = Math.round(f * 60);
+    return { bg: `rgba(${r},${g},${b},0.22)`, text: `rgb(${r},${g},${b})` };
+  }
+}
+
+// Build heatmap
+(function buildHeatmap() {
+  const tbody = document.getElementById('heatmap-body');
+  const withComposite = districtData.map(d => {
+    const avg = Math.round(d.scores.reduce((a, b) => a + b, 0) / d.scores.length);
+    return { ...d, composite: avg };
+  }).sort((a, b) => a.composite - b.composite);
+
+  withComposite.forEach((d, i) => {
+    const rank = i + 1;
+    const isWorst = rank <= 5;
+    const isBest = rank >= 21;
+
+    const tr = document.createElement('tr');
+
+    // Name cell
+    const tdName = document.createElement('td');
+    const rankColor = isWorst ? '#ff6b6b' : isBest ? '#6adb7a' : 'rgba(255,255,255,0.3)';
+    tdName.innerHTML = `
+      <span class="rank-badge" style="background:${rankColor}20;color:${rankColor};">${rank}</span>${d.name}
+    `;
+    tr.appendChild(tdName);
+
+    // Score cells
+    d.scores.forEach(score => {
+      const td = document.createElement('td');
+      const c = scoreToColor(score);
+      td.innerHTML = `<div class="score-cell" style="background:${c.bg};color:${c.text};">${score}</div>`;
+      tr.appendChild(td);
+    });
+
+    // Composite cell
+    const tdComp = document.createElement('td');
+    const cc = scoreToColor(d.composite);
+    tdComp.style.color = cc.text;
+    tdComp.style.fontWeight = '600';
+    tdComp.textContent = d.composite;
+    tr.appendChild(tdComp);
+
+    tbody.appendChild(tr);
+  });
+
+  // Build worst/best lists
+  const sorted = [...withComposite].sort((a, b) => a.composite - b.composite);
+  const worst5 = sorted.slice(0, 5);
+  const best5 = sorted.slice(-5).reverse();
+
+  function buildList(listId, data, colorFn) {
+    const el = document.getElementById(listId);
+    const max = data[data.length - 1]?.composite || 80;
+    const min = data[0]?.composite || 40;
+    data.forEach(d => {
+      const barColor = colorFn(d.composite);
+      const barPct = ((d.composite - 35) / 55) * 100;
+      el.innerHTML += `
+        <div class="dr-item">
+          <span class="dr-name">${d.name}</span>
+          <div class="dr-bar-wrap">
+            <div class="dr-bar" style="width:${barPct}%;background:${barColor};"></div>
+          </div>
+          <span class="dr-score">${d.composite}</span>
+        </div>
+      `;
+    });
+  }
+
+  buildList('worst-list', worst5, s => {
+    const t = (s - 40) / 20;
+    return `hsl(${t * 30},80%,55%)`;
+  });
+  buildList('best-list', best5, s => {
+    const t = (s - 65) / 20;
+    return `hsl(${100 + t * 40},60%,55%)`;
+  });
+})();
+
+/* ── SCROLL-IN FOR CONCLUSION ELEMENTS ── */
+ScrollTrigger.create({
+  trigger: '#sec-conclusion',
+  start: 'top 70%',
+  once: true,
+  onEnter() {
+    gsap.from('.key-stat-box', {
+      opacity: 0, y: 30, duration: 0.6, stagger: 0.12, ease: 'power2.out'
+    });
+    gsap.from('.heatmap-container', {
+      opacity: 0, y: 40, duration: 0.8, delay: 0.4, ease: 'power2.out'
+    });
+    gsap.from('.insight-card', {
+      opacity: 0, y: 30, duration: 0.6, stagger: 0.1, delay: 0.6, ease: 'power2.out'
+    });
+    gsap.from('.dash-link-card', {
+      opacity: 0, y: 40, duration: 0.5, stagger: 0.1, delay: 0.8, ease: 'power2.out'
+    });
+  }
+});
+</script>
+</body>
+</html>

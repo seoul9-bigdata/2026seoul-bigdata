@@ -1,0 +1,24 @@
+html, body {
+	/*overflow:scroll;
+	height: 100%;*/
+	margin: 0;
+	padding: 0;
+}
+
+#popupWrap {overflow:hidden;min-width:250px;margin:0;padding:0;border:0;border-collapse:collapse;border-spacing:0;background-color:#ffffff;font-size:0;color:#999999;line-height:1.6;font-family:'Pretendard-Regular';}
+#popupWrap > tbody > tr > td{height:100%;padding:0;margin:0; vertical-align:top}
+.popupContent {position:relative;z-index:100;margin:0;padding:0;}
+.popupContent p{margin:0;padding:0;}
+.popupContent img{width:100%;}
+.popupContent > .popuptext{font-size:15px;}
+.popupClose {position:relative;z-index:1000;height:30px;min-width:250px;padding:0 10px;font-family:'Pretendard-Regular';font-size:12px;color:#ffffff;line-height:30px;background-color:#2D3037; }
+.popupClose a{padding: 0 0;}
+a.popClose:link		 { font-weight:500; color:#ffffff; text-decoration:none; font-size:12px; }
+a.popClose:visited { font-size:12px !important; font-weight:bold; color:#363636; text-decoration:none; }
+a.popClose:active	 { font-weight:500; color:#ffffff; text-decoration:none; }
+a.popClose:hover	 { font-weight:500; color:#ffffff; text-decoration:none; }
+.Body-Margin20{ margin-bottom: -20px; }
+
+@media screen and (max-width: 768px){
+	a.popClose:link	{font-size:12px !important;}
+}
