@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서울 노인 도보 일상권 — 데이터 시각화 허브</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --black: #080a0c;
+    --white: #f5f5f0;
+    --gray-100: #1a1c20;
+    --gray-200: #2a2d33;
+    --gray-300: #3d4148;
+    --gray-400: #6b7280;
+    --gray-500: #9ca3af;
+    --accent: #e8e0d4;
+    --gold: #c9a96e;
+    --green-primary: #2d6a4f;
+    --green-light: #52b788;
+    --green-particle: #74c69d;
+    --blue-primary: #1e40af;
+    --blue-light: #60a5fa;
+    --blue-cool: #93c5fd;
+    --teal-primary: #0d9488;
+    --teal-light: #2dd4bf;
+    --urban-primary: #f59e0b;
+    --urban-light: #fcd34d;
+    --transit-primary: #7c3aed;
+    --transit-light: #a78bfa;
+    --font-sans: 'Inter', 'Noto Sans KR', sans-serif;
+    --font-serif: 'Noto Serif KR', serif;
+    --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--black);
+    color: var(--white);
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* ── Custom Cursor ── */
+  #cursor {
+    position: fixed;
+    width: 12px; height: 12px;
+    background: var(--white);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s var(--ease-expo), height 0.3s var(--ease-expo),
+                background 0.3s, opacity 0.3s;
+    mix-blend-mode: difference;
+  }
+  #cursor-ring {
+    position: fixed;
+    width: 40px; height: 40px;
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    transform: translate(-50%, -50%);
+    transition: all 0.15s var(--ease-expo);
+    mix-blend-mode: difference;
+  }
+  body.hovering #cursor { width: 20px; height: 20px; }
+  body.hovering #cursor-ring { width: 60px; height: 60px; border-color: rgba(255,255,255,0.8); }
+
+  /* ── Canvas BG ── */
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  /* ── Noise overlay ── */
+  .noise {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+
+  /* ── Page Wrapper ── */
+  #app {
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ── HERO ── */
+  #hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 8vw;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 2rem;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUp 1s var(--ease-expo) 0.3s forwards;
+  }
+
+  .hero-title {
+    font-family: var(--font-serif);
+    font-size: clamp(2.5rem, 7vw, 6.5rem);
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    opacity: 0;
+    transform: translateY(30px);
+    animation: fadeUp 1.2s var(--ease-expo) 0.5s forwards;
+  }
+
+  .hero-title em {
+    font-style: normal;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(255,255,255,0.4);
+  }
+
+  .hero-subtitle {
+    margin-top: 2.5rem;
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    font-weight: 300;
+    color: var(--gray-500);
+    max-width: 560px;
+    line-height: 1.8;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUp 1s var(--ease-expo) 0.9s forwards;
+  }
+
+  .hero-scroll {
+    position: absolute;
+    bottom: 3rem;
+    left: 8vw;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    color: var(--gray-400);
+    opacity: 0;
+    animation: fadeUp 1s var(--ease-expo) 1.5s forwards;
+  }
+  .hero-scroll-line {
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(to right, var(--gold), transparent);
+    animation: expandLine 1.5s var(--ease-expo) 1.8s both;
+  }
+
+  .hero-grid-decoration {
+    position: absolute;
+    right: 6vw;
+    top: 50%;
+    transform: translateY(-50%);
+    width: min(40vw, 500px);
+    height: min(40vw, 500px);
+    opacity: 0;
+    animation: fadeIn 2s ease 1s forwards;
+  }
+
+  /* ── Section Label ── */
+  .section-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+  .section-label::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 1px;
+    background: var(--gold);
+  }
+
+  /* ── THEMES SECTION ── */
+  #themes {
+    padding: 10vh 8vw;
+    position: relative;
+  }
+
+  .themes-intro {
+    max-width: 700px;
+    margin-bottom: 8rem;
+  }
+
+  .themes-intro h2 {
+    font-family: var(--font-serif);
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+  }
+
+  .themes-intro p {
+    font-size: 1.05rem;
+    color: var(--gray-500);
+    line-height: 1.9;
+    font-weight: 300;
+  }
+
+  /* ── Cards Grid ── */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: auto;
+    gap: 1.5rem;
+  }
+
+  /* Card base */
+  .card {
+    position: relative;
+    border-radius: 1.25rem;
+    overflow: hidden;
+    cursor: none;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 2.5rem;
+    transition: transform 0.6s var(--ease-expo), box-shadow 0.6s var(--ease-expo);
+    will-change: transform;
+  }
+
+  .card:hover { transform: translateY(-6px); }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: inherit;
+    opacity: 1;
+    z-index: 0;
+    transition: opacity 0.5s;
+  }
+
+  .card-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    transition: transform 0.8s var(--ease-expo);
+  }
+  .card:hover .card-bg { transform: scale(1.05); }
+
+  .card-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .card-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+  }
+
+  .card-content {
+    position: relative;
+    z-index: 3;
+  }
+
+  .card-number {
+    font-size: 0.65rem;
+    letter-spacing: 0.3em;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 1rem;
+  }
+
+  .card-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1.5rem;
+    opacity: 0.9;
+  }
+
+  .card-title {
+    font-family: var(--font-serif);
+    font-size: clamp(1.4rem, 2.5vw, 2rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.75rem;
+  }
+
+  .card-desc {
+    font-size: 0.875rem;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.65);
+    font-weight: 300;
+    margin-bottom: 2rem;
+    max-width: 320px;
+  }
+
+  .card-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.9);
+    text-decoration: none;
+    padding: 0.75rem 1.5rem;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 100px;
+    backdrop-filter: blur(10px);
+    background: rgba(255,255,255,0.08);
+    transition: all 0.4s var(--ease-expo);
+  }
+  .card-btn:hover {
+    background: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.5);
+    gap: 1.25rem;
+  }
+  .card-btn svg { transition: transform 0.4s var(--ease-expo); }
+  .card-btn:hover svg { transform: translateX(4px); }
+
+  /* Card layout positions */
+  .card-1 { grid-column: 1 / 8; grid-row: 1; }
+  .card-2 { grid-column: 8 / 13; grid-row: 1; }
+  .card-3 { grid-column: 1 / 5; grid-row: 2; }
+  .card-4 { grid-column: 5 / 9; grid-row: 2; }
+  .card-5 { grid-column: 9 / 13; grid-row: 2; }
+
+  /* Card color themes */
+  .card-1 .card-bg { background: linear-gradient(135deg, #1a3a2a 0%, #2d6a4f 50%, #1b4332 100%); }
+  .card-1 .card-overlay { background: linear-gradient(to top, rgba(11,31,22,0.9) 0%, rgba(11,31,22,0.2) 60%, transparent 100%); }
+
+  .card-2 .card-bg { background: linear-gradient(135deg, #0c1f3a 0%, #1e40af 50%, #0d2251 100%); }
+  .card-2 .card-overlay { background: linear-gradient(to top, rgba(6,15,40,0.9) 0%, rgba(6,15,40,0.2) 60%, transparent 100%); }
+
+  .card-3 .card-bg { background: linear-gradient(135deg, #062424 0%, #0d9488 50%, #083d3d 100%); }
+  .card-3 .card-overlay { background: linear-gradient(to top, rgba(4,24,24,0.9) 0%, rgba(4,24,24,0.2) 60%, transparent 100%); }
+
+  .card-4 .card-bg { background: linear-gradient(135deg, #2a1c00 0%, #78350f 40%, #d97706 80%, #451a03 100%); }
+  .card-4 .card-overlay { background: linear-gradient(to top, rgba(20,13,0,0.9) 0%, rgba(20,13,0,0.2) 60%, transparent 100%); }
+
+  .card-5 .card-bg { background: linear-gradient(135deg, #1a0a38 0%, #6d28d9 50%, #2e1065 100%); }
+  .card-5 .card-overlay { background: linear-gradient(to top, rgba(14,5,35,0.9) 0%, rgba(14,5,35,0.2) 60%, transparent 100%); }
+
+  /* ── VISION SECTION ── */
+  #vision {
+    padding: 15vh 8vw;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .vision-bg-text {
+    position: absolute;
+    top: 50%;
+    left: -2vw;
+    transform: translateY(-50%);
+    font-family: var(--font-serif);
+    font-size: clamp(8rem, 18vw, 18rem);
+    font-weight: 900;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(255,255,255,0.04);
+    pointer-events: none;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .vision-content {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+  }
+
+  .vision-content h2 {
+    font-family: var(--font-serif);
+    font-size: clamp(2.5rem, 6vw, 5.5rem);
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .vision-content h2 span {
+    color: transparent;
+    background: linear-gradient(135deg, var(--gold) 0%, #e8c87a 50%, var(--gold) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  .vision-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4rem;
+    margin-top: 6rem;
+    padding-top: 4rem;
+    border-top: 1px solid var(--gray-200);
+  }
+
+  .stat-item {}
+  .stat-number {
+    font-family: var(--font-serif);
+    font-size: clamp(2.5rem, 4vw, 3.5rem);
+    font-weight: 900;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+  .stat-label {
+    font-size: 0.875rem;
+    color: var(--gray-400);
+    line-height: 1.6;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 4rem 8vw;
+    border-top: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-brand {
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .footer-brand span { color: var(--gold); }
+
+  .footer-copy {
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── ZOOM OVERLAY ── */
+  #zoom-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+  }
+
+  #zoom-overlay.active { pointer-events: all; }
+
+  .zoom-bg {
+    position: absolute;
+    inset: 0;
+    transform: scale(0);
+    border-radius: 50%;
+    transition: transform 0.8s var(--ease-expo), border-radius 0.8s var(--ease-expo);
+  }
+
+  #zoom-overlay.active .zoom-bg {
+    transform: scale(3);
+    border-radius: 0;
+  }
+
+  .zoom-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.5s var(--ease-expo) 0.4s;
+    padding: 4rem;
+    max-width: 600px;
+  }
+
+  #zoom-overlay.active .zoom-content {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .zoom-content h3 {
+    font-family: var(--font-serif);
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin-bottom: 1rem;
+  }
+
+  .zoom-content p {
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 2.5rem;
+    line-height: 1.8;
+  }
+
+  .zoom-close {
+    position: absolute;
+    top: 2rem;
+    right: 2rem;
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    background: transparent;
+    color: white;
+    cursor: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+  .zoom-close:hover { background: rgba(255,255,255,0.1); }
+
+  .zoom-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 2.5rem;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 100px;
+    color: white;
+    text-decoration: none;
+    font-size: 0.875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    backdrop-filter: blur(10px);
+    transition: all 0.4s var(--ease-expo);
+  }
+  .zoom-link:hover {
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.6);
+    gap: 1.25rem;
+  }
+
+  /* ── SCROLL REVEAL ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.8s var(--ease-expo), transform 0.8s var(--ease-expo);
+  }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* ── Keyframes ── */
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    to { opacity: 1; }
+  }
+  @keyframes expandLine {
+    from { width: 0; opacity: 0; }
+    to { width: 60px; opacity: 1; }
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(0.5); opacity: 0.8; }
+    100% { transform: scale(2.5); opacity: 0; }
+  }
+  @keyframes float-particle {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(-120px) translateX(var(--dx, 20px)); opacity: 0; }
+  }
+  @keyframes transit-line {
+    0% { stroke-dashoffset: 1000; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { stroke-dashoffset: -1000; opacity: 0; }
+  }
+  @keyframes grid-pulse {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 0.7; }
+  }
+  @keyframes walk {
+    0% { transform: translateX(-30px); }
+    100% { transform: translateX(30px); }
+  }
+  @keyframes snowflake {
+    0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+    10% { opacity: 0.7; }
+    90% { opacity: 0.7; }
+    100% { transform: translateY(120px) rotate(360deg); opacity: 0; }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 1024px) {
+    .cards-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .card-1 { grid-column: 1 / 2; grid-row: 1; }
+    .card-2 { grid-column: 2 / 3; grid-row: 1; }
+    .card-3 { grid-column: 1 / 2; grid-row: 2; }
+    .card-4 { grid-column: 2 / 3; grid-row: 2; }
+    .card-5 { grid-column: 1 / 3; grid-row: 3; }
+    .vision-stats { grid-template-columns: 1fr 1fr; gap: 2.5rem; }
+  }
+
+  @media (max-width: 640px) {
+    .cards-grid { grid-template-columns: 1fr; }
+    .card-1, .card-2, .card-3, .card-4, .card-5 { grid-column: 1; grid-row: auto; }
+    .vision-stats { grid-template-columns: 1fr; gap: 2rem; }
+    footer { flex-direction: column; gap: 1rem; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Custom Cursor -->
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- Background Canvas -->
+<canvas id="bg-canvas"></canvas>
+<div class="noise"></div>
+
+<!-- Zoom Overlay -->
+<div id="zoom-overlay">
+  <div class="zoom-bg" id="zoom-bg"></div>
+  <div class="zoom-content" id="zoom-content">
+    <button class="zoom-close" id="zoom-close" aria-label="닫기">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M2 2L14 14M14 2L2 14" stroke="white" stroke-width="1.5"/>
+      </svg>
+    </button>
+    <div id="zoom-icon" style="margin-bottom:1.5rem;"></div>
+    <h3 id="zoom-title"></h3>
+    <p id="zoom-desc"></p>
+    <a href="#" id="zoom-link" class="zoom-link" target="_blank">
+      해당 페이지로 이동
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M2 8H14M9 3L14 8L9 13" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+    </a>
+  </div>
+</div>
+
+<div id="app">
+
+  <!-- ── HERO ── -->
+  <section id="hero">
+    <p class="hero-eyebrow">Seoul Elderly Pedestrian Daily Life Zone · 2026</p>
+    <h1 class="hero-title">
+      데이터로 노인의<br>
+      <em>더 나은 일상을</em><br>
+      설계합니다
+    </h1>
+    <p class="hero-subtitle">
+      서울 노인의 도보 일상권을 다섯 가지 테마로 분석하고 시각화합니다.<br>
+      녹지, 기후, 의료, 보행, 교통 — 모든 데이터가 하나로 연결됩니다.
+    </p>
+
+    <!-- Hero decoration SVG -->
+    <svg class="hero-grid-decoration" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="heroGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="rgba(201,169,110,0.15)"/>
+          <stop offset="100%" stop-color="rgba(201,169,110,0)"/>
+        </radialGradient>
+      </defs>
+      <circle cx="200" cy="200" r="180" stroke="rgba(201,169,110,0.1)" stroke-width="1"/>
+      <circle cx="200" cy="200" r="130" stroke="rgba(201,169,110,0.15)" stroke-width="1"/>
+      <circle cx="200" cy="200" r="80" stroke="rgba(201,169,110,0.2)" stroke-width="1"/>
+      <circle cx="200" cy="200" r="30" fill="rgba(201,169,110,0.08)"/>
+      <!-- Grid lines -->
+      <line x1="20" y1="200" x2="380" y2="200" stroke="rgba(201,169,110,0.08)" stroke-width="1"/>
+      <line x1="200" y1="20" x2="200" y2="380" stroke="rgba(201,169,110,0.08)" stroke-width="1"/>
+      <!-- Dots -->
+      <g fill="rgba(201,169,110,0.4)">
+        <circle cx="200" cy="20" r="3"/>
+        <circle cx="380" cy="200" r="3"/>
+        <circle cx="200" cy="380" r="3"/>
+        <circle cx="20" cy="200" r="3"/>
+      </g>
+      <!-- Data points -->
+      <circle cx="140" cy="140" r="5" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1">
+        <animate attributeName="r" values="5;12;5" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0;0.5" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="270" cy="155" r="5" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1">
+        <animate attributeName="r" values="5;12;5" dur="3.5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0;0.5" dur="3.5s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="160" cy="280" r="5" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1">
+        <animate attributeName="r" values="5;12;5" dur="4s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0;0.5" dur="4s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="290" cy="270" r="5" fill="none" stroke="rgba(201,169,110,0.5)" stroke-width="1">
+        <animate attributeName="r" values="5;12;5" dur="2.8s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0;0.5" dur="2.8s" repeatCount="indefinite"/>
+      </circle>
+    </svg>
+
+    <div class="hero-scroll">
+      <div class="hero-scroll-line"></div>
+      <span>Scroll to Explore</span>
+    </div>
+  </section>
+
+  <!-- ── THEMES ── -->
+  <section id="themes">
+    <div class="section-label">주제별 시각화</div>
+    <div class="themes-intro reveal">
+      <h2>5개의 데이터 렌즈로<br>도시를 읽습니다</h2>
+      <p>
+        65세 이상 서울 시민이 도보로 이동하는 일상의 반경, 그 안에 담긴<br>
+        공간·환경·의료·이동의 데이터를 인터랙티브하게 탐색하세요.
+      </p>
+    </div>
+
+    <div class="cards-grid">
+
+      <!-- Card 01: 녹지 공원 -->
+      <article class="card card-1 reveal"
+        data-theme="green"
+        data-title="녹지 공원 및 복지시설"
+        data-desc="서울 전역의 공원, 쉼터, 복지센터 분포를 도보 접근성 기반으로 시각화합니다. 노인이 실제로 걷는 반경 안에 얼마나 많은 녹지가 있는지 확인하세요."
+        data-url="#placeholder-green"
+        data-color-start="#062010"
+        data-color-end="#1b4332">
+        <div class="card-bg"></div>
+        <canvas class="card-canvas" id="canvas-green"></canvas>
+        <div class="card-overlay"></div>
+        <div class="card-content">
+          <p class="card-number">— 01</p>
+          <svg class="card-icon" viewBox="0 0 48 48" fill="none">
+            <path d="M24 40V24" stroke="rgba(116,198,157,0.9)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M24 24C24 24 16 18 16 10C16 5.58 19.58 2 24 2C28.42 2 32 5.58 32 10C32 18 24 24 24 24Z" fill="rgba(116,198,157,0.25)" stroke="rgba(116,198,157,0.8)" stroke-width="1.5"/>
+            <path d="M24 30C24 30 14 25 14 16" stroke="rgba(116,198,157,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M24 30C24 30 34 25 34 16" stroke="rgba(116,198,157,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <h3 class="card-title">녹지 공원 및<br>복지시설</h3>
+          <p class="card-desc">도보권 내 공원·복지센터 접근성 분석</p>
+          <a href="#" class="card-btn" data-card-link="true">
+            탐색하기
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 7H13M8 2L13 7L8 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- Card 02: 기후 -->
+      <article class="card card-2 reveal"
+        data-theme="blue"
+        data-title="기후 및 무더위쉼터"
+        data-desc="폭염 시즌 서울의 온도 분포와 무더위쉼터 위치를 실시간으로 연계합니다. 노인이 더위를 피해 접근할 수 있는 냉방시설의 도보 거리를 분석합니다."
+        data-url="#placeholder-climate"
+        data-color-start="#020d22"
+        data-color-end="#1e3a8a">
+        <div class="card-bg"></div>
+        <canvas class="card-canvas" id="canvas-blue"></canvas>
+        <div class="card-overlay"></div>
+        <div class="card-content">
+          <p class="card-number">— 02</p>
+          <svg class="card-icon" viewBox="0 0 48 48" fill="none">
+            <path d="M24 6V30" stroke="rgba(147,197,253,0.9)" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="24" cy="34" r="6" fill="rgba(96,165,250,0.2)" stroke="rgba(96,165,250,0.8)" stroke-width="1.5"/>
+            <path d="M17 14H11M17 20H13M17 26H15" stroke="rgba(147,197,253,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+            <!-- Snowflake -->
+            <path d="M36 8L38 6M38 10L36 8M36 8L38 10M38 6L36 8" stroke="rgba(147,197,253,0.6)" stroke-width="1" stroke-linecap="round"/>
+            <path d="M40 16L42 14M42 18L40 16M40 16L42 18M42 14L40 16" stroke="rgba(147,197,253,0.4)" stroke-width="1" stroke-linecap="round"/>
+          </svg>
+          <h3 class="card-title">기후 및<br>무더위쉼터</h3>
+          <p class="card-desc">폭염 취약지역 분석 및 쉼터 접근성 매핑</p>
+          <a href="#" class="card-btn" data-card-link="true">
+            탐색하기
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 7H13M8 2L13 7L8 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- Card 03: 의료접근성 -->
+      <article class="card card-3 reveal"
+        data-theme="teal"
+        data-title="의료 접근성"
+        data-desc="병원, 약국, 보건소 등 의료시설의 분포를 도보 이동시간으로 환산합니다. 의료 사각지대와 고령 인구 밀집 지역의 상관관계를 확인하세요."
+        data-url="#placeholder-medical"
+        data-color-start="#021a1a"
+        data-color-end="#0f5c56">
+        <div class="card-bg"></div>
+        <canvas class="card-canvas" id="canvas-teal"></canvas>
+        <div class="card-overlay"></div>
+        <div class="card-content">
+          <p class="card-number">— 03</p>
+          <svg class="card-icon" viewBox="0 0 48 48" fill="none">
+            <rect x="8" y="8" width="32" height="32" rx="4" fill="rgba(45,212,191,0.1)" stroke="rgba(45,212,191,0.7)" stroke-width="1.5"/>
+            <path d="M24 16V32M16 24H32" stroke="rgba(45,212,191,0.9)" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <h3 class="card-title">의료<br>접근성</h3>
+          <p class="card-desc">도보 기반 의료시설 접근성 분석</p>
+          <a href="#" class="card-btn" data-card-link="true">
+            탐색하기
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 7H13M8 2L13 7L8 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- Card 04: 보행일상권 -->
+      <article class="card card-4 reveal"
+        data-theme="urban"
+        data-title="보행 일상권"
+        data-desc="노인의 실제 보행 패턴을 분석하여 자주 이동하는 경로와 장애물을 시각화합니다. 보도 경사, 횡단보도 대기 시간, 그늘 경로까지 통합 분석합니다."
+        data-url="#placeholder-pedestrian"
+        data-color-start="#1a0e00"
+        data-color-end="#7c3d0a">
+        <div class="card-bg"></div>
+        <canvas class="card-canvas" id="canvas-urban"></canvas>
+        <div class="card-overlay"></div>
+        <div class="card-content">
+          <p class="card-number">— 04</p>
+          <svg class="card-icon" viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="10" r="4" fill="rgba(252,211,77,0.3)" stroke="rgba(252,211,77,0.8)" stroke-width="1.5"/>
+            <path d="M24 14L22 22L18 28M24 14L26 22L30 28" stroke="rgba(252,211,77,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M20 24L24 28L28 24" stroke="rgba(252,211,77,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M18 38L20 30M30 38L28 30" stroke="rgba(252,211,77,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <h3 class="card-title">보행<br>일상권</h3>
+          <p class="card-desc">실제 보행 경로 및 장애물 통합 분석</p>
+          <a href="#" class="card-btn" data-card-link="true">
+            탐색하기
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 7H13M8 2L13 7L8 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- Card 05: 대중교통 -->
+      <article class="card card-5 reveal"
+        data-theme="transit"
+        data-title="대중교통 접근성"
+        data-desc="버스·지하철 정류장의 도보 접근 거리와 노인 교통카드 이용 패턴을 분석합니다. 교통 소외지역 및 최적 노선 연계 방안을 시각적으로 제시합니다."
+        data-url="#placeholder-transit"
+        data-color-start="#0e0520"
+        data-color-end="#4c1d95">
+        <div class="card-bg"></div>
+        <canvas class="card-canvas" id="canvas-transit"></canvas>
+        <div class="card-overlay"></div>
+        <div class="card-content">
+          <p class="card-number">— 05</p>
+          <svg class="card-icon" viewBox="0 0 48 48" fill="none">
+            <rect x="6" y="14" width="36" height="20" rx="4" fill="rgba(167,139,250,0.1)" stroke="rgba(167,139,250,0.7)" stroke-width="1.5"/>
+            <circle cx="14" cy="34" r="3" fill="rgba(167,139,250,0.3)" stroke="rgba(167,139,250,0.7)" stroke-width="1.5"/>
+            <circle cx="34" cy="34" r="3" fill="rgba(167,139,250,0.3)" stroke="rgba(167,139,250,0.7)" stroke-width="1.5"/>
+            <path d="M6 22H42" stroke="rgba(167,139,250,0.4)" stroke-width="1"/>
+            <path d="M16 14V34M32 14V34" stroke="rgba(167,139,250,0.3)" stroke-width="1"/>
+            <circle cx="24" cy="18" r="1.5" fill="rgba(167,139,250,0.8)"/>
+          </svg>
+          <h3 class="card-title">대중교통<br>접근성</h3>
+          <p class="card-desc">버스·지하철 도보 접근성 및 이용 패턴</p>
+          <a href="#" class="card-btn" data-card-link="true">
+            탐색하기
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 7H13M8 2L13 7L8 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </a>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ── VISION ── -->
+  <section id="vision">
+    <div class="vision-bg-text" aria-hidden="true">SEOUL</div>
+    <div class="vision-content">
+      <div class="section-label reveal">우리의 비전</div>
+      <h2 class="reveal">
+        데이터가 만드는<br>
+        <span>더 안전한 서울,</span><br>
+        더 행복한 노년
+      </h2>
+
+      <div class="vision-stats reveal">
+        <div class="stat-item">
+          <div class="stat-number" data-count="1.7">0</div>
+          <div class="stat-label">서울 65세 이상 인구<br><strong>170만 명</strong></div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number" data-count="5">0</div>
+          <div class="stat-label">연계된 데이터<br><strong>5개 테마</strong></div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number" data-count="25">0</div>
+          <div class="stat-label">분석 자치구<br><strong>25개 구</strong></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <div class="footer-brand">서울 노인 도보 일상권 <span>데이터 허브</span></div>
+    <p class="footer-copy">© 2026 Seoul Big Data Team · All rights reserved</p>
+  </footer>
+
+</div><!-- /#app -->
+
+<script>
+// ─────────────────────────────────────────────────────────
+//  CURSOR
+// ─────────────────────────────────────────────────────────
+(function() {
+  const cursor = document.getElementById('cursor');
+  const ring = document.getElementById('cursor-ring');
+  let mx = -100, my = -100, rx = -100, ry = -100;
+
+  document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+  function animCursor() {
+    rx += (mx - rx) * 0.12;
+    ry += (my - ry) * 0.12;
+    cursor.style.left = mx + 'px';
+    cursor.style.top = my + 'px';
+    ring.style.left = rx + 'px';
+    ring.style.top = ry + 'px';
+    requestAnimationFrame(animCursor);
+  }
+  animCursor();
+
+  document.querySelectorAll('a, button, .card').forEach(el => {
+    el.addEventListener('mouseenter', () => document.body.classList.add('hovering'));
+    el.addEventListener('mouseleave', () => document.body.classList.remove('hovering'));
+  });
+})();
+
+// ─────────────────────────────────────────────────────────
+//  BACKGROUND CANVAS — floating dots / connections
+// ─────────────────────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+  let mouseX = 0, mouseY = 0;
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+
+  class Particle {
+    constructor() { this.reset(); }
+    reset() {
+      this.x = Math.random() * W;
+      this.y = Math.random() * H;
+      this.vx = (Math.random() - 0.5) * 0.3;
+      this.vy = (Math.random() - 0.5) * 0.3;
+      this.r = Math.random() * 1.5 + 0.5;
+      this.alpha = Math.random() * 0.4 + 0.1;
+    }
+    update() {
+      const dx = mouseX - this.x;
+      const dy = mouseY - this.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 150) {
+        this.vx -= dx / dist * 0.02;
+        this.vy -= dy / dist * 0.02;
+      }
+      this.vx *= 0.98;
+      this.vy *= 0.98;
+      this.x += this.vx;
+      this.y += this.vy;
+      if (this.x < 0 || this.x > W) this.vx *= -1;
+      if (this.y < 0 || this.y > H) this.vy *= -1;
+    }
+    draw() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(201,169,110,${this.alpha})`;
+      ctx.fill();
+    }
+  }
+
+  for (let i = 0; i < 80; i++) particles.push(new Particle());
+
+  function drawConnections() {
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        if (d < 120) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(201,169,110,${0.08 * (1 - d/120)})`;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(p => { p.update(); p.draw(); });
+    drawConnections();
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ─────────────────────────────────────────────────────────
+//  CARD CANVASES — theme-specific animations
+// ─────────────────────────────────────────────────────────
+
+// Green: rising particles
+(function() {
+  const canvas = document.getElementById('canvas-green');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+
+  function resize() {
+    W = canvas.width = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+  new ResizeObserver(resize).observe(canvas);
+  resize();
+
+  function randParticle() {
+    return {
+      x: Math.random() * W,
+      y: H + Math.random() * 40,
+      r: Math.random() * 3 + 1,
+      speed: Math.random() * 0.6 + 0.3,
+      drift: (Math.random() - 0.5) * 0.4,
+      alpha: 0,
+      maxAlpha: Math.random() * 0.5 + 0.2,
+      life: 0,
+      maxLife: Math.random() * 200 + 120
+    };
+  }
+
+  for (let i = 0; i < 30; i++) {
+    const p = randParticle();
+    p.y = Math.random() * H;
+    p.life = Math.random() * p.maxLife;
+    particles.push(p);
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach((p, i) => {
+      p.life++;
+      p.y -= p.speed;
+      p.x += p.drift;
+      const progress = p.life / p.maxLife;
+      p.alpha = progress < 0.2 ? (progress / 0.2) * p.maxAlpha
+               : progress > 0.8 ? ((1 - progress) / 0.2) * p.maxAlpha
+               : p.maxAlpha;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(116,198,157,${p.alpha})`;
+      ctx.fill();
+      if (p.life >= p.maxLife || p.y < -10) particles[i] = randParticle();
+    });
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// Blue: falling snowflakes
+(function() {
+  const canvas = document.getElementById('canvas-blue');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, flakes = [];
+
+  function resize() {
+    W = canvas.width = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+  new ResizeObserver(resize).observe(canvas);
+  resize();
+
+  function randFlake() {
+    return {
+      x: Math.random() * W,
+      y: -10,
+      r: Math.random() * 2 + 1,
+      speed: Math.random() * 0.5 + 0.2,
+      drift: (Math.random() - 0.5) * 0.3,
+      alpha: Math.random() * 0.4 + 0.15,
+      spin: Math.random() * 0.03
+    };
+  }
+
+  for (let i = 0; i < 25; i++) {
+    const f = randFlake();
+    f.y = Math.random() * H;
+    flakes.push(f);
+  }
+
+  function drawFlake(f) {
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.globalAlpha = f.alpha;
+    const arms = 6;
+    const len = f.r * 4;
+    for (let i = 0; i < arms; i++) {
+      ctx.rotate(Math.PI * 2 / arms);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, len);
+      ctx.strokeStyle = `rgba(147,197,253,1)`;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    flakes.forEach((f, i) => {
+      f.y += f.speed;
+      f.x += f.drift;
+      drawFlake(f);
+      if (f.y > H + 20) flakes[i] = randFlake();
+    });
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// Teal: pulse rings
+(function() {
+  const canvas = document.getElementById('canvas-teal');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, rings = [];
+
+  function resize() {
+    W = canvas.width = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+  new ResizeObserver(resize).observe(canvas);
+  resize();
+
+  function spawnRing() {
+    rings.push({
+      x: W * 0.5 + (Math.random() - 0.5) * W * 0.4,
+      y: H * 0.4 + (Math.random() - 0.5) * H * 0.3,
+      r: 0,
+      maxR: Math.random() * 80 + 60,
+      alpha: 0.6,
+      speed: Math.random() * 0.6 + 0.4
+    });
+  }
+
+  for (let i = 0; i < 3; i++) {
+    spawnRing();
+    rings[i].r = Math.random() * rings[i].maxR;
+  }
+
+  setInterval(spawnRing, 1200);
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    rings = rings.filter(r => r.alpha > 0.01);
+    rings.forEach(r => {
+      r.r += r.speed;
+      r.alpha *= 0.985;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(45,212,191,${r.alpha})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+    if (rings.length < 6) spawnRing();
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// Urban: grid lines
+(function() {
+  const canvas = document.getElementById('canvas-urban');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  function resize() {
+    W = canvas.width = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+  new ResizeObserver(resize).observe(canvas);
+  resize();
+
+  let t = 0;
+  const gridSize = 28;
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    t += 0.015;
+
+    // Grid
+    for (let x = 0; x < W; x += gridSize) {
+      for (let y = 0; y < H; y += gridSize) {
+        const pulse = Math.sin(t + x * 0.05 + y * 0.05) * 0.5 + 0.5;
+        ctx.globalAlpha = pulse * 0.18 + 0.05;
+        ctx.strokeStyle = 'rgba(252,211,77,1)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x, y, gridSize, gridSize);
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // Walker dots
+    const walkers = 4;
+    for (let i = 0; i < walkers; i++) {
+      const progress = (t * 0.3 + i * 0.25) % 1;
+      const wx = progress * (W + 40) - 20;
+      const wy = H * (0.3 + i * 0.15);
+      ctx.beginPath();
+      ctx.arc(wx, wy, 3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(252,211,77,0.7)`;
+      ctx.fill();
+      // Trail
+      const trailLen = 30;
+      const grad = ctx.createLinearGradient(wx - trailLen, wy, wx, wy);
+      grad.addColorStop(0, 'rgba(252,211,77,0)');
+      grad.addColorStop(1, 'rgba(252,211,77,0.3)');
+      ctx.beginPath();
+      ctx.moveTo(wx - trailLen, wy);
+      ctx.lineTo(wx, wy);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// Transit: motion blur lines
+(function() {
+  const canvas = document.getElementById('canvas-transit');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, lines = [];
+
+  function resize() {
+    W = canvas.width = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+  new ResizeObserver(resize).observe(canvas);
+  resize();
+
+  const colors = ['rgba(167,139,250,', 'rgba(196,181,253,', 'rgba(139,92,246,', 'rgba(124,58,237,'];
+
+  function spawnLine() {
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    lines.push({
+      x: -200,
+      y: H * (0.2 + Math.random() * 0.6),
+      speed: Math.random() * 8 + 6,
+      length: Math.random() * 150 + 80,
+      color,
+      alpha: Math.random() * 0.4 + 0.3
+    });
+  }
+
+  setInterval(spawnLine, 300);
+  for (let i = 0; i < 5; i++) { spawnLine(); lines[i].x = Math.random() * W; }
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    lines = lines.filter(l => l.x < W + 300);
+    lines.forEach(l => {
+      l.x += l.speed;
+      const grad = ctx.createLinearGradient(l.x - l.length, l.y, l.x, l.y);
+      grad.addColorStop(0, l.color + '0)');
+      grad.addColorStop(0.5, l.color + l.alpha + ')');
+      grad.addColorStop(1, l.color + '0)');
+      ctx.beginPath();
+      ctx.moveTo(l.x - l.length, l.y);
+      ctx.lineTo(l.x, l.y);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 1.5 + Math.random() * 0.5;
+      ctx.stroke();
+    });
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ─────────────────────────────────────────────────────────
+//  SCROLL REVEAL
+// ─────────────────────────────────────────────────────────
+(function() {
+  const els = document.querySelectorAll('.reveal');
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        setTimeout(() => e.target.classList.add('visible'), i * 80);
+        obs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  els.forEach(el => obs.observe(el));
+})();
+
+// ─────────────────────────────────────────────────────────
+//  COUNT UP ANIMATION
+// ─────────────────────────────────────────────────────────
+(function() {
+  const els = document.querySelectorAll('[data-count]');
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      const target = parseFloat(el.dataset.count);
+      const isDecimal = el.dataset.count.includes('.');
+      let start = 0;
+      const duration = 1800;
+      const startTime = performance.now();
+
+      function update(now) {
+        const progress = Math.min((now - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 4);
+        const val = start + (target - start) * eased;
+        el.textContent = isDecimal ? val.toFixed(1) : Math.floor(val);
+        if (progress < 1) requestAnimationFrame(update);
+      }
+      requestAnimationFrame(update);
+      obs.unobserve(el);
+    });
+  }, { threshold: 0.5 });
+  els.forEach(el => obs.observe(el));
+})();
+
+// ─────────────────────────────────────────────────────────
+//  ZOOM OVERLAY — Prezi-style card expand
+// ─────────────────────────────────────────────────────────
+(function() {
+  const overlay = document.getElementById('zoom-overlay');
+  const zoomBg = document.getElementById('zoom-bg');
+  const zoomTitle = document.getElementById('zoom-title');
+  const zoomDesc = document.getElementById('zoom-desc');
+  const zoomLink = document.getElementById('zoom-link');
+  const zoomIcon = document.getElementById('zoom-icon');
+  const closeBtn = document.getElementById('zoom-close');
+
+  const themeColors = {
+    green:  { bg: 'linear-gradient(135deg, #062010, #2d6a4f)', icon: '🌿' },
+    blue:   { bg: 'linear-gradient(135deg, #020d22, #1e40af)', icon: '❄️' },
+    teal:   { bg: 'linear-gradient(135deg, #021a1a, #0d9488)', icon: '🏥' },
+    urban:  { bg: 'linear-gradient(135deg, #1a0e00, #78350f)', icon: '🚶' },
+    transit:{ bg: 'linear-gradient(135deg, #0e0520, #4c1d95)', icon: '🚌' }
+  };
+
+  function openZoom(card) {
+    const theme = card.dataset.theme;
+    const tc = themeColors[theme] || themeColors.green;
+
+    zoomBg.style.background = tc.bg;
+    zoomIcon.textContent = tc.icon;
+    zoomIcon.style.fontSize = '3rem';
+    zoomTitle.textContent = card.dataset.title;
+    zoomDesc.textContent = card.dataset.desc;
+    zoomLink.href = card.dataset.url || '#';
+
+    overlay.classList.add('active');
+    overlay.style.opacity = '1';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeZoom() {
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  document.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('[data-card-link]')) return;
+      openZoom(card);
+    });
+  });
+
+  document.querySelectorAll('[data-card-link]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const card = btn.closest('.card');
+      openZoom(card);
+    });
+  });
+
+  closeBtn.addEventListener('click', closeZoom);
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) closeZoom();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeZoom();
+  });
+})();
+
+// ─────────────────────────────────────────────────────────
+//  PARALLAX on hero decoration
+// ─────────────────────────────────────────────────────────
+(function() {
+  const deco = document.querySelector('.hero-grid-decoration');
+  if (!deco) return;
+  document.addEventListener('mousemove', e => {
+    const dx = (e.clientX / window.innerWidth - 0.5) * 20;
+    const dy = (e.clientY / window.innerHeight - 0.5) * 20;
+    deco.style.transform = `translateY(-50%) translate(${dx}px, ${dy}px)`;
+  });
+})();
+</script>
+
+</body>
+</html>
