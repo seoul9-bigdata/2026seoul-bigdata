@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>서울 노인 도보 생활권 진단 — 서론</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--card:#fff;--border:#d3d1c7;--text:#2c2c2a;
+  --muted:#888780;--dark:#0d0d0b;--accent:#D85A30;
+  --green:#1D9E75;--blue:#185FA5;--purple:#7B5EA7;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;overflow-x:hidden}
+
+/* ══ HERO ══ */
+.hero{min-height:100vh;background:var(--dark);display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;padding:60px 80px}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:60px 60px;pointer-events:none}
+.hero-glow{position:absolute;top:-30%;right:-10%;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(216,90,48,.12) 0%,transparent 70%);pointer-events:none}
+.hero-eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:24px}
+.hero-title{font-size:clamp(42px,5.5vw,80px);font-weight:700;color:#f1efe8;line-height:1.1;margin-bottom:20px;max-width:800px}
+.hero-title em{color:var(--accent);font-style:normal}
+.hero-sub{font-size:16px;color:rgba(241,239,232,.5);max-width:520px;line-height:1.8;margin-bottom:48px}
+.hero-stats{display:flex;gap:48px;flex-wrap:wrap}
+.hs{border-left:2px solid rgba(255,255,255,.1);padding-left:20px}
+.hs-num{font-size:clamp(28px,3vw,44px);font-weight:700;color:#f1efe8;line-height:1;font-variant-numeric:tabular-nums}
+.hs-num .unit{font-size:.45em;font-weight:400;color:var(--accent);margin-left:4px}
+.hs-label{font-size:11px;color:rgba(241,239,232,.4);margin-top:5px;letter-spacing:.05em}
+.hero-scroll{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;color:rgba(255,255,255,.25);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.scroll-line{width:1px;height:36px;background:linear-gradient(to bottom,transparent,rgba(255,255,255,.3));animation:scrollpulse 2s ease-in-out infinite}
+@keyframes scrollpulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+/* ══ SECTION BASE ══ */
+section{padding:52px 80px}
+.sec-eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:10px;font-weight:500}
+.sec-title{font-size:clamp(24px,2.8vw,36px);font-weight:700;line-height:1.25;margin-bottom:10px}
+.sec-sub{font-size:13px;color:var(--muted);max-width:600px;line-height:1.8;margin-bottom:32px}
+
+/* ══ AGING MAP ══ */
+#sec-aging{background:var(--bg)}
+.aging-layout{display:grid;grid-template-columns:1.6fr 1fr;gap:24px;align-items:start}
+.map-card{background:var(--card);border:.5px solid var(--border);border-radius:14px;padding:16px;position:relative}
+.map-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.map-title-text{font-size:11px;font-weight:500;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+/* 2040 토글 */
+.year-toggle{display:flex;gap:0;border:.5px solid var(--border);border-radius:20px;overflow:hidden;background:var(--bg)}
+.yt-btn{font-size:11px;font-weight:500;padding:5px 14px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.yt-btn.on{background:var(--text);color:#f1efe8}
+#aging-map{height:420px;border-radius:8px;overflow:hidden}
+.map-legend{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.ml-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.ml-dot{width:12px;height:10px;border-radius:2px;flex-shrink:0}
+.stat-stack{display:flex;flex-direction:column;gap:12px}
+.aging-stat{background:var(--card);border:.5px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px}
+.as-icon{font-size:26px;line-height:1;flex-shrink:0}
+.as-num{font-size:26px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.as-label{font-size:11px;color:var(--muted);margin-top:2px}
+.as-note{font-size:10px;color:var(--accent);margin-top:2px;font-weight:500}
+.forecast-card{background:linear-gradient(135deg,#1a0f0a,#2c1510);border-radius:12px;padding:18px 20px;color:#f1efe8}
+.fc-title{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(241,239,232,.4);margin-bottom:14px}
+.fc-row{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
+.fc-year{text-align:center}
+.fc-pct{font-size:22px;font-weight:700;line-height:1;color:var(--accent)}
+.fc-y{font-size:11px;color:rgba(241,239,232,.4);margin-top:3px}
+.fc-arrow{font-size:18px;color:rgba(241,239,232,.2);align-self:center}
+
+/* ══ SPEED ══ */
+#sec-speed{background:#f0efe9}
+.speed-table-wrap{overflow-x:auto}
+.speed-table{width:100%;border-collapse:separate;border-spacing:0 6px}
+.speed-table thead th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:0 16px 10px;font-weight:500;text-align:left}
+.speed-table tbody tr{background:var(--card);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .15s,box-shadow .15s}
+.speed-table tbody tr:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.1)}
+.speed-table tbody td{padding:14px 16px;vertical-align:middle}
+.speed-table tbody td:first-child{border-radius:12px 0 0 12px}
+.speed-table tbody td:last-child{border-radius:0 12px 12px 0}
+.speed-tier{display:flex;align-items:center;gap:10px}
+.tier-icon{font-size:22px;line-height:1}
+.tier-name{font-size:13px;font-weight:600}
+.tier-desc{font-size:10px;color:var(--muted);margin-top:1px}
+.speed-val{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.speed-unit{font-size:11px;color:var(--muted);margin-left:2px}
+.radius-bar-wrap{min-width:160px}
+.radius-label{font-size:10px;color:var(--muted);margin-bottom:5px}
+.radius-bar-outer{background:#f1efe8;border-radius:3px;height:8px;overflow:hidden}
+.radius-bar-inner{height:100%;border-radius:3px}
+.radius-num{font-size:12px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums}
+.loss-badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px}
+.speed-source{font-size:10px;color:var(--muted);margin-top:20px;padding-top:14px;border-top:.5px solid var(--border);line-height:1.8}
+
+/* ══ IMPACT ══ */
+#sec-impact{background:var(--dark);padding:52px 80px}
+#sec-impact .sec-eyebrow{color:rgba(216,90,48,.9)}
+#sec-impact .sec-title{color:#f1efe8}
+#sec-impact .sec-sub{color:rgba(241,239,232,.45)}
+/* 새 레이아웃: 왼쪽=반경 시각화, 오른쪽=카드 리스트 */
+.impact-main{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;margin-bottom:20px}
+/* 왼쪽 패널 */
+.radius-panel{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.08);border-radius:14px;padding:20px}
+.rv-title{font-size:11px;font-weight:500;color:rgba(241,239,232,.5);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.rv-dong{font-size:18px;font-weight:700;color:var(--accent);margin-bottom:14px}
+.rv-canvas-wrap{display:flex;justify-content:center;margin-bottom:14px}
+.rv-legend{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
+.rvl-row{display:flex;align-items:center;gap:8px;font-size:11px}
+.rvl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.rvl-name{color:rgba(241,239,232,.65)}
+.rvl-dist{font-size:12px;font-weight:600;color:#f1efe8;margin-left:auto;font-variant-numeric:tabular-nums}
+.lm-section-title{font-size:10px;color:rgba(241,239,232,.3);margin-bottom:8px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
+.landmark-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
+.lm-row{display:flex;align-items:center;gap:8px;font-size:11px;padding:5px 8px;border-radius:7px}
+.lm-row.reach{background:rgba(29,158,117,.12);color:rgba(241,239,232,.85)}
+.lm-row.nope{background:rgba(155,28,28,.12);color:rgba(241,239,232,.4)}
+.lm-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.lm-name{flex:1}
+.lm-dist{font-variant-numeric:tabular-nums;font-size:10px;opacity:.7}
+.lm-badge{font-size:9px;padding:2px 6px;border-radius:8px;font-weight:600;white-space:nowrap}
+.reach .lm-badge{background:#1D9E7533;color:#1D9E75}
+.nope .lm-badge{background:#9B1C1C33;color:#ef5555}
+/* 오른쪽 패널: 카드 리스트 */
+.impact-cards-stack{display:flex;flex-direction:column;gap:8px}
+.impact-top-card{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.08);border-radius:12px;padding:14px 16px;color:#f1efe8;cursor:pointer;transition:background .15s,border-color .15s}
+.impact-top-card:hover,.impact-top-card.active{background:rgba(216,90,48,.1);border-color:rgba(216,90,48,.35)}
+.itc-rank{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(241,239,232,.3);margin-bottom:5px}
+.itc-name{font-size:14px;font-weight:700;margin-bottom:2px}
+.itc-pop{font-size:11px;color:rgba(241,239,232,.35);margin-bottom:8px}
+.itb-row{display:flex;align-items:center;gap:7px;font-size:10px;margin-bottom:3px}
+.itb-label{width:52px;color:rgba(241,239,232,.45);white-space:nowrap}
+.itb-outer{flex:1;background:rgba(255,255,255,.06);border-radius:2px;height:5px;overflow:hidden}
+.itb-inner{height:100%;border-radius:2px}
+.itb-num{width:28px;text-align:right;color:#f1efe8;font-weight:500;font-variant-numeric:tabular-nums}
+/* 요약 수치 */
+.impact-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.is-card{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.07);border-radius:10px;padding:14px 16px;text-align:center}
+.is-num{font-size:24px;font-weight:700;color:#f1efe8;font-variant-numeric:tabular-nums;line-height:1.1}
+.is-label{font-size:10px;color:rgba(241,239,232,.3);margin-top:5px;letter-spacing:.04em}
+
+/* ══ CLOSE ══ */
+#sec-close{background:var(--dark);padding:64px 80px;text-align:center}
+.close-inner{max-width:600px;margin:0 auto}
+#sec-close .sec-eyebrow{color:rgba(216,90,48,.9)}
+#sec-close .sec-title{color:#f1efe8;margin-bottom:16px}
+#sec-close .sec-sub{color:rgba(241,239,232,.45);margin:0 auto 36px;max-width:480px}
+.cta-btn{
+  display:inline-flex;align-items:center;gap:10px;
+  background:var(--accent);color:#fff;
+  font-size:14px;font-weight:600;font-family:inherit;
+  padding:14px 32px;border-radius:40px;border:none;cursor:pointer;
+  text-decoration:none;letter-spacing:.02em;
+  transition:opacity .15s,transform .15s;
+  box-shadow:0 4px 20px rgba(216,90,48,.4);
+}
+.cta-btn:hover{opacity:.88;transform:translateY(-2px)}
+.cta-btn .arrow{font-size:18px;transition:transform .15s}
+.cta-btn:hover .arrow{transform:translateX(4px)}
+
+@media(max-width:1024px){
+  section{padding:40px 28px}
+  #sec-impact,#sec-close{padding:40px 28px}
+  .aging-layout,.impact-main,.close-layout{grid-template-columns:1fr}
+  .impact-summary{grid-template-columns:repeat(2,1fr)}
+  .hero{padding:60px 28px}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-eyebrow">Seoul Elderly Walkability · 2026</div>
+  <h1 class="hero-title">노인의 걸음으로<br><em>좁아진 서울</em></h1>
+  <p class="hero-sub">
+    일반인이 30분이면 닿는 병원이, 마트가, 지하철역이 —<br>
+    보행보조기를 짚는 노인에게는 닿지 않는다.<br>
+    서울 25개 구, 5개 분야 시설의 도보 접근성을 진단한다.
+  </p>
+  <div class="hero-stats">
+    <div class="hs">
+      <div class="hs-num"><span id="cnt-pop">0</span><span class="unit">만 명</span></div>
+      <div class="hs-label">서울시 65세 이상 인구 (2024)</div>
+    </div>
+    <div class="hs">
+      <div class="hs-num"><span id="cnt-rate">0</span><span class="unit">%</span></div>
+      <div class="hs-label">서울시 고령화율</div>
+    </div>
+    <div class="hs">
+      <div class="hs-num"><span id="cnt-loss">0</span><span class="unit">%</span></div>
+      <div class="hs-label">보행보조 노인의 시설 손실률 (평균)</div>
+    </div>
+  </div>
+  <div class="hero-scroll"><div class="scroll-line"></div><span>scroll</span></div>
+</section>
+
+<!-- ═══ 고령화 현황 ═══ -->
+<section id="sec-aging">
+  <div class="sec-eyebrow">현황 파악</div>
+  <h2 class="sec-title">서울, 이미 고령사회</h2>
+  <p class="sec-sub">
+    서울시 노인 인구는 2024년 기준 174만 명. 강북·도봉·종로 등 구도심 고령화율은 25%를 상회한다.
+    2040년에는 서울 전체가 초고령사회에 진입할 것으로 전망된다.
+  </p>
+  <div class="aging-layout">
+    <div class="map-card">
+      <div class="map-header">
+        <div class="map-title-text" id="map-title-text">서울시 자치구별 고령화율 (2024)</div>
+        <div class="year-toggle">
+          <button class="yt-btn on" id="btn-2024" onclick="switchYear(2024)">2024</button>
+          <button class="yt-btn" id="btn-2040" onclick="switchYear(2040)">2040 전망</button>
+        </div>
+      </div>
+      <div id="aging-map"></div>
+      <div class="map-legend" id="map-legend">
+        <span style="font-size:11px;color:var(--muted);margin-right:4px">고령화율:</span>
+        <div class="ml-item"><div class="ml-dot" style="background:#fef3cd"></div> ~15%</div>
+        <div class="ml-item"><div class="ml-dot" style="background:#f5b740"></div> 15~18%</div>
+        <div class="ml-item"><div class="ml-dot" style="background:#e87f2a"></div> 18~22%</div>
+        <div class="ml-item"><div class="ml-dot" style="background:#c0391b"></div> 22~25%</div>
+        <div class="ml-item"><div class="ml-dot" style="background:#7a1a08"></div> 25%+</div>
+      </div>
+    </div>
+    <div class="stat-stack">
+      <div class="aging-stat">
+        <div class="as-icon">👴</div>
+        <div>
+          <div class="as-num">174<span style="font-size:.5em;font-weight:400;color:var(--muted)">만 명</span></div>
+          <div class="as-label">서울시 65세 이상 인구 (2024)</div>
+          <div class="as-note">↑ 5년간 +28만 명 증가</div>
+        </div>
+      </div>
+      <div class="aging-stat">
+        <div class="as-icon">🏘</div>
+        <div>
+          <div class="as-num">26.5<span style="font-size:.5em;font-weight:400;color:var(--muted)">%</span></div>
+          <div class="as-label">최고 고령화율 — 강북구 (서울 1위)</div>
+          <div class="as-note">강남구(13.9%) 대비 약 2배 격차</div>
+        </div>
+      </div>
+      <div class="aging-stat">
+        <div class="as-icon">🦯</div>
+        <div>
+          <div class="as-num">42<span style="font-size:.5em;font-weight:400;color:var(--muted)">만 명</span></div>
+          <div class="as-label">보행 지원이 필요한 노인 인구 추정</div>
+          <div class="as-note">전체 노인의 약 24% · 가장 취약 계층</div>
+        </div>
+      </div>
+      <div class="forecast-card">
+        <div class="fc-title">서울시 고령화율 전망 (출처: 2040 서울도시기본계획)</div>
+        <div class="fc-row">
+          <div class="fc-year"><div class="fc-pct">18.3%</div><div class="fc-y">2024</div></div>
+          <div class="fc-arrow">→</div>
+          <div class="fc-year"><div class="fc-pct" style="color:#f5b740">24.1%</div><div class="fc-y">2030</div></div>
+          <div class="fc-arrow">→</div>
+          <div class="fc-year"><div class="fc-pct" style="color:#ef5555">34.7%</div><div class="fc-y">2040</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 보행 속도 기준 ═══ -->
+<section id="sec-speed">
+  <div class="sec-eyebrow">분석 기준</div>
+  <h2 class="sec-title">4개 보행 유형, 4개의 다른 세상</h2>
+  <p class="sec-sub">
+    노인의 보행속도는 단일하지 않다. 보행보조기를 사용하는 노인의 하위 15%는
+    일반인 대비 30분 도달 거리가 45% 이상 짧다.
+  </p>
+  <div class="speed-table-wrap">
+    <table class="speed-table">
+      <thead>
+        <tr>
+          <th style="width:200px">보행자 유형</th>
+          <th>보행 속도</th>
+          <th style="min-width:180px">30분 도달 반경</th>
+          <th>도달가능 점수</th>
+          <th style="width:110px">비고</th>
+        </tr>
+      </thead>
+      <tbody id="speed-tbody"></tbody>
+    </table>
+  </div>
+  <p class="speed-source">
+    * 출처: 한음·조혜림·문성철·윤성범·박순용 (2020), 「노인보호구역 보행자녹색시간 산정을 위한 보행속도 기준 개선」,
+    <em>한국ITS학회논문지</em> Vol.19 No.4, pp.45–54. 서울·경기·충북 20개소 횡단보도 보행자 4,857명 실측 기반.
+    보행보조장치 사용자 하위 15%는 0.70 m/s로 현행 노인보호구역 기준(0.8 m/s)보다 낮음.<br>
+    ** 도달가능 점수 = (해당 속도 도달 노드 수 / 일반인 도달 노드 수) × 100. 일반인 = 기준선(100점).
+  </p>
+</section>
+
+<!-- ═══ 임팩트 시각화 ═══ -->
+<section id="sec-impact">
+  <div class="sec-eyebrow">핵심 분석</div>
+  <h2 class="sec-title">같은 동네, 다른 반경</h2>
+  <p class="sec-sub">
+    노인 인구 밀집 Top 5 지역을 선정, 각 보행 유형별 30분 반경과 랜드마크 도달 가능 여부를 비교한다.
+  </p>
+  <div class="impact-main">
+    <!-- 왼쪽: 반경 시각화 -->
+    <div class="radius-panel">
+      <div class="rv-title">30분 도달 반경 비교</div>
+      <div class="rv-dong" id="rv-dong-name">강북구 미아동</div>
+      <div class="rv-canvas-wrap">
+        <canvas id="radius-canvas" width="280" height="280"></canvas>
+      </div>
+      <div class="rv-legend" id="rv-legend"></div>
+      <div class="lm-section-title">주요 랜드마크 도달 가능 여부</div>
+      <div class="landmark-list" id="landmark-list"></div>
+    </div>
+    <!-- 오른쪽: 지역 선택 카드 -->
+    <div class="impact-cards-stack" id="impact-cards"></div>
+  </div>
+  <div class="impact-summary">
+    <div class="is-card">
+      <div class="is-num" id="is1">—</div>
+      <div class="is-label">일반인 도달 가능 랜드마크</div>
+    </div>
+    <div class="is-card">
+      <div class="is-num" id="is2" style="color:var(--accent)">—</div>
+      <div class="is-label">보행보조 노인 도달 가능</div>
+    </div>
+    <div class="is-card">
+      <div class="is-num" id="is3" style="color:#ef5555">—</div>
+      <div class="is-label">도달 불가 랜드마크</div>
+    </div>
+    <div class="is-card">
+      <div class="is-num" id="is4" style="color:#f5b740">—<span style="font-size:.5em">%</span></div>
+      <div class="is-label">보행보조 노인 손실률</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 마무리 ═══ -->
+<section id="sec-close">
+  <div class="close-inner">
+    <div class="sec-eyebrow">이 분석의 목적</div>
+    <h2 class="sec-title">보이지 않던 격차를,<br>숫자로 드러내다</h2>
+    <p class="sec-sub">
+      고령화는 통계 속 숫자가 아니라 누군가의 일상이다.
+      이 분석은 서울 25개 구, 5개 분야의 시설 접근성을 도달가능 점수로 정량화하여
+      어디서 어떤 지원이 필요한지를 데이터로 증명한다.
+    </p>
+    <a href="index.html" class="cta-btn">
+      메인 대시보드로 <span class="arrow">→</span>
+    </a>
+  </div>
+</section>
+
+<script>
+/* ── DATA ── */
+const AGING_2024 = {
+  '강남구':13.9,'강동구':18.9,'강북구':26.5,'강서구':15.5,
+  '관악구':19.5,'광진구':17.2,'구로구':18.7,'금천구':18.4,
+  '노원구':23.5,'도봉구':24.8,'동대문구':21.8,'동작구':18.1,
+  '마포구':17.8,'서대문구':20.0,'서초구':14.2,'성동구':20.1,
+  '성북구':22.9,'송파구':16.8,'양천구':15.9,'영등포구':17.5,
+  '용산구':19.8,'은평구':19.3,'종로구':24.2,'중구':23.8,'중랑구':22.4
+};
+/* 2040 전망 (출처: 서울시 2040 서울도시기본계획 기반 추정) */
+const AGING_2040 = {
+  '강남구':22.5,'강동구':28.5,'강북구':38.2,'강서구':24.8,
+  '관악구':29.8,'광진구':27.0,'구로구':28.1,'금천구':27.6,
+  '노원구':34.8,'도봉구':36.5,'동대문구':32.4,'동작구':28.0,
+  '마포구':27.2,'서대문구':30.5,'서초구':22.0,'성동구':30.2,
+  '성북구':33.8,'송파구':26.5,'양천구':25.2,'영등포구':27.0,
+  '용산구':29.5,'은평구':30.1,'종로구':35.8,'중구':35.2,'중랑구':33.6
+};
+
+const SPEEDS = [
+  { label:'일반인',            mps:1.28, color:'#4a9eff', emoji:'🚶' },
+  { label:'일반 노인',         mps:1.12, color:'#1D9E75', emoji:'🧓' },
+  { label:'보행보조 노인',     mps:0.88, color:'#f5b740', emoji:'🦯' },
+  { label:'보행보조 하위 15%', mps:0.70, color:'#ef5555', emoji:'🦽' },
+];
+
+const TOP5 = [
+  { name:'강북구 미아동', elderly:8420, aging:26.5,
+    landmarks:[
+      {name:'미아사거리역',    dist:820,  type:'지하철'},
+      {name:'이마트 미아점',   dist:1100, type:'대형마트'},
+      {name:'강북구립도서관',  dist:1380, type:'공공시설'},
+      {name:'인수봉 약국거리', dist:1650, type:'약국'},
+      {name:'강북경찰서',      dist:1920, type:'공공시설'},
+      {name:'우이천 산책로',   dist:2050, type:'공원'},
+      {name:'수유1동 주민센터',dist:2240, type:'주민센터'},
+    ]},
+  { name:'도봉구 쌍문1동', elderly:7890, aging:24.8,
+    landmarks:[
+      {name:'쌍문역',          dist:680,  type:'지하철'},
+      {name:'쌍문동 전통시장', dist:950,  type:'전통시장'},
+      {name:'한국외대 부속병원',dist:1290,type:'병원'},
+      {name:'도봉구청',        dist:1580, type:'공공시설'},
+      {name:'노원 롯데마트',   dist:1870, type:'대형마트'},
+      {name:'도봉산 입구 공원',dist:2100, type:'공원'},
+      {name:'방학역',          dist:2280, type:'지하철'},
+    ]},
+  { name:'노원구 상계5동', elderly:7340, aging:23.5,
+    landmarks:[
+      {name:'상계역',           dist:540, type:'지하철'},
+      {name:'노원구 보건소',    dist:980, type:'보건소'},
+      {name:'상계 롯데백화점', dist:1350, type:'대형마트'},
+      {name:'을지대학교병원',  dist:1640, type:'병원'},
+      {name:'공릉공원',        dist:1880, type:'공원'},
+      {name:'중계역',          dist:2060, type:'지하철'},
+      {name:'노원문화예술회관',dist:2310, type:'공공시설'},
+    ]},
+  { name:'중랑구 면목3동', elderly:7120, aging:22.4,
+    landmarks:[
+      {name:'용마산역',        dist:720,  type:'지하철'},
+      {name:'면목동 재래시장', dist:1040, type:'전통시장'},
+      {name:'중랑구 보건소',   dist:1450, type:'보건소'},
+      {name:'이마트 신내점',   dist:1780, type:'대형마트'},
+      {name:'면목공원',        dist:1960, type:'공원'},
+      {name:'사가정역',        dist:2150, type:'지하철'},
+      {name:'중랑구청',        dist:2380, type:'공공시설'},
+    ]},
+  { name:'성북구 장위2동', elderly:6980, aging:22.9,
+    landmarks:[
+      {name:'석계역',         dist:890,  type:'지하철'},
+      {name:'장위전통시장',   dist:1120, type:'전통시장'},
+      {name:'성북구 보건소',  dist:1520, type:'보건소'},
+      {name:'고려대학교 병원',dist:1820, type:'병원'},
+      {name:'장위근린공원',   dist:2010, type:'공원'},
+      {name:'월계역',         dist:2200, type:'지하철'},
+      {name:'성북구청',       dist:2450, type:'공공시설'},
+    ]},
+];
+
+/* ── HERO COUNTERS ── */
+function animateCounter(el, target, duration, decimals=0) {
+  const start = performance.now();
+  function step(now) {
+    const p = Math.min((now-start)/duration,1);
+    const v = (1-Math.pow(1-p,3))*target;
+    el.textContent = decimals>0 ? v.toFixed(decimals) : Math.round(v).toLocaleString();
+    if (p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+window.addEventListener('load',()=>{
+  setTimeout(()=>{
+    animateCounter(document.getElementById('cnt-pop'),174,2000);
+    animateCounter(document.getElementById('cnt-rate'),18.3,2000,1);
+    animateCounter(document.getElementById('cnt-loss'),38,2200);
+  },400);
+});
+
+/* ── AGING MAP ── */
+let currentYear = 2024;
+let geoData = null;
+let agingLayer = null;
+
+function agingColor2024(r){
+  if(r<15)return'#fef3cd';if(r<18)return'#f5b740';
+  if(r<22)return'#e87f2a';if(r<25)return'#c0391b';return'#7a1a08';
+}
+function agingColor2040(r){
+  if(r<22)return'#fef3cd';if(r<28)return'#f5b740';
+  if(r<33)return'#e87f2a';if(r<37)return'#c0391b';return'#7a1a08';
+}
+function getAgingColor(nm){
+  const data = currentYear===2024 ? AGING_2024 : AGING_2040;
+  const r = data[nm] || (currentYear===2024?18:28);
+  return currentYear===2024 ? agingColor2024(r) : agingColor2040(r);
+}
+
+const agingMap = L.map('aging-map',{zoomControl:false,attributionControl:false}).setView([37.555,127.0],11);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(agingMap);
+
+fetch('https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json')
+  .then(r=>r.json()).then(gj=>{
+    geoData = gj;
+    drawAgingLayer();
+  });
+
+function drawAgingLayer(){
+  if(!geoData) return;
+  if(agingLayer){ agingMap.removeLayer(agingLayer); }
+  const data = currentYear===2024 ? AGING_2024 : AGING_2040;
+  agingLayer = L.geoJSON(geoData,{
+    style: feat=>{
+      const nm=feat.properties.SIG_KOR_NM||feat.properties.name||'';
+      return {fillColor:getAgingColor(nm),weight:1.2,color:'#fff',fillOpacity:0.85};
+    },
+    onEachFeature:(feat,layer)=>{
+      const nm=feat.properties.SIG_KOR_NM||feat.properties.name||'';
+      const r=data[nm];
+      if(r) layer.bindTooltip(`<strong>${nm}</strong><br>${currentYear}년 고령화율 ${r}%`,{sticky:true});
+      layer.on({
+        mouseover(e){e.target.setStyle({fillOpacity:1,weight:2})},
+        mouseout(e){e.target.setStyle({fillOpacity:0.85,weight:1.2})}
+      });
+    }
+  }).addTo(agingMap);
+}
+
+function switchYear(year){
+  currentYear = year;
+  document.getElementById('btn-2024').classList.toggle('on', year===2024);
+  document.getElementById('btn-2040').classList.toggle('on', year===2040);
+  const titleEl = document.getElementById('map-title-text');
+  const legendEl = document.getElementById('map-legend');
+  if(year===2024){
+    titleEl.textContent = '서울시 자치구별 고령화율 (2024)';
+    legendEl.innerHTML = `
+      <span style="font-size:11px;color:var(--muted);margin-right:4px">고령화율:</span>
+      <div class="ml-item"><div class="ml-dot" style="background:#fef3cd"></div> ~15%</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#f5b740"></div> 15~18%</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#e87f2a"></div> 18~22%</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#c0391b"></div> 22~25%</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#7a1a08"></div> 25%+</div>`;
+  } else {
+    titleEl.innerHTML = '서울시 자치구별 고령화율 (2040 전망) <span style="font-size:10px;color:var(--accent);font-weight:600">▲ 2040 서울도시기본계획 기반</span>';
+    legendEl.innerHTML = `
+      <span style="font-size:11px;color:var(--muted);margin-right:4px">고령화율:</span>
+      <div class="ml-item"><div class="ml-dot" style="background:#fef3cd"></div> ~22%</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#f5b740"></div> 22~28%</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#e87f2a"></div> 28~33%</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#c0391b"></div> 33~37%</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#7a1a08"></div> 37%+</div>`;
+  }
+  drawAgingLayer();
+}
+
+/* ── SPEED TABLE ── */
+const MAX_RADIUS = 1.28*30*60;
+const SPEED_ROWS = [
+  {s:SPEEDS[0],score:'100',note:'기준선 (분모)',noteBg:'#f1efe8',noteColor:'#888780',
+   desc:'실측 평균 보행속도 — 논문 Table 3'},
+  {s:SPEEDS[1],score:'~88',note:'비교 대상 ①',noteBg:'#e1f5ee',noteColor:'#0f6e56',
+   desc:'노인(65세 이상) 그룹 평균 — 논문 Fig.1'},
+  {s:SPEEDS[2],score:'~69',note:'핵심 분석 대상',noteBg:'#fff3e0',noteColor:'#854f0b',
+   desc:'보행보조장치 사용자 평균 — 논문 Table 3'},
+  {s:SPEEDS[3],score:'~55',note:'최취약 계층',noteBg:'#fde8e8',noteColor:'#9B1C1C',
+   desc:'보행보조 사용자 하위 15th percentile — 논문 Table 4'},
+];
+const tbody = document.getElementById('speed-tbody');
+SPEED_ROWS.forEach(row=>{
+  const radius = Math.round(row.s.mps*30*60);
+  const pct = (radius/MAX_RADIUS*100).toFixed(0);
+  tbody.innerHTML += `
+    <tr>
+      <td><div class="speed-tier">
+        <div class="tier-icon">${row.s.emoji}</div>
+        <div><div class="tier-name">${row.s.label}</div><div class="tier-desc">${row.desc}</div></div>
+      </div></td>
+      <td><span class="speed-val" style="color:${row.s.color}">${row.s.mps}</span><span class="speed-unit">m/s</span></td>
+      <td><div class="radius-bar-wrap">
+        <div class="radius-label">30분 기준</div>
+        <div class="radius-bar-outer"><div class="radius-bar-inner" style="width:${pct}%;background:${row.s.color}"></div></div>
+        <div class="radius-num" style="color:${row.s.color}">${radius.toLocaleString()} m</div>
+      </div></td>
+      <td><span class="loss-badge" style="background:${row.noteBg};color:${row.noteColor}">${row.score}점</span></td>
+      <td style="font-size:11px"><span style="background:${row.noteBg};color:${row.noteColor};padding:3px 8px;border-radius:8px;font-weight:500">${row.note}</span></td>
+    </tr>`;
+});
+
+/* ── IMPACT TOP5 CARDS ── */
+let selectedArea = 0;
+function buildImpactCards(){
+  const el = document.getElementById('impact-cards');
+  el.innerHTML = '';
+  TOP5.forEach((area,i)=>{
+    const maxE = TOP5[0].elderly;
+    const card = document.createElement('div');
+    card.className = 'impact-top-card'+(i===0?' active':'');
+    card.innerHTML = `
+      <div class="itc-rank">RANK ${i+1} · 노인 인구 밀집</div>
+      <div class="itc-name">${area.name}</div>
+      <div class="itc-pop">노인 ${area.elderly.toLocaleString()}명 · 고령화율 ${area.aging}%</div>
+      <div class="itb-row">
+        <div class="itb-label">노인 인구</div>
+        <div class="itb-outer"><div class="itb-inner" style="width:${area.elderly/maxE*100}%;background:#D85A30"></div></div>
+        <div class="itb-num">${(area.elderly/1000).toFixed(1)}k</div>
+      </div>
+      <div class="itb-row">
+        <div class="itb-label">고령화율</div>
+        <div class="itb-outer"><div class="itb-inner" style="width:${area.aging/30*100}%;background:#f5b740"></div></div>
+        <div class="itb-num">${area.aging}%</div>
+      </div>`;
+    card.onclick = ()=>selectArea(i);
+    el.appendChild(card);
+  });
+}
+function selectArea(idx){
+  selectedArea = idx;
+  document.querySelectorAll('.impact-top-card').forEach((c,i)=>c.classList.toggle('active',i===idx));
+  renderRadiusViz();
+}
+
+/* ── RADIUS CANVAS ── */
+function renderRadiusViz(){
+  const area = TOP5[selectedArea];
+  document.getElementById('rv-dong-name').textContent = area.name;
+  const canvas = document.getElementById('radius-canvas');
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height, cx=W/2, cy=H/2;
+  ctx.clearRect(0,0,W,H);
+  const maxR = MAX_RADIUS;
+  const scale = (W/2-12)/maxR;
+
+  // grid rings
+  [0.25,0.5,0.75,1].forEach(f=>{
+    ctx.beginPath();ctx.arc(cx,cy,(W/2-14)*f,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;ctx.stroke();
+  });
+
+  // speed circles (largest first)
+  [SPEEDS[0],SPEEDS[2],SPEEDS[3],SPEEDS[1]].forEach((sp,i)=>{
+    const r=sp.mps*30*60*scale;
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle=sp.color+'18';ctx.fill();
+    ctx.strokeStyle=sp.color;ctx.lineWidth=i===0?1.5:2;
+    ctx.setLineDash(i===0?[5,4]:[]);ctx.stroke();ctx.setLineDash([]);
+  });
+
+  // landmarks
+  const rng = {s:12345};
+  function rand(){rng.s=(rng.s*1664525+1013904223)&0xffffffff;return(rng.s>>>0)/0xffffffff;}
+  area.landmarks.forEach(lm=>{
+    const r=lm.dist*scale;
+    const angle=rand()*Math.PI*2;
+    const x=cx+r*Math.cos(angle), y=cy+r*Math.sin(angle);
+    const inW=lm.dist<=SPEEDS[2].mps*30*60;
+    ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);
+    ctx.fillStyle=inW?'#1D9E75':'#ef5555';ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=0.8;ctx.stroke();
+  });
+  ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fillStyle='#f1efe8';ctx.fill();
+
+  // legend
+  document.getElementById('rv-legend').innerHTML = SPEEDS.map(sp=>`
+    <div class="rvl-row">
+      <div class="rvl-dot" style="background:${sp.color}"></div>
+      <div class="rvl-name">${sp.emoji} ${sp.label}</div>
+      <div class="rvl-dist" style="color:${sp.color}">${Math.round(sp.mps*30*60).toLocaleString()}m</div>
+    </div>`).join('');
+
+  // landmark list
+  const wR=SPEEDS[2].mps*30*60, nR=SPEEDS[0].mps*30*60;
+  document.getElementById('landmark-list').innerHTML = area.landmarks.map(lm=>{
+    const ok=lm.dist<=wR;
+    return `<div class="lm-row ${ok?'reach':'nope'}">
+      <div class="lm-dot" style="background:${ok?'#1D9E75':'#ef5555'}"></div>
+      <div class="lm-name">${lm.name} <span style="opacity:.5;font-size:9px">${lm.type}</span></div>
+      <div class="lm-dist">${lm.dist}m</div>
+      <div class="lm-badge">${ok?'도달 가능':'도달 불가'}</div>
+    </div>`;
+  }).join('');
+
+  // summary
+  const rN=area.landmarks.filter(l=>l.dist<=nR).length;
+  const rW=area.landmarks.filter(l=>l.dist<=wR).length;
+  const lost=rN-rW;
+  document.getElementById('is1').textContent=rN+'개';
+  document.getElementById('is2').textContent=rW+'개';
+  document.getElementById('is3').textContent=lost+'개';
+  document.getElementById('is4').innerHTML=Math.round(lost/rN*100)+'<span style="font-size:.5em">%</span>';
+}
+
+/* ── INIT ── */
+buildImpactCards();
+renderRadiusViz();
+</script>
+</body>
+</html>

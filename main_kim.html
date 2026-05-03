@@ -1,0 +1,1808 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>분(分)의 격차 — 서울 노인 도보 생활권 진단</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600&family=Noto+Sans+KR:wght@300;400;500;700;900&family=IBM+Plex+Mono:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+    <style>
+      :root {
+        --bg: #020510;
+        --accent: #4fc3f7;
+        --gold: #f5b740;
+        --mono: "IBM Plex Mono", monospace;
+        --serif: "Noto Serif KR", serif;
+        --sans: "Noto Sans KR", sans-serif;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        scroll-behavior: auto;
+      }
+      body {
+        font-family: var(--sans);
+        background: var(--bg);
+        color: #edecea;
+        overflow-x: hidden;
+      }
+
+      /* ── SECTION 1: SPACE ── */
+      #sec-space {
+        position: relative;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      #stars-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+      }
+      .space-planet {
+        position: absolute;
+        z-index: 1;
+        pointer-events: none;
+      }
+      .planet-body {
+        width: 320px;
+        height: 320px;
+        border-radius: 50%;
+        position: relative;
+        overflow: hidden;
+      }
+      .planet-surface {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: radial-gradient(
+          ellipse at 35% 35%,
+          #1e4a7c 0%,
+          #0c2444 40%,
+          #060f20 100%
+        );
+      }
+      .planet-shadow {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        box-shadow: rgba(0, 0, 0, 0.97) 120px -90px 80px -10px inset;
+      }
+      .planet-glow {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        box-shadow: rgba(79, 195, 247, 0.35) -50px 40px 60px -40px inset;
+      }
+      .planet-lights {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background:
+          radial-gradient(
+            circle at 40% 55%,
+            rgba(255, 220, 100, 0.06) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 65% 40%,
+            rgba(255, 220, 100, 0.04) 0%,
+            transparent 40%
+          ),
+          radial-gradient(
+            circle at 30% 70%,
+            rgba(79, 195, 247, 0.05) 0%,
+            transparent 30%
+          );
+      }
+      .planet-outer-glow {
+        position: absolute;
+        inset: -20px;
+        border-radius: 50%;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(79, 195, 247, 0.08) 0%,
+          transparent 65%
+        );
+        pointer-events: none;
+      }
+      .planet-ring {
+        position: absolute;
+        width: 520px;
+        height: 60px;
+        border-radius: 50%;
+        border: 1px solid rgba(79, 195, 247, 0.12);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotateX(75deg);
+        pointer-events: none;
+      }
+      .planet-ring-2 {
+        position: absolute;
+        width: 620px;
+        height: 80px;
+        border-radius: 50%;
+        border: 1px solid rgba(79, 195, 247, 0.06);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotateX(75deg);
+        pointer-events: none;
+      }
+      .space-content {
+        position: relative;
+        z-index: 3;
+        text-align: center;
+        padding: 0 24px;
+        max-width: 760px;
+      }
+      .space-kicker {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.3em;
+        color: rgba(79, 195, 247, 0.7);
+        text-transform: uppercase;
+        margin-bottom: 1.4rem;
+        display: block;
+        opacity: 0;
+      }
+      .space-headline {
+        font-family: var(--serif);
+        font-size: clamp(2rem, 5vw, 3.6rem);
+        font-weight: 300;
+        line-height: 1.35;
+        margin-bottom: 1.8rem;
+        opacity: 0;
+        transform: translateY(24px);
+      }
+      .space-headline em {
+        color: var(--gold);
+        font-style: normal;
+      }
+      .space-sub {
+        font-size: clamp(0.85rem, 1.4vw, 1rem);
+        color: rgba(255, 255, 255, 0.5);
+        line-height: 1.9;
+        margin-bottom: 2.8rem;
+        opacity: 0;
+      }
+      .stat-row {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        opacity: 0;
+      }
+      .stat-pill {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.6);
+        border: 1px solid rgba(79, 195, 247, 0.2);
+        padding: 0.6rem 1.2rem;
+        border-radius: 40px;
+        backdrop-filter: blur(8px);
+        background: rgba(79, 195, 247, 0.04);
+      }
+      .stat-pill strong {
+        color: var(--accent);
+      }
+      .scroll-hint {
+        position: absolute;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.6rem;
+        z-index: 3;
+        opacity: 0;
+      }
+      .scroll-hint span {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.25em;
+        color: rgba(255, 255, 255, 0.3);
+      }
+      .scroll-hint::after {
+        content: "";
+        width: 1px;
+        height: 48px;
+        background: linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.3),
+          transparent
+        );
+        animation: line-drop 1.8s ease-in-out infinite;
+      }
+      @keyframes line-drop {
+        0% {
+          opacity: 0;
+          transform: scaleY(0);
+          transform-origin: top;
+        }
+        50% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+          transform: scaleY(1);
+          transform-origin: top;
+        }
+      }
+
+      /* ── SECTION 2: INTRODUCE LINK ── */
+      #sec-intro-link {
+        background: linear-gradient(
+          180deg,
+          #020510 0%,
+          #060d1e 60%,
+          #020510 100%
+        );
+        padding: 100px 80px;
+        position: relative;
+        overflow: hidden;
+      }
+      #sec-intro-link::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(79, 195, 247, 0.018) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(79, 195, 247, 0.018) 1px, transparent 1px);
+        background-size: 80px 80px;
+        pointer-events: none;
+      }
+      .intro-link-inner {
+        max-width: 1160px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 80px;
+        align-items: center;
+        position: relative;
+        z-index: 1;
+      }
+      .intro-preview-tiles {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .ipt-card {
+        background: rgba(255, 255, 255, 0.032);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 14px;
+        padding: 20px 24px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .ipt-card:nth-child(2) {
+        transform: translateX(24px);
+      }
+      .ipt-card:nth-child(3) {
+        transform: translateX(48px);
+      }
+      .ipt-icon {
+        font-size: 1.9rem;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+      .ipt-val {
+        font-family: var(--mono);
+        font-size: 1.65rem;
+        font-weight: 500;
+        line-height: 1;
+        color: var(--accent);
+      }
+      .ipt-label {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.38);
+        margin-top: 5px;
+        line-height: 1.5;
+      }
+      .intro-text-side .section-kicker {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.35em;
+        color: rgba(79, 195, 247, 0.6);
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 1.4rem;
+      }
+      .intro-text-side h2 {
+        font-family: var(--serif);
+        font-size: clamp(1.7rem, 2.8vw, 2.6rem);
+        font-weight: 300;
+        line-height: 1.4;
+        margin-bottom: 1.2rem;
+      }
+      .intro-text-side h2 em {
+        color: var(--gold);
+        font-style: normal;
+      }
+      .intro-text-side p {
+        font-size: 0.92rem;
+        color: rgba(255, 255, 255, 0.5);
+        line-height: 1.95;
+        margin-bottom: 2.4rem;
+        max-width: 440px;
+      }
+      .intro-cta-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        text-decoration: none;
+        border: 1px solid rgba(79, 195, 247, 0.3);
+        border-radius: 12px;
+        padding: 1rem 1.8rem;
+        background: rgba(79, 195, 247, 0.06);
+        color: rgba(255, 255, 255, 0.88);
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        position: relative;
+        overflow: hidden;
+        transition:
+          border-color 0.25s,
+          background 0.25s,
+          box-shadow 0.25s,
+          transform 0.2s;
+      }
+      .intro-cta-btn::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          135deg,
+          rgba(79, 195, 247, 0.1) 0%,
+          transparent 60%
+        );
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .intro-cta-btn:hover {
+        border-color: rgba(79, 195, 247, 0.6);
+        background: rgba(79, 195, 247, 0.1);
+        box-shadow: 0 0 32px rgba(79, 195, 247, 0.15);
+        transform: translateY(-2px);
+      }
+      .intro-cta-btn:hover::before {
+        opacity: 1;
+      }
+      .intro-cta-arrow {
+        font-size: 16px;
+        position: relative;
+        z-index: 1;
+        transition: transform 0.2s;
+      }
+      .intro-cta-btn:hover .intro-cta-arrow {
+        transform: translateX(4px);
+      }
+      .intro-cta-btn span:first-child {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ── SECTION 3: DESCENT ── */
+      #sec-descent {
+        min-height: 55vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 80px 24px;
+        background: linear-gradient(180deg, #020510 0%, #061020 100%);
+        position: relative;
+        overflow: hidden;
+      }
+      #sec-descent::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 70% 80% at 50% 50%,
+          rgba(79, 195, 247, 0.04) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+      .section-kicker {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.35em;
+        color: rgba(79, 195, 247, 0.6);
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 1.2rem;
+      }
+      .descent-inner {
+        position: relative;
+        z-index: 1;
+        max-width: 700px;
+      }
+      .descent-inner .section-kicker {
+        color: rgba(245, 183, 64, 0.7);
+      }
+      .descent-inner h2 {
+        font-family: var(--serif);
+        font-size: clamp(1.6rem, 3vw, 2.4rem);
+        font-weight: 300;
+        line-height: 1.45;
+        margin-bottom: 1.4rem;
+        background: linear-gradient(135deg, #edecea, var(--accent));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .descent-inner p {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.95rem;
+        line-height: 2;
+      }
+      .time-table {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        margin-top: 2.2rem;
+        text-align: left;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 1.4rem 2rem;
+      }
+      .time-row {
+        display: flex;
+        gap: 2rem;
+        align-items: center;
+        font-family: var(--mono);
+        font-size: 13px;
+      }
+      .time-row .age {
+        color: rgba(255, 255, 255, 0.5);
+        min-width: 156px;
+      }
+      .time-row .bar {
+        height: 3px;
+        border-radius: 2px;
+        background: var(--gold);
+      }
+      .time-row .val {
+        color: var(--gold);
+        font-weight: 500;
+      }
+
+      /* ── SECTION 4: CATEGORIES — LEFT STICKY + RIGHT ZIGZAG ── */
+      #sec-categories {
+        position: relative;
+      }
+
+      #cat-sticky-wrap {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* Backgrounds */
+      .cat-bg-layer {
+        position: absolute;
+        inset: 0;
+        transition: opacity 1.2s ease;
+        opacity: 0;
+      }
+      .cat-bg-layer.active {
+        opacity: 1;
+      }
+
+      .bg-climate {
+        background: linear-gradient(
+          135deg,
+          #040918 0%,
+          #0a1a38 50%,
+          #040a1c 100%
+        );
+      }
+      .bg-climate::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            ellipse 50% 40% at 20% 30%,
+            rgba(30, 80, 180, 0.18) 0%,
+            transparent 70%
+          ),
+          radial-gradient(
+            ellipse 30% 50% at 80% 70%,
+            rgba(100, 150, 255, 0.08) 0%,
+            transparent 60%
+          );
+      }
+      .bg-infra {
+        background: linear-gradient(
+          135deg,
+          #0e0800 0%,
+          #1e1000 50%,
+          #0a0500 100%
+        );
+      }
+      .bg-infra::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            ellipse 60% 40% at 30% 60%,
+            rgba(220, 120, 20, 0.12) 0%,
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 40% 60% at 70% 30%,
+            rgba(255, 180, 60, 0.06) 0%,
+            transparent 50%
+          );
+      }
+      .bg-medical {
+        background: linear-gradient(
+          135deg,
+          #020e1a 0%,
+          #041e30 50%,
+          #020c18 100%
+        );
+      }
+      .bg-medical::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            ellipse 50% 50% at 50% 40%,
+            rgba(0, 180, 160, 0.1) 0%,
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 30% 40% at 20% 80%,
+            rgba(40, 140, 200, 0.06) 0%,
+            transparent 50%
+          );
+      }
+      .bg-welfare {
+        background: linear-gradient(
+          135deg,
+          #020e05 0%,
+          #041a08 50%,
+          #021005 100%
+        );
+      }
+      .bg-welfare::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            ellipse 60% 50% at 40% 50%,
+            rgba(30, 160, 80, 0.12) 0%,
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 40% 60% at 70% 30%,
+            rgba(80, 200, 100, 0.06) 0%,
+            transparent 50%
+          );
+      }
+
+      /* Left panel: absolutely positioned inside sticky */
+      .cat-left-panel {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 46%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 80px 56px 80px 80px;
+        z-index: 2;
+        pointer-events: none;
+      }
+      .cat-left-meta-label {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        color: rgba(255, 255, 255, 0.2);
+        text-transform: uppercase;
+        margin-bottom: 48px;
+      }
+      .cat-left-items-wrap {
+        position: relative;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 260px;
+      }
+      .cat-left-item {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        transform: translateY(calc(-50% + 24px));
+        opacity: 0;
+        transition:
+          opacity 0.55s ease,
+          transform 0.55s ease;
+        pointer-events: none;
+      }
+      .cat-left-item.active {
+        opacity: 1;
+        transform: translateY(-50%);
+        pointer-events: auto;
+      }
+      .cli-eyebrow {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        margin-bottom: 1.1rem;
+        opacity: 0.85;
+      }
+      .cli-title {
+        font-family: var(--serif);
+        font-size: clamp(2rem, 2.8vw, 3rem);
+        font-weight: 300;
+        line-height: 1.22;
+        margin-bottom: 1.3rem;
+        color: #f0ede6;
+      }
+      .cli-sub {
+        display: block;
+        font-size: 0.68em;
+        color: rgba(255, 255, 255, 0.38);
+        margin-top: 6px;
+        letter-spacing: 0;
+      }
+      .cli-desc {
+        font-size: 0.89rem;
+        color: rgba(255, 255, 255, 0.46);
+        line-height: 1.95;
+        max-width: 320px;
+        margin-bottom: 1.6rem;
+      }
+      .cli-analyst {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        color: rgba(255, 255, 255, 0.2);
+        text-transform: uppercase;
+      }
+
+      /* Vertical progress indicator */
+      .cat-dots-v {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-bottom: 88px;
+      }
+      .cat-dot-v {
+        width: 5px;
+        height: 5px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.16);
+        transition:
+          background 0.35s,
+          height 0.35s;
+        flex-shrink: 0;
+      }
+      .cat-dot-v.active {
+        background: rgba(255, 255, 255, 0.72);
+        height: 22px;
+      }
+
+      /* Right panel: pulled up via negative margin to overlap sticky */
+      .cat-right-panel {
+        margin-top: -100vh;
+        padding-left: 48%;
+        padding-right: 80px;
+        padding-top: 16vh;
+        padding-bottom: 38vh;
+        display: flex;
+        flex-direction: column;
+        gap: 140px;
+        position: relative;
+        z-index: 3;
+        pointer-events: none;
+      }
+
+      /* Cards: normal flow, zigzag */
+      .cat-card {
+        position: relative;
+        pointer-events: auto;
+        width: min(440px, 100%);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(22px);
+        -webkit-backdrop-filter: blur(22px);
+        padding: 2.4rem 2.6rem 2rem;
+        opacity: 0;
+        transform: translateY(50px);
+        will-change: transform, opacity;
+        transition: border-color 0.4s;
+      }
+      .cat-card:nth-child(odd) {
+        margin-right: auto;
+      }
+      .cat-card:nth-child(even) {
+        margin-left: auto;
+      }
+      .cat-card.is-active {
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      .cat-card:hover .cat-btn {
+        background: rgba(255, 255, 255, 0.12);
+        transform: translateX(4px);
+      }
+
+      .cat-card-climate {
+        background: rgba(10, 25, 60, 0.55);
+      }
+      .cat-card-infra {
+        background: rgba(30, 16, 4, 0.55);
+      }
+      .cat-card-medical {
+        background: rgba(4, 20, 32, 0.55);
+      }
+      .cat-card-welfare {
+        background: rgba(4, 16, 8, 0.55);
+      }
+
+      .cat-domain-tag {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        color: rgba(255, 255, 255, 0.35);
+        display: block;
+        margin-bottom: 1rem;
+      }
+      .cat-icon {
+        font-size: 2.4rem;
+        margin-bottom: 1.1rem;
+        display: block;
+        line-height: 1;
+      }
+      .cat-card h2 {
+        font-family: var(--serif);
+        font-size: clamp(1.6rem, 2.2vw, 2.1rem);
+        font-weight: 400;
+        margin-bottom: 0.7rem;
+        line-height: 1.2;
+      }
+      .cat-card .cat-stat {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.32);
+        margin-bottom: 1rem;
+        letter-spacing: 0.04em;
+      }
+      .cat-card p {
+        font-size: 0.92rem;
+        color: rgba(255, 255, 255, 0.62);
+        line-height: 1.85;
+        margin-bottom: 1.8rem;
+      }
+      .cat-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.15em;
+        color: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 0.65rem 1.3rem;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        text-decoration: none;
+        transition:
+          background 0.2s,
+          transform 0.2s;
+      }
+
+      /* ── SECTION 5: CONCLUSION CTA ── */
+      #sec-conclusion {
+        background: linear-gradient(
+          180deg,
+          #020510 0%,
+          #06091a 50%,
+          #020510 100%
+        );
+        padding: 120px 80px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 80vh;
+      }
+      #sec-conclusion::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 60% 70% at 50% 50%,
+          rgba(245, 183, 64, 0.055) 0%,
+          transparent 65%
+        );
+        pointer-events: none;
+      }
+      .ccta-wrap {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        max-width: 720px;
+      }
+      .ccta-kicker {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.35em;
+        color: rgba(245, 183, 64, 0.55);
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 1.6rem;
+      }
+      .ccta-title {
+        font-family: var(--serif);
+        font-size: clamp(2rem, 4vw, 3.4rem);
+        font-weight: 300;
+        line-height: 1.3;
+        margin-bottom: 1.4rem;
+      }
+      .ccta-title em {
+        color: var(--gold);
+        font-style: normal;
+      }
+      .ccta-desc {
+        font-size: 0.95rem;
+        color: rgba(255, 255, 255, 0.44);
+        line-height: 1.95;
+        margin-bottom: 2.8rem;
+      }
+      .ccta-domains {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 3rem;
+      }
+      .ccta-domain-tag {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        padding: 5px 14px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        color: rgba(255, 255, 255, 0.35);
+      }
+      .ccta-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 16px;
+        text-decoration: none;
+        background: linear-gradient(
+          135deg,
+          rgba(245, 183, 64, 0.14) 0%,
+          rgba(245, 183, 64, 0.05) 100%
+        );
+        border: 1px solid rgba(245, 183, 64, 0.32);
+        border-radius: 14px;
+        padding: 1.1rem 2.4rem;
+        color: rgba(255, 255, 255, 0.88);
+        font-family: var(--mono);
+        font-size: 13px;
+        letter-spacing: 0.15em;
+        position: relative;
+        overflow: hidden;
+        transition:
+          border-color 0.3s,
+          box-shadow 0.3s,
+          transform 0.2s;
+      }
+      .ccta-btn::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          135deg,
+          rgba(245, 183, 64, 0.18) 0%,
+          transparent 70%
+        );
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .ccta-btn:hover {
+        border-color: rgba(245, 183, 64, 0.62);
+        box-shadow:
+          0 0 52px rgba(245, 183, 64, 0.18),
+          0 8px 32px rgba(0, 0, 0, 0.4);
+        transform: translateY(-3px);
+      }
+      .ccta-btn:hover::before {
+        opacity: 1;
+      }
+      .ccta-btn-text {
+        position: relative;
+        z-index: 1;
+      }
+      .ccta-btn-arrow {
+        font-size: 18px;
+        color: var(--gold);
+        position: relative;
+        z-index: 1;
+        transition: transform 0.2s;
+      }
+      .ccta-btn:hover .ccta-btn-arrow {
+        transform: translate(3px, -3px);
+      }
+
+      /* ── CURSOR ── */
+      body { cursor: none; }
+      #cursor {
+        position: fixed; width: 12px; height: 12px;
+        background: white; border-radius: 50%;
+        pointer-events: none; z-index: 9999;
+        transform: translate(-50%, -50%);
+        transition: width .3s cubic-bezier(.16,1,.3,1), height .3s cubic-bezier(.16,1,.3,1);
+        mix-blend-mode: difference;
+      }
+      #cursor-ring {
+        position: fixed; width: 40px; height: 40px;
+        border: 1px solid rgba(255,255,255,.35);
+        border-radius: 50%; pointer-events: none; z-index: 9998;
+        transform: translate(-50%, -50%);
+        transition: all .15s cubic-bezier(.16,1,.3,1);
+        mix-blend-mode: difference;
+      }
+      body.cursor-hover #cursor { width: 20px; height: 20px; }
+      body.cursor-hover #cursor-ring { width: 58px; height: 58px; border-color: rgba(255,255,255,.75); }
+
+      /* ── CARD CANVAS ── */
+      .cat-card-canvas {
+        position: absolute; inset: 0; z-index: 0;
+        pointer-events: none; border-radius: 20px;
+      }
+      .cat-domain-tag, .cat-icon, .cat-card h2,
+      .cat-card .cat-stat, .cat-card p, .cat-btn {
+        position: relative; z-index: 1;
+      }
+
+      /* Footer */
+      footer {
+        background: #020510;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 3rem 24px;
+        text-align: center;
+      }
+      footer p {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.2);
+        line-height: 2;
+        letter-spacing: 0.05em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cursor"></div>
+    <div id="cursor-ring"></div>
+
+    <!-- ═══ SECTION 1: SPACE ═══ -->
+    <section id="sec-space">
+      <canvas id="stars-canvas"></canvas>
+
+      <div
+        class="space-planet"
+        id="space-planet"
+        style="
+          transform: translate(-50%, -50%);
+          position: absolute;
+          top: 50%;
+          left: 50%;
+        "
+      >
+        <div class="planet-ring-2"></div>
+        <div class="planet-ring"></div>
+        <div class="planet-outer-glow"></div>
+        <div class="planet-body">
+          <div class="planet-surface"></div>
+          <div class="planet-lights"></div>
+          <div class="planet-glow"></div>
+          <div class="planet-shadow"></div>
+        </div>
+      </div>
+
+      <div class="space-content">
+        <span class="space-kicker"
+          >서울 2040 도시기본계획 · 도보 30분 생활권</span
+        >
+        <h1 class="space-headline">
+          "걸어서 30분"<br />
+          <em>이 약속은 누구의 시간으로</em><br />
+          만들어졌는가?
+        </h1>
+        <p class="space-sub">
+          서울시는 도보 30분 생활권을 핵심 비전으로 내걸었다.<br />
+          그러나 그 30분은 청장년층(1.28m/s)의 시간이다.<br />
+          2040년, 서울 인구의 32%는 65세 이상 노인이 된다.
+        </p>
+        <div class="stat-row">
+          <div class="stat-pill">
+            노인 보행속도 <strong>1.12–0.70 m/s</strong>
+          </div>
+          <div class="stat-pill">청년 30분 → 노인 <strong>34분+</strong></div>
+          <div class="stat-pill">2040 노인 인구 <strong>32%</strong></div>
+        </div>
+      </div>
+
+      <div class="scroll-hint"><span>SCROLL</span></div>
+    </section>
+
+    <!-- ═══ SECTION 2: INTRODUCE LINK ═══ -->
+    <section id="sec-intro-link">
+      <div class="intro-link-inner">
+        <!-- Left: preview stat tiles -->
+        <div class="intro-preview-tiles">
+          <div class="ipt-card">
+            <div class="ipt-icon">🗺</div>
+            <div>
+              <div class="ipt-val">19.8%</div>
+              <div class="ipt-label">
+                2024 서울 평균 고령화율<br />자치구별 지도 시각화
+              </div>
+            </div>
+          </div>
+          <div class="ipt-card">
+            <div class="ipt-icon">📈</div>
+            <div>
+              <div class="ipt-val">32%</div>
+              <div class="ipt-label">
+                2040 예측 고령화율<br />현재 vs 전망 토글 비교
+              </div>
+            </div>
+          </div>
+          <div class="ipt-card">
+            <div class="ipt-icon">🚶</div>
+            <div>
+              <div class="ipt-val">4종</div>
+              <div class="ipt-label">
+                실증 보행속도 기준 (4,857명)<br />일반인·노인·보조·하위15%
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: text + button -->
+        <div class="intro-text-side">
+          <span class="section-kicker">서론 · 시각화 배경</span>
+          <h2>
+            왜 노인 보행속도인가<br />
+            — <em>시각화의 출발점</em>
+          </h2>
+          <p>
+            2040년 서울 고령화 전망, 실증 보행속도 4가지 기준, 그리고 고령인구
+            밀집 지역에서 발생하는 반경 손실의 시각화. 이 시각화가 어떤 질문에서
+            시작했는지를 확인하세요.
+          </p>
+          <a href="introduce_kim.html" class="intro-cta-btn">
+            <span>서론 대시보드 열기</span>
+            <span class="intro-cta-arrow">→</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ SECTION 3: DESCENT ═══ -->
+    <section id="sec-descent">
+      <div class="descent-inner">
+        <span class="section-kicker" style="color: rgba(245, 183, 64, 0.7)"
+          >본론 · 4개 생활 도메인</span
+        >
+        <h2>
+          같은 지도 위, 다른 시간<br />
+          서울을 4개 도메인으로 다시 측정한다
+        </h2>
+        <p>
+          청년이 30분에 닿는 거리를 노인은 얼마나 걸려야 닿는가.<br />
+          기후 재난·생활 인프라·의료·복지 4개 분야에서<br />
+          그 <strong style="color: var(--gold)">분(分)의 격차</strong>를
+          추적했다.
+        </p>
+        <div class="time-table">
+          <div class="time-row">
+            <span class="age">일반 노인 &nbsp;1.12 m/s</span>
+            <div class="bar" style="width: 68px"></div>
+            <span class="val">약 34분</span>
+          </div>
+          <div class="time-row">
+            <span class="age">보행보조 &nbsp;&nbsp;0.88 m/s</span>
+            <div class="bar" style="width: 108px"></div>
+            <span class="val">약 44분</span>
+          </div>
+          <div class="time-row">
+            <span class="age">하위 15% &nbsp;&nbsp;0.70 m/s</span>
+            <div class="bar" style="width: 160px"></div>
+            <span class="val">약 55분</span>
+          </div>
+          <div
+            style="
+              font-family: var(--mono);
+              font-size: 9px;
+              color: rgba(255, 255, 255, 0.2);
+              margin-top: 0.6rem;
+            "
+          >
+            * 청년(1.28 m/s) 30분권 시설 도달에 각 보행 유형이 소요하는 시간
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ SECTION 4: CATEGORIES ═══ -->
+    <div id="sec-categories">
+      <!-- Sticky: backgrounds + left panel -->
+      <div id="cat-sticky-wrap">
+        <div class="cat-bg-layer bg-climate active" id="bg-0"></div>
+        <div class="cat-bg-layer bg-infra" id="bg-1"></div>
+        <div class="cat-bg-layer bg-medical" id="bg-2"></div>
+        <div class="cat-bg-layer bg-welfare" id="bg-3"></div>
+
+        <div class="cat-left-panel">
+          <div class="cat-left-meta-label">본론 — 4개 대시보드</div>
+
+          <div class="cat-left-items-wrap">
+            <div class="cat-left-item active" id="left-0">
+              <div class="cli-eyebrow" style="color: #7ec8e3">
+                D5 · Climate Disaster
+              </div>
+              <h2 class="cli-title">
+                기후 재난<span class="cli-sub">쉼터 접근성</span>
+              </h2>
+              <p class="cli-desc">
+                폭염과 한파 속 노인의 피난처. 위기의 순간 무더위·한파쉼터가 보행
+                반경 안에 존재하는가를 동 단위로 진단합니다.
+              </p>
+              <div class="cli-analyst">KIM SEONGRYEONG</div>
+            </div>
+
+            <div class="cat-left-item" id="left-1">
+              <div class="cli-eyebrow" style="color: #f5b740">
+                D2 · Daily Infrastructure
+              </div>
+              <h2 class="cli-title">
+                생활 인프라<span class="cli-sub">일상 접근성</span>
+              </h2>
+              <p class="cli-desc">
+                먹고 쓰고 처리하는 일상. 전통시장·슈퍼마켓·은행·주민센터의 도보
+                도달 가능성을 서울 전역에서 측정합니다.
+              </p>
+              <div class="cli-analyst">SHIM JAEHYEON</div>
+            </div>
+
+            <div class="cat-left-item" id="left-2">
+              <div class="cli-eyebrow" style="color: #3ecfa0">
+                D3 · Healthcare Access
+              </div>
+              <h2 class="cli-title">
+                의료 접근성<span class="cli-sub">만성질환 관리</span>
+              </h2>
+              <p class="cli-desc">
+                만성질환을 걸어서 관리하는 현실. 1차 진료기관·약국·보건소 접근
+                격차를 OSM 보행 네트워크 기반으로 분석합니다.
+              </p>
+              <div class="cli-analyst">LEE JEONGTAE</div>
+            </div>
+
+            <div class="cat-left-item" id="left-3">
+              <div class="cli-eyebrow" style="color: #6adb7a">
+                D4 · Welfare & Green Space
+              </div>
+              <h2 class="cli-title">
+                복지·녹지<span class="cli-sub">돌봄과 여가</span>
+              </h2>
+              <p class="cli-desc">
+                삶의 질을 만드는 연결. 경로당·노인복지관·공원의 도보 접근성을
+                노인 보행속도 기준으로 서울 25개 구에서 비교합니다.
+              </p>
+              <div class="cli-analyst">YANG SEOKJUN</div>
+            </div>
+          </div>
+
+          <div class="cat-dots-v">
+            <div class="cat-dot-v active" id="dot-0"></div>
+            <div class="cat-dot-v" id="dot-1"></div>
+            <div class="cat-dot-v" id="dot-2"></div>
+            <div class="cat-dot-v" id="dot-3"></div>
+          </div>
+        </div>
+      </div>
+      <!-- /cat-sticky-wrap -->
+
+      <!-- Right scrolling cards (overlaps sticky via negative margin-top) -->
+      <div class="cat-right-panel">
+        <div class="cat-card cat-card-climate" id="cat-0">
+          <canvas class="cat-card-canvas" id="canvas-climate"></canvas>
+          <span class="cat-domain-tag">D5 · CLIMATE DISASTER</span>
+          <span class="cat-icon">🌡</span>
+          <h2 style="color: #7ec8e3">기후 재난</h2>
+          <p class="cat-stat">무더위쉼터 · 한파쉼터 접근성 분석 — 김성령</p>
+          <p>
+            폭염과 한파는 노인에게 생존의 문제다.<br />
+            이미 거동이 불편한 독거노인에게, 위기의 순간<br />
+            쉼터는 과연 닿을 수 있는 거리에 있는가?
+          </p>
+          <a
+            href="outputs-KIM/260430_submit/16_climate_shelter_dashboard.html"
+            class="cat-btn"
+            target="_blank"
+          >
+            대시보드 보기 →
+          </a>
+        </div>
+
+        <div class="cat-card cat-card-infra" id="cat-1">
+          <canvas class="cat-card-canvas" id="canvas-infra"></canvas>
+          <span class="cat-domain-tag">D2 · DAILY INFRASTRUCTURE</span>
+          <span class="cat-icon">🏪</span>
+          <h2 style="color: #f5b740">생활 인프라</h2>
+          <p class="cat-stat">
+            전통시장 · 슈퍼마켓 · 은행 · 주민센터 분석 — 심재현
+          </p>
+          <p>
+            일상의 쇼핑, 금융 업무, 행정 처리—<br />
+            노인이 이 모든 것을 걸어서 해결할 수 있는 동네는<br />
+            서울에 얼마나 존재하는가?
+          </p>
+          <a
+            href="outputs_SHIM/260429/outputs/infra_dashboard_v5.html"
+            class="cat-btn"
+            target="_blank"
+          >
+            대시보드 보기 →
+          </a>
+        </div>
+
+        <div class="cat-card cat-card-medical" id="cat-2">
+          <canvas class="cat-card-canvas" id="canvas-medical"></canvas>
+          <span class="cat-domain-tag">D3 · HEALTHCARE ACCESS</span>
+          <span class="cat-icon">🏥</span>
+          <h2 style="color: #3ecfa0">의료 접근성</h2>
+          <p class="cat-stat">1차 진료기관 · 약국 · 보건소 분석 — 이정태</p>
+          <p>
+            노인의 만성질환 관리는 꾸준한 접근에 달려 있다.<br />
+            동네에서 걸어서 병원과 약국을 오갈 수 있는<br />
+            가능성은 구마다 얼마나 다른가?
+          </p>
+          <a
+            href="medical_LEE/outputs/medical_dashboard.html"
+            class="cat-btn"
+            target="_blank"
+          >
+            대시보드 보기 →
+          </a>
+        </div>
+
+        <div class="cat-card cat-card-welfare" id="cat-3">
+          <canvas class="cat-card-canvas" id="canvas-welfare"></canvas>
+          <span class="cat-domain-tag">D4 · WELFARE & GREEN SPACE</span>
+          <span class="cat-icon">🌳</span>
+          <h2 style="color: #6adb7a">복지·녹지</h2>
+          <p class="cat-stat">경로당 · 노인복지관 · 공원 분석 — 양석준</p>
+          <p>
+            일상의 돌봄과 여가는 삶의 질을 결정한다.<br />
+            경로당과 공원을 걸어서 이용할 수 있는 노인은<br />
+            서울 전체의 몇 퍼센트인가?
+          </p>
+          <a
+            href="Bokji/output_v3/infra_dashboard_bokji.html"
+            class="cat-btn"
+            target="_blank"
+          >
+            대시보드 보기 →
+          </a>
+        </div>
+      </div>
+      <!-- /cat-right-panel -->
+    </div>
+    <!-- /sec-categories -->
+
+    <!-- ═══ SECTION 5: CONCLUSION CTA ═══ -->
+    <section id="sec-conclusion">
+      <div class="ccta-wrap">
+        <span class="ccta-kicker">결론 · 종합 진단</span>
+        <h2 class="ccta-title">
+          서울 25개 구,<br />
+          <em>노인 도보 생활권</em><br />
+          종합 성적표
+        </h2>
+        <p class="ccta-desc">
+          기후·인프라·의료·복지 4개 도메인의 접근성을 종합했다.<br />
+          경사도 보정까지 반영한 노인 보행속도 기준으로,<br />
+          서울의 격차는 얼마나 뚜렷하게 드러나는가.
+        </p>
+        <div class="ccta-domains">
+          <span class="ccta-domain-tag">🌡 기후 쉼터</span>
+          <span class="ccta-domain-tag">🏪 생활 인프라</span>
+          <span class="ccta-domain-tag">🏥 의료 접근성</span>
+          <span class="ccta-domain-tag">🌳 복지·녹지</span>
+        </div>
+        <a href="conclusion_kim.html" class="ccta-btn">
+          <span class="ccta-btn-text">종합 진단 대시보드 열기</span>
+          <span class="ccta-btn-arrow">↗</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p>
+        서울 노인 도보 생활권 진단 프로젝트 · 2026<br />
+        유호준 · 심재현 · 이정태 · 양석준 · 김성령<br />
+        <span style="color: rgba(255, 255, 255, 0.1)"
+          >데이터 기반 생활밀착형 행정 모델 지원 연구</span
+        >
+      </p>
+    </footer>
+
+    <script>
+      gsap.registerPlugin(ScrollTrigger);
+
+      /* ── STARS CANVAS ── */
+      (function initStars() {
+        const canvas = document.getElementById("stars-canvas");
+        const ctx = canvas.getContext("2d");
+        let W, H;
+        const stars = [];
+
+        function resize() {
+          W = canvas.width = window.innerWidth;
+          H = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener("resize", resize);
+
+        for (let i = 0; i < 300; i++) {
+          stars.push({
+            x: Math.random(),
+            y: Math.random(),
+            r: Math.random() * 1.4 + 0.2,
+            a: Math.random(),
+            da: (Math.random() - 0.5) * 0.008,
+            speed: Math.random() * 0.00008 + 0.00002,
+          });
+        }
+        function draw() {
+          ctx.clearRect(0, 0, W, H);
+          for (const s of stars) {
+            s.a += s.da;
+            if (s.a > 1) {
+              s.a = 1;
+              s.da = -Math.abs(s.da);
+            }
+            if (s.a < 0.1) {
+              s.a = 0.1;
+              s.da = Math.abs(s.da);
+            }
+            s.y -= s.speed;
+            if (s.y < 0) s.y = 1;
+            ctx.beginPath();
+            ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,255,255,${s.a})`;
+            ctx.fill();
+          }
+          requestAnimationFrame(draw);
+        }
+        draw();
+      })();
+
+      /* ── SPACE INTRO ANIMATION ── */
+      window.addEventListener("load", () => {
+        gsap
+          .timeline({ delay: 0.3 })
+          .to(".space-kicker", {
+            opacity: 1,
+            y: 0,
+            duration: 0.9,
+            ease: "power2.out",
+          })
+          .to(
+            ".space-headline",
+            { opacity: 1, y: 0, duration: 1, ease: "power2.out" },
+            "-=0.4",
+          )
+          .to(
+            ".space-sub",
+            { opacity: 1, duration: 0.8, ease: "power2.out" },
+            "-=0.3",
+          )
+          .to(
+            ".stat-row",
+            { opacity: 1, duration: 0.7, ease: "power2.out" },
+            "-=0.2",
+          )
+          .to(".scroll-hint", { opacity: 1, duration: 0.6 }, "-=0.2");
+
+        gsap.to("#space-planet", {
+          y: -12,
+          duration: 3.5,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: -1,
+        });
+      });
+
+      /* ── PLANET PARALLAX ── */
+      ScrollTrigger.create({
+        trigger: "#sec-space",
+        start: "top top",
+        end: "bottom top",
+        scrub: 1,
+        onUpdate(self) {
+          const p = self.progress;
+          gsap.set("#space-planet", {
+            scale: 1 - p * 0.4,
+            opacity: 1 - p * 1.5,
+          });
+          gsap.set(".space-content", { y: p * -60, opacity: 1 - p * 1.8 });
+        },
+      });
+
+      /* ── SCROLL-IN: INTRO LINK + DESCENT ── */
+      gsap.utils.toArray(".intro-link-inner, .descent-inner").forEach((el) => {
+        gsap.from(el, {
+          opacity: 0,
+          y: 40,
+          duration: 1,
+          ease: "power2.out",
+          scrollTrigger: { trigger: el, start: "top 80%", once: true },
+        });
+      });
+
+      [...document.querySelectorAll(".ipt-card")].forEach((card, i) => {
+        gsap.from(card, {
+          opacity: 0,
+          x: -28,
+          duration: 0.65,
+          ease: "power2.out",
+          delay: i * 0.13,
+          scrollTrigger: { trigger: card, start: "top 88%", once: true },
+        });
+      });
+
+      /* ── CATEGORIES: LEFT STICKY + RIGHT ZIGZAG ── */
+      (function initCategories() {
+        const cards = [0, 1, 2, 3].map((i) =>
+          document.getElementById("cat-" + i),
+        );
+        const bgs = [0, 1, 2, 3].map((i) => document.getElementById("bg-" + i));
+        const dotsV = [0, 1, 2, 3].map((i) =>
+          document.getElementById("dot-" + i),
+        );
+        const leftItems = [0, 1, 2, 3].map((i) =>
+          document.getElementById("left-" + i),
+        );
+        let currentIndex = -1;
+
+        function setActive(idx) {
+          if (idx === currentIndex) return;
+          currentIndex = idx;
+
+          bgs.forEach((b, i) => b.classList.toggle("active", i === idx));
+          dotsV.forEach((d, i) => d.classList.toggle("active", i === idx));
+          leftItems.forEach((l, i) => l.classList.toggle("active", i === idx));
+
+          cards.forEach((c, i) => {
+            const on = i === idx;
+            gsap.to(c, {
+              opacity: on ? 1 : 0.3,
+              scale: on ? 1 : 0.96,
+              duration: 0.5,
+              ease: "power2.out",
+              overwrite: "auto",
+            });
+            c.classList.toggle("is-active", on);
+          });
+        }
+
+        gsap.set(cards, { opacity: 0, y: 60 });
+
+        cards.forEach((card, i) => {
+          /* Fade + slide in as card enters viewport */
+          ScrollTrigger.create({
+            trigger: card,
+            start: "top 90%",
+            once: true,
+            onEnter() {
+              gsap.to(card, {
+                y: 0,
+                opacity: i === currentIndex ? 1 : 0.3,
+                duration: 0.75,
+                ease: "power2.out",
+                overwrite: "auto",
+              });
+            },
+          });
+
+          /* Activate when card center crosses viewport center */
+          ScrollTrigger.create({
+            trigger: card,
+            start: "center 57%",
+            onEnter: () => setActive(i),
+            onEnterBack: () => setActive(i),
+          });
+        });
+
+        /* Pre-activate first card when section first becomes visible */
+        ScrollTrigger.create({
+          trigger: "#sec-categories",
+          start: "top 25%",
+          once: true,
+          onEnter() {
+            setActive(0);
+            gsap.to(cards[0], {
+              opacity: 1,
+              y: 0,
+              duration: 0.7,
+              overwrite: "auto",
+            });
+          },
+        });
+      })();
+
+      /* ── CONCLUSION CTA SCROLL-IN ── */
+      [
+        ".ccta-kicker",
+        ".ccta-title",
+        ".ccta-desc",
+        ".ccta-domains",
+        ".ccta-btn",
+      ].forEach((sel, i) => {
+        gsap.from(sel, {
+          opacity: 0,
+          y: 30,
+          duration: 0.75,
+          ease: "power2.out",
+          delay: i * 0.1,
+          scrollTrigger: {
+            trigger: "#sec-conclusion",
+            start: "top 68%",
+            once: true,
+          },
+        });
+      });
+
+      /* ── CURSOR ── */
+      (function initCursor() {
+        const cur  = document.getElementById('cursor');
+        const ring = document.getElementById('cursor-ring');
+        if (!cur || !ring) return;
+        let mx = -200, my = -200, rx = -200, ry = -200;
+        document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+        (function tick() {
+          rx += (mx - rx) * 0.12;
+          ry += (my - ry) * 0.12;
+          cur.style.left  = mx + 'px';
+          cur.style.top   = my + 'px';
+          ring.style.left = rx + 'px';
+          ring.style.top  = ry + 'px';
+          requestAnimationFrame(tick);
+        })();
+        document.querySelectorAll('a, button, .cat-card, .ipt-card, .ccta-btn, .intro-cta-btn').forEach(el => {
+          el.addEventListener('mouseenter', () => document.body.classList.add('cursor-hover'));
+          el.addEventListener('mouseleave', () => document.body.classList.remove('cursor-hover'));
+        });
+      })();
+
+      /* ── CANVAS: Climate — snowflakes (한파) + heat sparks (폭염) ── */
+      (function() {
+        const canvas = document.getElementById('canvas-climate');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let W, H, flakes = [], sparks = [];
+
+        function resize() {
+          W = canvas.width  = canvas.offsetWidth;
+          H = canvas.height = canvas.offsetHeight;
+        }
+        new ResizeObserver(resize).observe(canvas);
+        resize();
+
+        function randFlake() {
+          return { x: Math.random()*W, y: -10,
+            r: Math.random()*1.6+0.7, speed: Math.random()*0.45+0.18,
+            drift: (Math.random()-0.5)*0.3, alpha: Math.random()*0.3+0.1 };
+        }
+        function randSpark() {
+          return { x: Math.random()*W, y: H+10,
+            r: Math.random()*2+0.8, speed: Math.random()*0.45+0.2,
+            drift: (Math.random()-0.5)*0.4,
+            alpha: 0, maxAlpha: Math.random()*0.38+0.12,
+            life: 0, maxLife: Math.random()*160+100 };
+        }
+
+        for (let i=0; i<20; i++) { const f=randFlake(); f.y=Math.random()*H; flakes.push(f); }
+        for (let i=0; i<20; i++) { const s=randSpark(); s.y=Math.random()*H; s.life=Math.random()*s.maxLife; sparks.push(s); }
+
+        function drawFlake(f) {
+          ctx.save();
+          ctx.translate(f.x, f.y);
+          ctx.globalAlpha = f.alpha;
+          for (let i=0; i<6; i++) {
+            ctx.rotate(Math.PI/3);
+            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0, f.r*4.5);
+            ctx.strokeStyle = 'rgba(147,197,253,1)';
+            ctx.lineWidth = 0.7; ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        function loop() {
+          ctx.clearRect(0, 0, W, H);
+          flakes.forEach((f,i) => {
+            f.y += f.speed; f.x += f.drift;
+            drawFlake(f);
+            if (f.y > H+20) flakes[i] = randFlake();
+          });
+          sparks.forEach((s,i) => {
+            s.life++; s.y -= s.speed; s.x += s.drift;
+            const p = s.life / s.maxLife;
+            s.alpha = p < 0.2 ? (p/0.2)*s.maxAlpha : p > 0.8 ? ((1-p)/0.2)*s.maxAlpha : s.maxAlpha;
+            const r = Math.floor(255), g = Math.floor(110 + Math.random()*80);
+            ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(${r},${g},40,${s.alpha})`; ctx.fill();
+            if (s.life >= s.maxLife || s.y < -10) sparks[i] = randSpark();
+          });
+          requestAnimationFrame(loop);
+        }
+        loop();
+      })();
+
+      /* ── CANVAS: Infra — city grid + walker dots ── */
+      (function() {
+        const canvas = document.getElementById('canvas-infra');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let W, H, t = 0;
+        const gs = 28;
+
+        function resize() {
+          W = canvas.width  = canvas.offsetWidth;
+          H = canvas.height = canvas.offsetHeight;
+        }
+        new ResizeObserver(resize).observe(canvas);
+        resize();
+
+        function loop() {
+          ctx.clearRect(0, 0, W, H);
+          t += 0.015;
+          for (let x=0; x<W; x+=gs) {
+            for (let y=0; y<H; y+=gs) {
+              const p = Math.sin(t + x*0.05 + y*0.05)*0.5 + 0.5;
+              ctx.globalAlpha = p*0.14 + 0.03;
+              ctx.strokeStyle = 'rgba(245,183,64,1)';
+              ctx.lineWidth = 0.5;
+              ctx.strokeRect(x, y, gs, gs);
+            }
+          }
+          ctx.globalAlpha = 1;
+          for (let i=0; i<3; i++) {
+            const prog = (t*0.25 + i/3) % 1;
+            const wx = prog*(W+40)-20;
+            const wy = H*(0.32 + i*0.18);
+            ctx.beginPath(); ctx.arc(wx, wy, 2.5, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(245,183,64,0.65)'; ctx.fill();
+            const grad = ctx.createLinearGradient(wx-28, wy, wx, wy);
+            grad.addColorStop(0, 'rgba(245,183,64,0)');
+            grad.addColorStop(1, 'rgba(245,183,64,0.25)');
+            ctx.beginPath(); ctx.moveTo(wx-28, wy); ctx.lineTo(wx, wy);
+            ctx.strokeStyle = grad; ctx.lineWidth = 1.5; ctx.stroke();
+          }
+          requestAnimationFrame(loop);
+        }
+        loop();
+      })();
+
+      /* ── CANVAS: Medical — expanding pulse rings ── */
+      (function() {
+        const canvas = document.getElementById('canvas-medical');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let W, H, rings = [];
+
+        function resize() {
+          W = canvas.width  = canvas.offsetWidth;
+          H = canvas.height = canvas.offsetHeight;
+        }
+        new ResizeObserver(resize).observe(canvas);
+        resize();
+
+        function spawnRing() {
+          rings.push({
+            x: W*0.5 + (Math.random()-0.5)*W*0.4,
+            y: H*0.4 + (Math.random()-0.5)*H*0.3,
+            r: 0, maxR: Math.random()*80+50,
+            alpha: 0.55, speed: Math.random()*0.55+0.35
+          });
+        }
+        for (let i=0; i<3; i++) { spawnRing(); rings[i].r = Math.random()*rings[i].maxR; }
+        setInterval(spawnRing, 1100);
+
+        function loop() {
+          ctx.clearRect(0, 0, W, H);
+          rings = rings.filter(r => r.alpha > 0.01);
+          rings.forEach(r => {
+            r.r += r.speed; r.alpha *= 0.984;
+            ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
+            ctx.strokeStyle = `rgba(62,207,160,${r.alpha})`;
+            ctx.lineWidth = 1.5; ctx.stroke();
+          });
+          if (rings.length < 6) spawnRing();
+          requestAnimationFrame(loop);
+        }
+        loop();
+      })();
+
+      /* ── CANVAS: Welfare — rising green particles ── */
+      (function() {
+        const canvas = document.getElementById('canvas-welfare');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let W, H, pts = [];
+
+        function resize() {
+          W = canvas.width  = canvas.offsetWidth;
+          H = canvas.height = canvas.offsetHeight;
+        }
+        new ResizeObserver(resize).observe(canvas);
+        resize();
+
+        function randPt() {
+          return { x: Math.random()*W, y: H+Math.random()*40,
+            r: Math.random()*2.5+1, speed: Math.random()*0.55+0.25,
+            drift: (Math.random()-0.5)*0.4,
+            alpha: 0, maxAlpha: Math.random()*0.42+0.16,
+            life: 0, maxLife: Math.random()*200+120 };
+        }
+        for (let i=0; i<30; i++) {
+          const p = randPt(); p.y = Math.random()*H; p.life = Math.random()*p.maxLife;
+          pts.push(p);
+        }
+
+        function loop() {
+          ctx.clearRect(0, 0, W, H);
+          pts.forEach((p,i) => {
+            p.life++; p.y -= p.speed; p.x += p.drift;
+            const pr = p.life / p.maxLife;
+            p.alpha = pr < 0.2 ? (pr/0.2)*p.maxAlpha : pr > 0.8 ? ((1-pr)/0.2)*p.maxAlpha : p.maxAlpha;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(106,219,122,${p.alpha})`; ctx.fill();
+            if (p.life >= p.maxLife || p.y < -10) pts[i] = randPt();
+          });
+          requestAnimationFrame(loop);
+        }
+        loop();
+      })();
+    </script>
+  </body>
+</html>
