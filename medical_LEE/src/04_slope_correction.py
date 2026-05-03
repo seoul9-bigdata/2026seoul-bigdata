@@ -178,6 +178,13 @@ top5_slope = gdf_dong.nlargest(5, "slope_est")[
 print("\n  경사도 상위 5개 동:")
 print(top5_slope.to_string(index=False))
 
+# CSV 저장: tobler_ratio_LEE.csv
+OUT_CSV = OUT_DIR / "tobler_ratio_LEE.csv"
+df_tobler = gdf_dong[["dong_code", "full_name", "tobler_ratio"]].copy()
+df_tobler["tobler_ratio"] = df_tobler["tobler_ratio"].round(6)
+df_tobler.to_csv(str(OUT_CSV), index=False, encoding="utf-8-sig")
+print(f"\n  저장: {OUT_CSV}  ({len(df_tobler)}개 행정동)")
+
 
 # ═══════════════════════════════════════════════════════════════
 # 4. 지도 시각화
@@ -402,5 +409,5 @@ print(f"  경사 보정 후 평균: {gdf_dong['dist_slope_m'].mean():.0f}m")
 print(f"  경사로 인한 추가 손실 평균: {gdf_dong['dist_reduction_pct'].mean():.1f}%")
 print("=" * 60)
 print("\n출력 파일:")
-for f in [out10, out11]:
+for f in [out10, out11, OUT_CSV]:
     print(f"  {f}")
