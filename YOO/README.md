@@ -3,6 +3,9 @@
 서울시 빅데이터 캠퍼스 활용 경진대회(시각화 부문) 출품 프로젝트.
 공공데이터 기반으로 서울 노인의 보행 사고·대중교통 이동·환승 부담을 결합 분석하고 인터랙티브 지도·차트로 시각화한다.
 
+> 🎯 **최종 산출물**: [`260504_submit/`](./260504_submit/) — 5탭 통합 대시보드 (`outputs/transit_dashboard.html`).
+> 본 상위 README는 데이터 수집/DB 스키마/노트북 적재 과정을 문서화하며, 분석/시각화 최종 결과는 위 서브폴더 README를 참고.
+
 ## 핵심 아이디어
 
 - TAAS 노인 보행사고 + 노인 카드 trip + 환승 접근성 + 정류소·역 좌표 = **단일 정류소 단위 위험도 산출**
@@ -49,7 +52,13 @@ prototype-seoul/
 │   ├── analysis_extra.ipynb          # OD·시간대·노선 분석 + Chart.js 대시보드
 │   └── crosswalk_safety.ipynb        # 서울 25구 신호 없는 횡단보도 × 노인 사고
 │
-├── 산출물 (HTML)
+├── 260504_submit/                    # ★ 최종 제출 산출물 (5탭 통합 대시보드)
+│   ├── README.md
+│   ├── src/                          # 01~09 데이터 가공 + HTML 빌더
+│   ├── data/                         # 가공 결과 JSON
+│   └── outputs/transit_dashboard.html
+│
+├── 산출물 (HTML, 중간 단계)
 │   ├── kakao_map.html                # 동작구 파일럿 지도
 │   ├── seoul_elderly_map.html        # 서울 25구 종합 위험 지도
 │   ├── seoul_elderly_od_flow.html    # 노인 OD 흐름선 (곡선·색상·필터)
@@ -171,6 +180,15 @@ python3 -m http.server 8000
 
 ## 산출물 미리보기
 
+### ★ 최종 제출 (2026-05-06)
+- **`260504_submit/outputs/transit_dashboard.html`** — 5탭 통합 대시보드
+  1. 🌌 환승 별자리 (정류장 환승시간 + 25구 TOP10 + 환승 종류 + 병원 정류장)
+  2. 🌡️ 폭염 정류장 (정류장 50m 내 더위쉼터)
+  3. 🛒 거점 시설 (시장·공원·병원·복지관 등 347개 + TOP20 유입)
+  4. 🚦 횡단보도 안전 (신호 없는 횡단보도 + 노인 보행사고)
+  5. 🔀 환승 OD (환승 거점역 from-route → to-route, 10,323건 재구성)
+
+### 중간 단계 (참고)
 - **`seoul_elderly_dashboard.html`** — Chart.js 3탭 대시보드 (OD·시간대·노선)
 - **`seoul_elderly_map.html`** — 카카오맵 종합 위험 지도 (사고·이용·환승·결합)
 - **`seoul_elderly_od_flow.html`** — 노인 OD 흐름선 (곡선·색상 그라디언트·슬라이더 필터)
