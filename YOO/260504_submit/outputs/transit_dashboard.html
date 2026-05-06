@@ -113,6 +113,41 @@ footer{padding:1.4rem 3rem;border-top:1px solid var(--border);background:var(--b
   border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;letter-spacing:.04em;transition:all .12s;width:100%}
 .od-toggle:hover{border-color:var(--pink);color:var(--pink)}
 .od-toggle.on{background:var(--pink);color:var(--bg);border-color:var(--pink)}
+
+/* ── pixel markers (kakao CustomOverlay) ── */
+.dot-mk{
+  border-radius:50%;border:1.5px solid rgba(255,255,255,.85);cursor:pointer;
+  transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,.55);
+  transition:transform .12s,box-shadow .12s;pointer-events:auto;
+}
+.dot-mk:hover{transform:translate(-50%,-50%) scale(1.55);box-shadow:0 2px 10px rgba(255,255,255,.45);z-index:50}
+.dot-mk.tiny{border-width:1px}
+.icn-mk{
+  width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.9);
+  display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1;cursor:pointer;
+  transform:translate(-50%,-50%);box-shadow:0 2px 7px rgba(0,0,0,.55);transition:transform .12s;
+  pointer-events:auto;
+}
+.icn-mk:hover{transform:translate(-50%,-50%) scale(1.25)}
+.pulse-mk{
+  width:18px;height:18px;border-radius:50%;background:#f5b740;
+  border:2px solid #fff;transform:translate(-50%,-50%);
+  box-shadow:0 0 0 0 rgba(245,183,64,.7);animation:pulse 1.4s ease-out 3;
+  pointer-events:none;
+}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(245,183,64,.85)}
+  100%{box-shadow:0 0 0 28px rgba(245,183,64,0)}
+}
+.iw-card{
+  font-family:var(--sans);font-size:12px;color:#222;padding:9px 12px;line-height:1.55;min-width:200px;max-width:300px;
+}
+.iw-card .h{font-size:13.5px;font-weight:600;margin-bottom:4px;color:#111}
+.iw-card .sub{font-size:10.5px;color:#888;letter-spacing:.02em;margin-bottom:6px}
+.iw-card .row{display:flex;justify-content:space-between;font-size:11px;padding:1.5px 0;color:#444}
+.iw-card .row b{font-weight:500;color:#111}
+.iw-card .tag{display:inline-block;padding:1px 6px;font-size:10px;border-radius:3px;
+  background:rgba(0,0,0,.06);color:#555;margin-right:4px}
 </style>
 </head>
 <body>
@@ -378,6 +413,46 @@ function odColor(n) {
   return '#b48ef4';
 }
 
+// ──── 픽셀 마커 헬퍼 (CustomOverlay 기반) ────
+let _iw = null;
+function openIW(map, lat, lon, html){
+  if (_iw) _iw.close();
+  _iw = new kakao.maps.InfoWindow({
+    position: new kakao.maps.LatLng(lat, lon),
+    content: '<div class="iw-card">'+html+'</div>',
+    removable: true,
+  });
+  _iw.open(map);
+}
+function dotMarker(map, lat, lon, opts){
+  const el = document.createElement('div');
+  el.className = 'dot-mk' + (opts.tiny ? ' tiny' : '');
+  el.style.cssText = 'width:'+opts.size+'px;height:'+opts.size+'px;background:'+opts.color+
+                     ';opacity:'+(opts.opacity!=null?opts.opacity:0.92);
+  if (opts.onClick){
+    el.addEventListener('click', e => { e.stopPropagation(); opts.onClick(); });
+  } else {
+    el.style.cursor = 'default';
+  }
+  return new kakao.maps.CustomOverlay({
+    map, position: new kakao.maps.LatLng(lat, lon),
+    content: el, yAnchor: 0.5, xAnchor: 0.5, clickable: !!opts.onClick,
+    zIndex: opts.z != null ? opts.z : 3,
+  });
+}
+function iconMarker(map, lat, lon, glyph, color, onClick){
+  const el = document.createElement('div');
+  el.className = 'icn-mk';
+  el.style.cssText = 'background:'+color;
+  el.textContent = glyph;
+  if (onClick) el.addEventListener('click', e => { e.stopPropagation(); onClick(); });
+  return new kakao.maps.CustomOverlay({
+    map, position: new kakao.maps.LatLng(lat, lon),
+    content: el, yAnchor: 0.5, xAnchor: 0.5, clickable: true, zIndex: 6,
+  });
+}
+function fmtNum(n){return (n||0).toLocaleString();}
+
 const odLayers = {};
 function renderODCurves(map, tab) {
   const lines = [];
@@ -389,17 +464,19 @@ function renderODCurves(map, tab) {
       strokeColor: odColor(o.n), strokeOpacity: 0.65, strokeStyle: 'solid',
     });
     lines.push(pl);
-    // 출발·도착 점
-    const dotR = Math.max(60, Math.sqrt(o.n) * 25);
-    lines.push(new kakao.maps.Circle({
-      map, center: new kakao.maps.LatLng(o.ride_lat, o.ride_lon),
-      radius: dotR, strokeWeight: 0, fillColor: '#3ecfa0', fillOpacity: 0.75,
-    }));
-    lines.push(new kakao.maps.Circle({
-      map, center: new kakao.maps.LatLng(o.goff_lat, o.goff_lon),
-      radius: dotR * 0.9, strokeWeight: 1, strokeColor: '#fff', strokeOpacity: 0.7,
-      fillColor: '#f472b6', fillOpacity: 0.75,
-    }));
+    // 출발·도착 픽셀 마커
+    const sz = Math.max(7, Math.min(15, Math.sqrt(o.n) * 2.4));
+    const onCli = (role) => () => {
+      const html =
+        '<div class="h">'+(role==='ride'?o.ride_nm:o.goff_nm)+'</div>'+
+        '<div class="sub">'+(role==='ride'?'🟢 출발':'🔴 도착')+
+          ' · <span class="tag">'+(role==='ride'?o.ride_kind:o.goff_kind)+'</span></div>'+
+        '<div class="row"><span>OD pair</span><b>'+o.ride_nm+' → '+o.goff_nm+'</b></div>'+
+        '<div class="row"><span>노인 trip</span><b>'+o.n+'건</b></div>';
+      openIW(map, role==='ride'?o.ride_lat:o.goff_lat, role==='ride'?o.ride_lon:o.goff_lon, html);
+    };
+    lines.push(dotMarker(map, o.ride_lat, o.ride_lon, {size:sz, color:'#3ecfa0', onClick:onCli('ride'), z:5}));
+    lines.push(dotMarker(map, o.goff_lat, o.goff_lon, {size:sz*0.9, color:'#f472b6', onClick:onCli('goff'), z:5}));
   });
   odLayers[tab] = lines;
 }
@@ -477,52 +554,74 @@ function showStationInfo(map, s) {
 
 function renderTab1(map) {
   DATA.stations.forEach(s => {
-    const r = Math.max(80, Math.min(600, Math.sqrt(s.elder_rides) * 12));
+    const sz = Math.max(4, Math.min(14, Math.sqrt(s.elder_rides || 1) * 0.55));
     const color = xferColor(s.avg_xfer_sec);
-    const c = new kakao.maps.Circle({
-      map, center: new kakao.maps.LatLng(s.lat, s.lon),
-      radius: r, strokeWeight: 0, fillColor: color, fillOpacity: 0.65,
+    dotMarker(map, s.lat, s.lon, {
+      size: sz, color, opacity: 0.85,
+      tiny: sz < 6,
+      onClick: () => showStationInfo(map, s),
     });
-    kakao.maps.event.addListener(c, 'click', () => showStationInfo(map, s));
   });
 }
 
 function renderTab3(map) {
+  // 더위쉼터 — 작은 주황 점, 클릭 시 시설명
   DATA.heat.forEach(s => {
-    new kakao.maps.Circle({
-      map, center: new kakao.maps.LatLng(s.lat, s.lng),
-      radius: 100, strokeWeight: 0, fillColor: '#f5b740', fillOpacity: 0.4,
+    dotMarker(map, s.lat, s.lng, {
+      size: 6, color: '#f5b740', opacity: 0.7, tiny: true, z: 2,
+      onClick: () => openIW(map, s.lat, s.lng,
+        '<div class="h">'+s.name+'</div>'+
+        '<div class="sub">🌡️ 더위쉼터</div>'+
+        '<div class="row"><span>유형</span><b>'+s.type+'</b></div>'),
     });
   });
+  // 정류장 — 폭염 사각지대(쉼터 100m 내 없음)는 크게 빨강, 그 외는 작게 초록
   DATA.climate.forEach(s => {
     const blind = s.heat_within_100m === 0;
-    const color = blind ? '#ff5f5f' : '#3ecfa0';
-    const r = blind ? Math.max(200, Math.sqrt(s.elder_rides_noon) * 25) : 120;
-    new kakao.maps.Circle({
-      map, center: new kakao.maps.LatLng(s.lat, s.lon),
-      radius: r, strokeWeight: blind ? 2 : 0, strokeColor: '#fff', strokeOpacity: 0.7,
-      fillColor: color, fillOpacity: blind ? 0.7 : 0.4,
+    const sz = blind
+      ? Math.max(8, Math.min(20, Math.sqrt(s.elder_rides_noon || 1) * 1.0))
+      : Math.max(3, Math.min(7,  Math.sqrt(s.elder_rides_noon || 1) * 0.35));
+    dotMarker(map, s.lat, s.lon, {
+      size: sz, color: blind ? '#ff5f5f' : '#3ecfa0',
+      opacity: blind ? 0.85 : 0.55, tiny: sz < 5, z: blind ? 5 : 3,
+      onClick: () => openIW(map, s.lat, s.lon,
+        '<div class="h">'+s.sttn_nm+'</div>'+
+        '<div class="sub"><span class="tag">'+s.kind+'</span>'+
+          (blind ? '🚨 폭염 사각지대' : '✅ 쉼터 인접')+'</div>'+
+        '<div class="row"><span>최근접 더위쉼터</span><b>'+fmtNum(s.heat_nearest_m)+' m</b></div>'+
+        '<div class="row"><span>한파쉼터</span><b>'+fmtNum(s.cold_nearest_m)+' m</b></div>'+
+        '<div class="row"><span>정오 노인 승하차</span><b>'+fmtNum(s.elder_rides_noon)+'회</b></div>'),
     });
   });
 }
 
 function renderTab4(map) {
-  const TYPE_COLOR = {
-    '거점 시장':       '#7cd982',
-    '노인복지관':      '#b48ef4',
-    '거점 공원':       '#3ecfa0',
-    '장거리 터미널·역': '#5aadff',
-    '노인 명소':       '#f5b740',
-    '환승 거점역':     '#ff5f5f',
+  const TYPE_GLYPH = {
+    '거점 시장':       '🛒',
+    '거점 공원':       '🌳',
+    '응급·상급병원':   '🏥',
+    '노인복지관':      '🏛',
+    '환승 거점역':     '🚇',
+    '장거리 터미널·역':'🚌',
+    '노인 명소':       '⭐',
+  };
+  const FALLBACK = (DATA.anchor_type_colors) || {
+    '거점 시장':'#7cd982','노인복지관':'#b48ef4','거점 공원':'#3ecfa0',
+    '장거리 터미널·역':'#5aadff','노인 명소':'#f5b740','환승 거점역':'#ff5f5f',
+    '응급·상급병원':'#f472b6',
   };
   DATA.anchors.forEach(a => {
-    const color = TYPE_COLOR[a.anchor_type] || '#888680';
-    const r = Math.max(220, Math.min(2200, Math.sqrt(a.elder_alights_300m || 1) * 28));
-    new kakao.maps.Circle({
-      map, center: new kakao.maps.LatLng(a.lat, a.lon),
-      radius: r, strokeWeight: 2, strokeColor: '#fff', strokeOpacity: 0.55,
-      fillColor: color, fillOpacity: 0.5,
-    });
+    const color = FALLBACK[a.anchor_type] || '#888680';
+    const glyph = TYPE_GLYPH[a.anchor_type] || '📍';
+    iconMarker(map, a.lat, a.lon, glyph, color, () =>
+      openIW(map, a.lat, a.lon,
+        '<div class="h">'+a.name+'</div>'+
+        '<div class="sub"><span class="tag" style="background:'+color+'33;color:'+color+'">'+
+          a.anchor_type+'</span> '+a.gu+'</div>'+
+        '<div class="row"><span>최근접 정류장</span><b>'+(a.nearest_stn||'-')+
+          ' ('+fmtNum(a.nearest_stn_dist_m)+'m)</b></div>'+
+        '<div class="row"><span>300m 내 정류장</span><b>'+fmtNum(a.nearby_stations_300m)+'개</b></div>'+
+        '<div class="row"><span>300m 노인 하차</span><b>'+fmtNum(a.elder_alights_300m)+'회</b></div>'));
   });
 }
 
@@ -542,10 +641,10 @@ function panToStation(tabN, lat, lon, name) {
     map.setLevel(4, { animate: true });
     map.panTo(ll);
     if (highlightMarker) highlightMarker.setMap(null);
-    highlightMarker = new kakao.maps.Circle({
-      map, center: ll, radius: 80,
-      strokeWeight: 3, strokeColor: '#f5b740', strokeOpacity: 0.95,
-      fillColor: '#f5b740', fillOpacity: 0.35,
+    const pe = document.createElement('div');
+    pe.className = 'pulse-mk';
+    highlightMarker = new kakao.maps.CustomOverlay({
+      map, position: ll, content: pe, yAnchor: 0.5, xAnchor: 0.5, zIndex: 999,
     });
     setTimeout(() => { if (highlightMarker) { highlightMarker.setMap(null); highlightMarker = null; }}, 4500);
   };

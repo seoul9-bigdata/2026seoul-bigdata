@@ -117,26 +117,35 @@ def build_html(cw_near, acc):
 <html lang="ko"><head>
 <meta charset="utf-8">
 <title>서울 신호 없는 횡단보도 × 노인 보행사고</title>
-<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey={KAKAO_KEY}"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={KAKAO_KEY}"></script>
 <style>
 body{{margin:0;font-family:-apple-system,BlinkMacSystemFont,sans-serif}}
 #map{{width:100%;height:100vh}}
 #panel{{position:absolute;top:12px;left:12px;background:rgba(255,255,255,0.96);
        padding:14px 16px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.18);z-index:10;max-width:300px}}
 h3{{margin:0 0 8px 0;font-size:15px}}
-.legend{{display:flex;align-items:center;gap:6px;margin:4px 0;font-size:13px}}
-.dot{{width:12px;height:12px;border-radius:50%;display:inline-block}}
-.red{{background:#d62728}}.blue{{background:#1f77b4}}
 select{{width:100%;margin-top:8px;padding:5px;font-size:13px}}
 .stat{{font-size:12px;color:#444;margin-top:8px;line-height:1.6}}
 .note{{font-size:11px;color:#888;margin-top:6px;line-height:1.5}}
+.dot-mk{{
+  border-radius:50%;border:1.5px solid rgba(255,255,255,.85);cursor:pointer;
+  transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,.45);
+  transition:transform .12s;pointer-events:auto;
+}}
+.dot-mk:hover{{transform:translate(-50%,-50%) scale(1.5);z-index:50}}
+.iw-card{{font-family:-apple-system,sans-serif;font-size:12px;color:#222;
+  padding:9px 12px;line-height:1.55;min-width:200px;max-width:300px}}
+.iw-card .h{{font-size:13.5px;font-weight:600;margin-bottom:4px;color:#111}}
+.iw-card .sub{{font-size:10.5px;color:#888;margin-bottom:6px}}
+.iw-card .row{{display:flex;justify-content:space-between;font-size:11px;padding:1.5px 0;color:#444}}
+.iw-card .row b{{font-weight:500;color:#111}}
 </style>
 </head>
 <body>
 <div id="panel">
   <select id="guSelect"><option value="">전체 자치구</option>{gu_options}</select>
   <div class="stat" id="stat"></div>
-  <div class="note">※ '신호 없음' = '보행등유무 = N'으로 명시된 것만. NaN/'-'은 보수적으로 신호 있음으로 가정.</div>
+  <div class="note">🔴 노인 보행사고 · 🔵 신호 없는 횡단보도 (보행등 = 'N' 명시만). 마커 클릭 → 상세.</div>
 </div>
 <div id="map"></div>
 <script>
@@ -148,31 +157,51 @@ const map = new kakao.maps.Map(document.getElementById("map"), {{
   level: 7
 }});
 
+let _iw = null;
+function openIW(lat,lon,html){{
+  if(_iw) _iw.close();
+  _iw = new kakao.maps.InfoWindow({{
+    position: new kakao.maps.LatLng(lat,lon),
+    content: '<div class="iw-card">'+html+'</div>',
+    removable: true,
+  }});
+  _iw.open(map);
+}}
+function dotOverlay(lat,lon,size,color,onClick,z){{
+  const el = document.createElement('div');
+  el.className = 'dot-mk';
+  el.style.cssText = 'width:'+size+'px;height:'+size+'px;background:'+color+';opacity:.9';
+  el.addEventListener('click', e => {{ e.stopPropagation(); onClick(); }});
+  return new kakao.maps.CustomOverlay({{
+    map, position: new kakao.maps.LatLng(lat,lon),
+    content: el, yAnchor:0.5, xAnchor:0.5, clickable:true, zIndex:z||3,
+  }});
+}}
+
 const accLayer = [];
 const cwLayer = [];
-
 function clear(arr){{arr.forEach(m=>m.setMap(null));arr.length=0}}
 
 function draw(filter){{
   clear(accLayer); clear(cwLayer);
   let accCnt=0, cwCnt=0;
-  ACC.forEach(p=>{{
-    if(filter && p.gu!==filter) return;
-    const c = new kakao.maps.Circle({{
-      center: new kakao.maps.LatLng(p.lat, p.lon),
-      radius: 130,
-      strokeWeight: 0, fillColor:"#d62728",
-      fillOpacity: 0.55,
-    }});
-    c.setMap(map); accLayer.push(c); accCnt++;
-  }});
   CW.forEach(p=>{{
     if(filter && p.gu!==filter) return;
-    const c = new kakao.maps.Circle({{
-      center: new kakao.maps.LatLng(p.lat, p.lon),
-      radius: 100, strokeWeight: 0, fillColor:"#1f77b4", fillOpacity:0.55,
-    }});
-    c.setMap(map); cwLayer.push(c); cwCnt++;
+    cwLayer.push(dotOverlay(p.lat,p.lon,7,'#1f77b4',()=>openIW(p.lat,p.lon,
+      '<div class="h">신호 없는 횡단보도</div>'+
+      '<div class="sub">'+(p.gu||'')+'</div>'+
+      '<div class="row"><span>음향신호기</span><b>'+(p['음향']?'있음':'없음')+'</b></div>'+
+      '<div class="row"><span>고원식</span><b>'+(p['고원식']?'있음':'없음')+'</b></div>'),3));
+    cwCnt++;
+  }});
+  ACC.forEach(p=>{{
+    if(filter && p.gu!==filter) return;
+    accLayer.push(dotOverlay(p.lat,p.lon,9,'#d62728',()=>openIW(p.lat,p.lon,
+      '<div class="h">노인 보행사고</div>'+
+      '<div class="sub">'+(p.gu||'')+'</div>'+
+      '<div class="row"><span>사고 분류</span><b>'+(p.acdnt||'-')+'</b></div>'+
+      '<div class="row"><span>중상도</span><b>'+(p.grade||'-')+'</b></div>'),5));
+    accCnt++;
   }});
   document.getElementById("stat").textContent =
     `노인 사고 ${{accCnt}}건 · 신호 없는 횡단보도 ${{cwCnt}}개 표시 중`;
