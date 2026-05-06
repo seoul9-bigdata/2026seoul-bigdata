@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>서울시 노인 보행일상권 — 복지·녹지 접근성 종합 결론</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;background:#f5f4f0;color:#2c2c2a;font-size:14px;line-height:1.6;overflow-y:scroll}
+header{background:#2c2c2a;color:#f1efe8;padding:20px 32px}
+header h1{font-size:18px;font-weight:500;margin-bottom:4px}
+header p{font-size:12px;opacity:.55}
+.wrap{max-width:1320px;margin:0 auto;padding:20px 20px 60px}
+.section{margin-bottom:28px}
+.section-title{font-size:13px;font-weight:600;letter-spacing:.06em;color:#888780;text-transform:uppercase;margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid #e8e6e0}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.card{background:#fff;border:0.5px solid #d3d1c7;border-radius:12px;padding:16px 20px}
+.card-title{font-size:11px;color:#888780;margin-bottom:6px}
+.card-val{font-size:26px;font-weight:500}
+.card-sub{font-size:11px;color:#888780;margin-top:4px}
+.card.warn{background:#fff8f0;border-color:#efb87c}
+.card.danger{background:#fff0f0;border-color:#e08080}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.chart-card{background:#fff;border:0.5px solid #d3d1c7;border-radius:12px;padding:16px 20px}
+.chart-label{font-size:11px;font-weight:500;color:#555;margin-bottom:10px}
+.chart-wrap{position:relative;height:420px}
+.chart-wrap-sm{position:relative;height:300px}
+.note{background:#faeeda;border:0.5px solid #ef9f27;border-radius:8px;padding:12px 16px;font-size:12px;color:#633806;line-height:1.8;margin-top:16px}
+.finding{background:#eef4ff;border:0.5px solid #a0b8e0;border-radius:8px;padding:12px 16px;font-size:12px;color:#1a3a6a;line-height:1.8;margin-top:8px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:7px 10px;text-align:right;font-weight:500;color:#888780;border-bottom:0.5px solid #d3d1c7;white-space:nowrap;position:sticky;top:0;background:#fff;z-index:1}
+th:first-child{text-align:left}
+td{padding:7px 10px;border-bottom:0.5px solid #f1efe8;text-align:right}
+td:first-child{text-align:left;font-weight:500}
+tr:hover td{background:#fafaf8}
+.tbl-wrap{overflow-x:auto;max-height:440px;overflow-y:auto;border:0.5px solid #d3d1c7;border-radius:8px}
+.pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px}
+.phi{background:#e1f5ee;color:#0f6e56}
+.pmd{background:#faeeda;color:#854f0b}
+.plo{background:#fcebeb;color:#a32d2d}
+.drop-hi{color:#c62828;font-weight:600}
+.drop-lo{color:#555}
+.legend-row{display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#5f5e5a}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.tab-btns{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+.tb{font-size:12px;padding:4px 12px;border-radius:6px;border:0.5px solid #b4b2a9;background:transparent;color:#888780;cursor:pointer;font-family:inherit}
+.tb:hover{background:#f5f4f0}
+.tb.on{background:#f1efe8;color:#2c2c2a;font-weight:500;border-color:#d3d1c7}
+@media(max-width:900px){.cards,.grid2,.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>서울시 노인 보행일상권 ② — 복지·녹지 인프라 접근성 종합 결론</h1>
+  <p>OSM 보행 네트워크 기반 · Tobler 경사 보정 적용 · 30분 기준 · 서울시 25개 자치구 · 2026</p>
+</header>
+
+<div class="wrap">
+
+  <!-- ── 요약 카드 ── -->
+  <div class="section">
+    <div class="section-title">서울시 전체 평균 도달가능점수 (복지+공원 합산)</div>
+    <div class="cards" id="summaryCards"></div>
+    <div class="finding" id="findingText"></div>
+  </div>
+
+  <!-- ── 비교 차트 ── -->
+  <div class="section">
+    <div class="section-title">보행자 유형별 도달가능점수 — 경사 보정 전후 비교 (구 단위)</div>
+    <div class="tab-btns">
+      <button class="tb on" onclick="showChart('노인',this)">🧓 일반 노인 (1.12 m/s)</button>
+      <button class="tb" onclick="showChart('보행보조',this)">🦽 보조기기 (0.88 m/s)</button>
+      <button class="tb" onclick="showChart('하위15',this)">♿ 보조 하위15% (0.70 m/s)</button>
+    </div>
+    <div class="chart-card">
+      <div class="legend-row">
+        <div class="leg-item"><div class="leg-dot" style="background:#4a90d9"></div>경사 보정 없음 (경사X)</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#e05b3a"></div>경사 보정 적용 (경사O)</div>
+      </div>
+      <div class="chart-wrap"><canvas id="compareChart"></canvas></div>
+      <p style="font-size:11px;color:#888780;margin-top:8px">
+        도달가능점수 = (해당 속도로 도달 가능한 복지+공원 합산 수 / 일반인 도달 수) × 100 · 구 내 행정동 평균
+      </p>
+    </div>
+  </div>
+
+  <!-- ── 경사 보정 감소량 ── -->
+  <div class="section">
+    <div class="section-title">경사 보정으로 인한 점수 감소량 (경사X − 경사O)</div>
+    <div class="grid2">
+      <div class="chart-card">
+        <div class="chart-label">보조기기 vs 하위15% — 구별 감소량</div>
+        <div class="chart-wrap-sm"><canvas id="dropChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-label">3개 유형 동시 비교 — 구별 (하위15% 감소 내림차순)</div>
+        <div class="chart-wrap-sm"><canvas id="drop3Chart"></canvas></div>
+      </div>
+    </div>
+    <div class="note" id="dropNote"></div>
+  </div>
+
+  <!-- ── 종합 테이블 ── -->
+  <div class="section">
+    <div class="section-title">구별 도달가능점수 종합 테이블 (하위15% 경사O 오름차순)</div>
+    <div class="tbl-wrap">
+      <table id="mainTable"></table>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<script>
+const GU   = [{"gu":"성북구","n_x":69.9,"n_o":40.8,"b_x":40.9,"b_o":20.9,"h_x":27.9,"h_o":8.1,"drop_n":29.1,"drop_b":20.0,"drop_h":19.8},{"gu":"서초구","n_x":84.1,"n_o":45.7,"b_x":41.3,"b_o":15.9,"h_x":20.3,"h_o":8.6,"drop_n":38.4,"drop_b":25.4,"drop_h":11.7},{"gu":"관악구","n_x":71.1,"n_o":28.5,"b_x":29.0,"b_o":16.5,"h_x":18.1,"h_o":8.9,"drop_n":42.6,"drop_b":12.5,"drop_h":9.2},{"gu":"서대문구","n_x":75.6,"n_o":38.9,"b_x":47.8,"b_o":19.6,"h_x":30.2,"h_o":12.5,"drop_n":36.7,"drop_b":28.2,"drop_h":17.7},{"gu":"종로구","n_x":77.6,"n_o":33.0,"b_x":43.3,"b_o":22.5,"h_x":28.4,"h_o":12.9,"drop_n":44.6,"drop_b":20.8,"drop_h":15.5},{"gu":"중구","n_x":75.2,"n_o":42.4,"b_x":41.0,"b_o":21.9,"h_x":22.3,"h_o":13.0,"drop_n":32.8,"drop_b":19.1,"drop_h":9.3},{"gu":"중랑구","n_x":76.8,"n_o":50.1,"b_x":51.6,"b_o":28.2,"h_x":29.4,"h_o":13.9,"drop_n":26.7,"drop_b":23.4,"drop_h":15.5},{"gu":"강동구","n_x":76.0,"n_o":54.5,"b_x":45.2,"b_o":33.4,"h_x":18.7,"h_o":14.8,"drop_n":21.5,"drop_b":11.8,"drop_h":3.9},{"gu":"은평구","n_x":75.8,"n_o":30.5,"b_x":47.7,"b_o":20.5,"h_x":25.0,"h_o":14.8,"drop_n":45.3,"drop_b":27.2,"drop_h":10.2},{"gu":"마포구","n_x":70.3,"n_o":49.0,"b_x":39.7,"b_o":31.6,"h_x":25.6,"h_o":15.3,"drop_n":21.3,"drop_b":8.1,"drop_h":10.3},{"gu":"구로구","n_x":78.3,"n_o":49.6,"b_x":45.8,"b_o":25.9,"h_x":20.8,"h_o":16.9,"drop_n":28.7,"drop_b":19.9,"drop_h":3.9},{"gu":"노원구","n_x":75.9,"n_o":47.4,"b_x":40.4,"b_o":22.4,"h_x":21.5,"h_o":17.1,"drop_n":28.5,"drop_b":18.0,"drop_h":4.4},{"gu":"동대문구","n_x":71.9,"n_o":53.4,"b_x":36.8,"b_o":27.1,"h_x":21.7,"h_o":17.8,"drop_n":18.5,"drop_b":9.7,"drop_h":3.9},{"gu":"강북구","n_x":72.9,"n_o":37.5,"b_x":37.4,"b_o":25.3,"h_x":20.2,"h_o":18.0,"drop_n":35.4,"drop_b":12.1,"drop_h":2.2},{"gu":"용산구","n_x":74.9,"n_o":46.4,"b_x":50.4,"b_o":36.5,"h_x":31.5,"h_o":18.8,"drop_n":28.5,"drop_b":13.9,"drop_h":12.7},{"gu":"영등포구","n_x":75.6,"n_o":67.4,"b_x":41.6,"b_o":38.1,"h_x":26.8,"h_o":20.1,"drop_n":8.2,"drop_b":3.5,"drop_h":6.7},{"gu":"강남구","n_x":68.6,"n_o":55.1,"b_x":45.8,"b_o":30.8,"h_x":28.8,"h_o":20.2,"drop_n":13.5,"drop_b":15.0,"drop_h":8.6},{"gu":"금천구","n_x":82.7,"n_o":50.7,"b_x":59.2,"b_o":31.3,"h_x":37.8,"h_o":20.8,"drop_n":32.0,"drop_b":27.9,"drop_h":17.0},{"gu":"강서구","n_x":77.9,"n_o":61.3,"b_x":52.3,"b_o":41.1,"h_x":34.0,"h_o":21.0,"drop_n":16.6,"drop_b":11.2,"drop_h":13.0},{"gu":"성동구","n_x":77.8,"n_o":49.9,"b_x":44.7,"b_o":33.7,"h_x":35.7,"h_o":23.7,"drop_n":27.9,"drop_b":11.0,"drop_h":12.0},{"gu":"도봉구","n_x":76.4,"n_o":58.4,"b_x":50.9,"b_o":37.9,"h_x":33.7,"h_o":24.6,"drop_n":18.0,"drop_b":13.0,"drop_h":9.1},{"gu":"동작구","n_x":82.5,"n_o":53.9,"b_x":59.0,"b_o":40.0,"h_x":41.2,"h_o":25.3,"drop_n":28.6,"drop_b":19.0,"drop_h":15.9},{"gu":"양천구","n_x":81.7,"n_o":64.0,"b_x":48.5,"b_o":39.4,"h_x":30.1,"h_o":26.7,"drop_n":17.7,"drop_b":9.1,"drop_h":3.4},{"gu":"송파구","n_x":80.7,"n_o":71.0,"b_x":42.6,"b_o":37.4,"h_x":33.1,"h_o":28.6,"drop_n":9.7,"drop_b":5.2,"drop_h":4.5},{"gu":"광진구","n_x":74.1,"n_o":58.1,"b_x":51.9,"b_o":46.1,"h_x":37.8,"h_o":35.0,"drop_n":16.0,"drop_b":5.8,"drop_h":2.8}];
+const AVG  = {"점수_노인_경사X":76.2,"점수_노인_경사O":49.5,"점수_보행보조_경사X":45.4,"점수_보행보조_경사O":29.8,"점수_하위15_경사X":28.0,"점수_하위15_경사O":18.3};
+
+// ── 요약 카드 ────────────────────────────────────────────────────────────────
+const CARD_CFG = [
+  {key:'n',  label:'일반 노인 (1.12 m/s)', x:'n_x', o:'n_o'},
+  {key:'b',  label:'보조기기 (0.88 m/s)',   x:'b_x', o:'b_o'},
+  {key:'h',  label:'보조 하위15% (0.70 m/s)', x:'h_x', o:'h_o'},
+];
+function gradeClass(v){
+  return v===null?'':v>=80?'phi':v>=50?'pmd':'plo';
+}
+function renderCards(){
+  const avgs = {
+    n_x: AVG['점수_노인_경사X'],    n_o: AVG['점수_노인_경사O'],
+    b_x: AVG['점수_보행보조_경사X'], b_o: AVG['점수_보행보조_경사O'],
+    h_x: AVG['점수_하위15_경사X'],  h_o: AVG['점수_하위15_경사O'],
+  };
+  document.getElementById('summaryCards').innerHTML = CARD_CFG.map(c=>{
+    const vx=avgs[c.x], vo=avgs[c.o], drop=vo!==null&&vx!==null?(vx-vo).toFixed(1):null;
+    const cls = vo>=80?'card':vo>=50?'card warn':'card danger';
+    return `<div class="${cls}">
+      <div class="card-title">${c.label}</div>
+      <div class="card-val">
+        <span class="pill ${gradeClass(vx)}">${vx}점</span>
+        <span style="font-size:14px;color:#999;margin:0 6px">→</span>
+        <span class="pill ${gradeClass(vo)}">${vo}점</span>
+      </div>
+      <div class="card-sub">경사X → 경사O · 서울 구 평균${drop!==null?' · 경사로 −'+drop+'점':''}</div>
+    </div>`;
+  }).join('');
+
+  // 핵심 발견 텍스트
+  const worst = GU[0];
+  const bestH = [...GU].sort((a,b)=>b.h_o-a.h_o)[0];
+  const maxDrop = [...GU].sort((a,b)=>b.drop_h-a.drop_h)[0];
+  document.getElementById('findingText').innerHTML =
+    `📌 <b>핵심 발견</b><br>
+    · 보조 하위15% 기준 경사 보정 후 최저 구: <b>${worst.gu}</b> (${worst.h_o}점)<br>
+    · 보조 하위15% 기준 경사 보정 후 최고 구: <b>${bestH.gu}</b> (${bestH.h_o}점)<br>
+    · 경사 보정으로 하위15% 점수 최대 감소 구: <b>${maxDrop.gu}</b> (−${maxDrop.drop_h}점)`;
+}
+
+// ── 비교 차트 ────────────────────────────────────────────────────────────────
+let compareChartObj = null;
+const KEY_MAP = {
+  '노인':   {x:'n_x', o:'n_o'},
+  '보행보조':{x:'b_x', o:'b_o'},
+  '하위15': {x:'h_x', o:'h_o'},
+};
+function showChart(type, btn){
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  const ks = KEY_MAP[type];
+  const sorted = [...GU].sort((a,b)=>a[ks.o]-b[ks.o]);
+  const labels = sorted.map(g=>g.gu);
+  const dataX  = sorted.map(g=>g[ks.x]);
+  const dataO  = sorted.map(g=>g[ks.o]);
+
+  if(compareChartObj){ compareChartObj.destroy(); compareChartObj=null; }
+  compareChartObj = new Chart(document.getElementById('compareChart'),{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'경사X', data:dataX, backgroundColor:'rgba(74,144,217,0.75)', borderRadius:3},
+        {label:'경사O', data:dataO, backgroundColor:'rgba(224,91,58,0.75)',  borderRadius:3},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'top',labels:{font:{size:11},boxWidth:12}},
+        tooltip:{callbacks:{label:c=>` ${parseFloat(c.raw).toFixed(1)}점`}}
+      },
+      scales:{
+        x:{ticks:{font:{size:10}},grid:{display:false}},
+        y:{min:0,max:105,
+           grid:{color:'#f1efe8'},
+           title:{display:true,text:'도달가능점수 (%)',font:{size:10}}}
+      }
+    }
+  });
+}
+
+// ── 감소량 차트 ──────────────────────────────────────────────────────────────
+function renderDropCharts(){
+  const sorted = [...GU].sort((a,b)=>b.drop_h-a.drop_h);
+  const labels = sorted.map(g=>g.gu);
+
+  // 보조기기 vs 하위15%
+  new Chart(document.getElementById('dropChart'),{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'보조기기 감소', data:sorted.map(g=>g.drop_b),
+         backgroundColor:'rgba(255,152,0,0.75)', borderRadius:3},
+        {label:'하위15% 감소', data:sorted.map(g=>g.drop_h),
+         backgroundColor:'rgba(244,67,54,0.75)', borderRadius:3},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:10}},
+               tooltip:{callbacks:{label:c=>` −${parseFloat(c.raw).toFixed(1)}점`}}},
+      scales:{x:{ticks:{font:{size:9}},grid:{display:false}},
+              y:{grid:{color:'#f1efe8'},
+                 title:{display:true,text:'점수 감소량 (점)',font:{size:10}}}}
+    }
+  });
+
+  // 3개 유형 동시
+  new Chart(document.getElementById('drop3Chart'),{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'노인 감소',    data:sorted.map(g=>g.drop_n),
+         backgroundColor:'rgba(76,175,80,0.7)', borderRadius:3},
+        {label:'보조기기 감소', data:sorted.map(g=>g.drop_b),
+         backgroundColor:'rgba(255,152,0,0.7)', borderRadius:3},
+        {label:'하위15% 감소', data:sorted.map(g=>g.drop_h),
+         backgroundColor:'rgba(244,67,54,0.7)', borderRadius:3},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:10}},
+               tooltip:{callbacks:{label:c=>` −${parseFloat(c.raw).toFixed(1)}점`}}},
+      scales:{x:{ticks:{font:{size:9}},grid:{display:false}},
+              y:{grid:{color:'#f1efe8'},
+                 title:{display:true,text:'점수 감소량 (점)',font:{size:10}}}}
+    }
+  });
+
+  // 노트
+  const worst = sorted[0];
+  const avg_h = (GU.reduce((s,g)=>s+g.drop_h,0)/GU.length).toFixed(1);
+  document.getElementById('dropNote').innerHTML =
+    `⚠️ 경사 보정 감소량이 클수록 지역 지형이 노인 접근성에 미치는 영향이 큽니다.<br>
+    · 서울 평균: 하위15% 기준 경사 보정 시 <b>−${avg_h}점</b> 감소<br>
+    · 가장 큰 영향: <b>${worst.gu}</b> (하위15% −${worst.drop_h}점, 보조기기 −${worst.drop_b}점, 노인 −${worst.drop_n}점)`;
+}
+
+// ── 종합 테이블 ──────────────────────────────────────────────────────────────
+function renderTable(){
+  function pill(v){
+    if(v===null) return '<span class="pill" style="background:#eee;color:#666">N/A</span>';
+    const cls=v>=80?'phi':v>=50?'pmd':'plo';
+    return `<span class="pill ${cls}">${v.toFixed(1)}</span>`;
+  }
+  function dropCell(v){
+    const cls = v>=10?'drop-hi':'drop-lo';
+    return `<span class="${cls}">−${v.toFixed(1)}</span>`;
+  }
+
+  const rows = GU.map(g=>`<tr>
+    <td>${g.gu}</td>
+    <td>${pill(g.n_x)}</td><td>${pill(g.n_o)}</td>
+    <td>${dropCell(g.drop_n)}</td>
+    <td>${pill(g.b_x)}</td><td>${pill(g.b_o)}</td>
+    <td>${dropCell(g.drop_b)}</td>
+    <td>${pill(g.h_x)}</td><td>${pill(g.h_o)}</td>
+    <td>${dropCell(g.drop_h)}</td>
+  </tr>`).join('');
+
+  document.getElementById('mainTable').innerHTML=`
+    <thead>
+      <tr>
+        <th rowspan="2">구명</th>
+        <th colspan="3" style="text-align:center;border-left:1px solid #e0e0e0">🧓 일반 노인 (1.12)</th>
+        <th colspan="3" style="text-align:center;border-left:1px solid #e0e0e0">🦽 보조기기 (0.88)</th>
+        <th colspan="3" style="text-align:center;border-left:1px solid #e0e0e0">♿ 하위15% (0.70)</th>
+      </tr>
+      <tr>
+        <th style="border-left:1px solid #e0e0e0">경사X</th><th>경사O</th><th>감소</th>
+        <th style="border-left:1px solid #e0e0e0">경사X</th><th>경사O</th><th>감소</th>
+        <th style="border-left:1px solid #e0e0e0">경사X</th><th>경사O</th><th>감소</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  `;
+}
+
+// ── 초기화 ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  renderCards();
+  showChart('노인', document.querySelector('.tb'));
+  renderDropCharts();
+  renderTable();
+});
+</script>
+</body>
+</html>
