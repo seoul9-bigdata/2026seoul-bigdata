@@ -95,7 +95,7 @@ tr:hover td{background:#fafaf8}
     </div>
     <div class="divider"></div>
     <!-- 시간 + 시설 -->
-    <div class="crow">
+    <div class="crow" id="ctrl-time-ftype">
       <span class="lbl">보행 시간</span>
       <button class="btn on" data-t="15" onclick="setT(15,this)">15분</button>
       <button class="btn" data-t="30" onclick="setT(30,this)">30분</button>
@@ -575,14 +575,14 @@ function setSlope(val, btn) {
   update();
 }
 function setT(t, btn) {
-  document.querySelectorAll('.ctrl .crow:nth-child(3) .btn:not(.bw)')
+  document.querySelectorAll('#ctrl-time-ftype .btn:not(.bw)')
           .forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
   cT = t;
   update();
 }
 function setF(f, btn) {
-  document.querySelectorAll('.ctrl .crow:nth-child(3) .btn.bw')
+  document.querySelectorAll('#ctrl-time-ftype .btn.bw')
           .forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
   cF = f;
