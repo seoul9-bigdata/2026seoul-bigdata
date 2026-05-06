@@ -12,6 +12,7 @@
 |------|----|----|
 | 핵심 지표 | 취약도·박탈 노인 수 | **도달가능점수** (선택속도 도달 수 / 일반인 도달 수 × 100) |
 | 경사 보정 | 미적용 | **Tobler 보행속도 모델** — 동별 OSM 경사도 기반 보정 |
+| 경사 보정 방법론 | — | 동당 **1회** Dijkstra + 속도별 threshold 필터 (`norm_time` 방식) |
 | 속도 계층 | 일반인·노인·보조기기·하위15% | 동일 + **경사보정 3종** (노인·보조기기·하위15%) |
 | 집계 단위 | 동(洞) 단위만 | 동 단위 + **구(區) 단위 도달가능점수** |
 | 대시보드 | 구별 반경 원만 | + **동별 반경 원** 토글, 경사로 보정 온/오프 |
@@ -21,8 +22,9 @@
 
 ## 생성 스크립트 실행 순서
 
-```
-# 1. Tobler 보정 Dijkstra 재계산 (약 15분 소요)
+```bash
+# 1. Tobler 보정 Dijkstra 재계산 (약 3~5분 소요)
+#    ※ output_v2/seoul_walk.graphml 없으면 OSM에서 자동 다운로드 (최초 1회, 10~15분 추가)
 python compute_tobler_v4.py
 
 # 2. 구 단위 점수 집계 CSV 추출
@@ -34,6 +36,41 @@ python generate_dashboard_v4.py
 # 4. 결론 HTML 생성
 python generate_conclusion_v4.py
 ```
+
+---
+
+## `compute_tobler_v4.py` 방법론 상세
+
+### Tobler Hiking Function
+
+```
+tobler_ratio(g) = exp(−3.5 × (g + 0.05)) / exp(−3.5 × 0.05)
+
+g = grade_abs  (방향 무관 절댓값, 최대 0.5 캡 적용)
+g = 0.00  →  ratio = 1.00  (평탄지)
+g = 0.10  →  ratio ≈ 0.70
+g = 0.20  →  ratio ≈ 0.50
+```
+
+일반인 속도(1.28 m/s)는 보정 대상에서 제외하며, 경사 무관 기준선으로 고정 사용한다.
+
+### Dijkstra 방법론 (`17_slope_dijkstra.py` 방식)
+
+```
+norm_time = raw_dist / tobler_ratio   (speed=1 m/s 정규화 이동 시간)
+도달 조건: norm_time ≤ speed_mps × 1800s
+       ↔  raw_dist ≤ speed_mps × tobler_ratio × 1800s
+```
+
+동당 **1회** Dijkstra (최대 cutoff)를 실행한 뒤, 속도별 threshold로 필터링한다.  
+기존 방식(속도당 1회 × 3회)과 수학적으로 동치이나, 실행 시간이 약 3배 단축된다.
+
+| 구분 | 기존 방식 | 개선 방식 |
+|------|----------|----------|
+| Dijkstra 횟수 | 426동 × 속도 3종 = 1,278회 | 426동 × **1회** = 426회 |
+| cutoff | 속도별 `speed × tobler × 1800` | `max_speed × max_tobler × 1800` (단일) |
+| 속도 적용 | cutoff 스케일 조정 | 결과 dict를 threshold로 필터 |
+| MAX_DIST | 고정값 | **tobler_ratio 최대값 기반 동적 계산** (누락 버그 수정) |
 
 ---
 
@@ -52,7 +89,7 @@ python generate_conclusion_v4.py
 | `동_key` | `구명_동명` 형태의 고유 키 (예: `종로구_사직동`) |
 | `구명` / `동명` | 자치구명·행정동명 |
 | `65세이상인구` / `고령화율` | 동별 고령 인구 현황 |
-| `복지_일반인` | 일반인 속도(1.39 m/s) 기준 30분 내 복지시설 수 |
+| `복지_일반인` | 일반인 속도(1.28 m/s) 기준 30분 내 복지시설 수 |
 | `복지_일반노인` | 노인 속도(1.12 m/s) 기준 복지시설 수 |
 | `복지_보조기기` | 보조기기 속도(0.88 m/s) 기준 복지시설 수 |
 | `복지_보조하위15p` | 하위15% 속도(0.70 m/s) 기준 복지시설 수 |
@@ -148,13 +185,13 @@ python generate_conclusion_v4.py
 #### 데이터 구조 (내장 JSON)
 
 ```
-DONG[426]: { gu, dong, pop, rate, vuln,
+DONG[426]: { gu, dong, pop65, aging, vuln,
              w[4], p[4],          ← 경사보정 전 도달 수 (속도 0~3)
              wc[4], pc[4],        ← 경사보정 후 도달 수
              tobler,              ← 동별 Tobler 비율
              clat, clng }         ← 행정동 중심점 좌표
-WELFARE[189]: { name, addr, lat, lng }
-PARK[132]:    { name, area, lat, lng }
+WELFARE[189]: { name, gu, type, lat, lng }
+PARK[132]:    { name, gu, area, lat, lng }
 ```
 
 #### 점수 색상 기준 (동별 반경 원)
@@ -162,10 +199,9 @@ PARK[132]:    { name, area, lat, lng }
 | 점수 범위 | 색상 |
 |----------|------|
 | 80점 이상 | 녹색 (`#2e7d32`) |
-| 60–79점 | 연두 (`#7cb342`) |
-| 40–59점 | 주황 (`#ef6c00`) |
-| 40점 미만 | 빨강 (`#c62828`) |
-| N/A (분모=0) | 회색 (`#aaa`) |
+| 50–79점 | 주황 (`#f57f17`) |
+| 50점 미만 | 빨강 (`#c62828`) |
+| N/A (분모=0) | 회색 (`#9e9e9e`) |
 
 ---
 
@@ -202,14 +238,15 @@ PARK[132]:    { name, area, lat, lng }
 
 ```
 [의존 입력]
-  output_v2/dong_reachability_v2.csv     ← v2 기존 Dijkstra 결과
-  output_v2/seoul_walk.graphml           ← OSM 보행 네트워크 (188 MB)
-  medical_LEE/outputs/tobler_ratio_LEE.csv  ← 동별 Tobler 비율 (426개 동)
-  output/geocode_cache.json              ← 복지시설 주소 → 좌표 캐시
+  output_v2/dong_reachability_v2.csv        ← v2 기존 Dijkstra 결과
+  output_v2/seoul_walk.graphml              ← OSM 보행 네트워크 (188 MB, 없으면 자동 다운로드)
+  medical_LEE/outputs/tobler_ratio_LEE.csv  ← 동별 Tobler 비율 (426개 동 전수 매칭)
+  output/geocode_cache.json                 ← 복지시설 주소 → 좌표 캐시
   서울시 사회복지시설(노인여가복지시설) 목록.csv
   서울시 주요 공원현황(2026 상반기).xlsx
 
-        ↓ compute_tobler_v4.py (Dijkstra × 426동 × 3속도)
+        ↓ compute_tobler_v4.py
+          (Dijkstra × 426동 × 1회, threshold 필터 × 3속도 → 약 3~5분)
 
   output_v4/dong_reachability_v4.csv   (45.5 KB, 426행 × 25열)
 
@@ -229,6 +266,7 @@ PARK[132]:    { name, area, lat, lng }
 | 용어 | 정의 |
 |------|------|
 | **Tobler 보행속도 모델** | 경사도에 따른 보행 속도 보정 계수. 평탄지 = 1.0, 경사 클수록 감소 |
+| **norm_time** | `length / tobler_ratio` — speed=1 m/s 기준 정규화 이동 시간. 속도별 필터 기준값 |
 | **도달가능점수** | `(선택 속도 도달 수 / 일반인 도달 수) × 100`. 일반인 기준 100, 낮을수록 취약 |
 | **경사X / 경사O** | 경사 보정 미적용 / 적용. 일반인 속도는 경사O도 보정 없음 (기준선) |
 | **하위15%** | 보조기기 사용자 중 보행 속도 하위 15% (0.70 m/s) |
