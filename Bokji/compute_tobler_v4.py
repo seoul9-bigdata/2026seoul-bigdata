@@ -18,7 +18,7 @@ Dijkstra cutoff 로 사용, 실제 도달 가능 시설 수를 재계산한다.
     + 공원_일반노인보정 / 공원_보조기기보정 / 공원_보조하위15p보정
 """
 
-import sys, warnings, io, os, re, json, time
+import sys, warnings, io, os, re, json, time, math
 sys.stdout.reconfigure(encoding='utf-8')
 warnings.filterwarnings('ignore')
 
@@ -43,6 +43,16 @@ os.makedirs(OUT_V4, exist_ok=True)
 
 CRS_WGS84 = 'EPSG:4326'
 SECS_30   = 30 * 60   # 1800 초
+
+# ── Tobler hiking function (17_slope_dijkstra.py 기준) ────────────────────────
+# tobler_ratio(g) = exp(-3.5 × (g + 0.05)) / exp(-3.5 × 0.05)
+# g = grade_abs (방향 무관 절댓값, 0.5 캡 적용)
+# g=0.00 → ratio=1.00  g=0.10 → ratio≈0.70  g=0.20 → ratio≈0.50
+_TOBLER_NORM = math.exp(-3.5 * 0.05)
+
+def tobler_ratio_fn(grade_abs: float) -> float:
+    g = min(grade_abs, 0.5)
+    return math.exp(-3.5 * (g + 0.05)) / _TOBLER_NORM
 
 # 보정 대상 속도 3종 (일반인은 보정 없이 기준값 그대로 사용)
 BASE_SPEEDS = {
@@ -158,7 +168,13 @@ print(f"  공원 {len(parks_gdf)}개 좌표 확보")
 # 3. OSM 보행 네트워크 로드 (캐시)
 # ─────────────────────────────────────────────────────────────────────────────
 print(f"\n3. OSM 그래프 로드: {GRAPH_FILE}")
-G   = ox.load_graphml(GRAPH_FILE)
+if os.path.exists(GRAPH_FILE):
+    G = ox.load_graphml(GRAPH_FILE)
+else:
+    print("  캐시 없음 → 서울 보행 네트워크 다운로드 중... (5~15분 소요)")
+    G = ox.graph_from_place("Seoul, South Korea", network_type="walk")
+    ox.save_graphml(G, GRAPH_FILE)
+    print(f"  저장 완료: {GRAPH_FILE}")
 G_u = ox.convert.to_undirected(G)
 print(f"  노드 {G_u.number_of_nodes():,}개  엣지 {G_u.number_of_edges():,}개")
 
@@ -219,10 +235,12 @@ if n_no_center:
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. Tobler 보정 Dijkstra 계산
 # ─────────────────────────────────────────────────────────────────────────────
-print("\n6. Tobler 보정 Dijkstra 계산")
-total_runs = len(merged) * len(BASE_SPEEDS)
-print(f"  {len(merged)}개 동 × {len(BASE_SPEEDS)}개 속도 = {total_runs:,}회 Dijkstra")
+print("\n6. Tobler 보정 Dijkstra 계산 (17_slope_dijkstra.py 방법론)")
+print(f"  {len(merged)}개 동 × 1회 Dijkstra → {len(BASE_SPEEDS)}개 속도 threshold 필터")
 print(f"  (일반인 속도는 보정 없이 기존 값 그대로 사용)\n")
+print(f"  방법론: norm_time = length / tobler_ratio")
+print(f"         도달 조건: norm_time ≤ speed_mps × {SECS_30}s")
+print(f"         즉: raw_dist ≤ speed_mps × tobler_ratio × {SECS_30}s\n")
 
 col_names = []
 for k in BASE_SPEEDS:
@@ -230,6 +248,13 @@ for k in BASE_SPEEDS:
     col_names.append(f'공원_{k}보정')
 
 col_data = {c: [] for c in col_names}
+
+# tobler_ratio_LEE.csv 값이 1.0을 초과할 수 있으므로 실제 최대값 기준으로 cutoff 설정
+# (tobler_r > 1.0 인 동이 있으면 thresh > 고정 MAX_DIST → 노드 누락 방지)
+_max_tobler = max(1.0, merged['tobler_ratio'].max())
+MAX_DIST = int(max(BASE_SPEEDS.values()) * _max_tobler * SECS_30)
+print(f"  Dijkstra cutoff: {MAX_DIST} m  (max_speed={max(BASE_SPEEDS.values())} m/s"
+      f" × max_tobler={_max_tobler:.4f} × {SECS_30}s)")
 
 t0 = time.time()
 for idx, row in merged.iterrows():
@@ -252,17 +277,24 @@ for idx, row in merged.iterrows():
             col_data[f'공원_{k}보정'].append(0)
         continue
 
+    # ── 17_slope_dijkstra.py 핵심 패턴 ─────────────────────────────────────
+    # 동당 1회 Dijkstra (최대 평지거리 cutoff)
+    try:
+        reachable = nx.single_source_dijkstra_path_length(
+            G_u, center_node, cutoff=MAX_DIST, weight='length'
+        )
+    except Exception:
+        for k in BASE_SPEEDS:
+            col_data[f'복지_{k}보정'].append(0)
+            col_data[f'공원_{k}보정'].append(0)
+        continue
+
+    # 속도별 threshold 필터 (norm_time = raw_dist / tobler_r ≤ speed × SECS_30)
     for speed_key, base_mps in BASE_SPEEDS.items():
-        corrected_dist = int(base_mps * tobler_r * SECS_30)
-        try:
-            reachable = nx.single_source_dijkstra_path_length(
-                G_u, center_node, cutoff=corrected_dist, weight='length'
-            )
-            reach_set = set(reachable.keys())
-            w_cnt = sum(welfare_node_count[n] for n in reach_set if n in welfare_node_count)
-            p_cnt = sum(park_node_count[n]    for n in reach_set if n in park_node_count)
-        except Exception:
-            w_cnt = p_cnt = 0
+        thresh = base_mps * tobler_r * SECS_30   # ≡ norm_time 기준 budget
+        reach_set = {n for n, d in reachable.items() if d <= thresh}
+        w_cnt = sum(welfare_node_count[n] for n in reach_set if n in welfare_node_count)
+        p_cnt = sum(park_node_count[n]    for n in reach_set if n in park_node_count)
         col_data[f'복지_{speed_key}보정'].append(w_cnt)
         col_data[f'공원_{speed_key}보정'].append(p_cnt)
 
