@@ -220,3 +220,8 @@ uv.lock
 # 원본 DB는 너무 커서 .gz로만 push (gunzip으로 풀어 사용)
 YOO/data/seoul.duckdb
 prompt.md
+
+# 260504 submit 캐시 (OSM 그래프 / 다익 행렬 — 큰 파일)
+YOO/260504_submit/cache/*.graphml
+YOO/260504_submit/cache/*.npy
+YOO/260504_submit/cache/*.pkl
