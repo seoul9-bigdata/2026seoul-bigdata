@@ -1260,7 +1260,7 @@
               서울 전체의 몇 퍼센트인가?
             </p>
             <a
-              href="Bokji/output_v3/infra_dashboard_bokji.html"
+              href="Bokji/output_v4/infra_dashboard_bokji.html"
               class="cat-btn"
               target="_blank"
             >
@@ -1480,6 +1480,15 @@
           </p>
         </div>
 
+        <!-- Conclusion dashboard CTA -->
+        <div style="text-align:center;margin-bottom:48px;">
+          <p style="font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:1.2rem;">종합 결론 대시보드</p>
+          <a href="final_output/LEE/conclusion_LEE.html" target="_blank" style="display:inline-flex;align-items:center;gap:12px;background:rgba(245,183,64,.08);border:1px solid rgba(245,183,64,.3);border-radius:16px;padding:1.4rem 2.8rem;text-decoration:none;color:#f5b740;font-family:var(--serif);font-size:1.25rem;font-weight:400;transition:background .25s,border-color .25s;" onmouseover="this.style.background='rgba(245,183,64,.16)';this.style.borderColor='rgba(245,183,64,.6)'" onmouseout="this.style.background='rgba(245,183,64,.08)';this.style.borderColor='rgba(245,183,64,.3)'">
+            5개 분야 종합 취약도 진단 →
+          </a>
+          <p style="font-family:var(--mono);font-size:10px;color:rgba(255,255,255,.25);margin-top:.8rem;letter-spacing:.05em;">의료·복지녹지 실측 데이터 + 교통·인프라·기후 통합 / 구 단위 도달가능점수 비교</p>
+        </div>
+
         <!-- Links to individual dashboards -->
         <div>
           <p class="heatmap-title" style="margin-bottom: 1.8rem">
@@ -1529,7 +1538,7 @@
               <span class="dl-arrow">↗</span>
             </a>
             <a
-              href="Bokji/output_v3/infra_dashboard_bokji.html"
+              href="Bokji/output_v4/infra_dashboard_bokji.html"
               class="dash-link-card welfare"
               target="_blank"
             >
@@ -1770,32 +1779,35 @@
       })();
 
       /* ── HEATMAP DATA ── */
+      /* scores: [D5기후(추정), D2인프라(추정), D3의료(실측), D4복지녹지(실측)] */
+      /* D3: conclusion_medical_LEE.csv 노인_경사X 30분 기준 */
+      /* D4: gu_scores_v4.csv 노인_경사X 30분 기준 */
       const districtData = [
-        { name: "강남구", scores: [72, 85, 88, 75] },
-        { name: "강동구", scores: [65, 70, 68, 63] },
-        { name: "강북구", scores: [42, 55, 52, 47] },
-        { name: "강서구", scores: [60, 65, 63, 61] },
-        { name: "관악구", scores: [45, 58, 60, 48] },
-        { name: "광진구", scores: [60, 68, 68, 62] },
-        { name: "구로구", scores: [55, 63, 60, 55] },
-        { name: "금천구", scores: [50, 60, 57, 52] },
-        { name: "노원구", scores: [55, 65, 62, 52] },
-        { name: "도봉구", scores: [45, 52, 53, 45] },
-        { name: "동대문구", scores: [62, 70, 70, 58] },
-        { name: "동작구", scores: [62, 68, 70, 65] },
-        { name: "마포구", scores: [72, 78, 75, 65] },
-        { name: "서대문구", scores: [53, 65, 68, 50] },
-        { name: "서초구", scores: [78, 82, 85, 75] },
-        { name: "성동구", scores: [68, 74, 72, 65] },
-        { name: "성북구", scores: [48, 60, 62, 52] },
-        { name: "송파구", scores: [72, 78, 75, 70] },
-        { name: "양천구", scores: [65, 70, 70, 68] },
-        { name: "영등포구", scores: [68, 72, 73, 60] },
-        { name: "용산구", scores: [70, 72, 75, 60] },
-        { name: "은평구", scores: [50, 63, 60, 55] },
-        { name: "종로구", scores: [62, 71, 78, 55] },
-        { name: "중구", scores: [65, 80, 85, 50] },
-        { name: "중랑구", scores: [52, 62, 60, 55] },
+        { name: "강남구", scores: [72, 85, 73, 69] },
+        { name: "강동구", scores: [65, 70, 79, 76] },
+        { name: "강북구", scores: [42, 55, 77, 73] },
+        { name: "강서구", scores: [60, 65, 78, 78] },
+        { name: "관악구", scores: [45, 58, 71, 71] },
+        { name: "광진구", scores: [60, 68, 80, 74] },
+        { name: "구로구", scores: [55, 63, 74, 78] },
+        { name: "금천구", scores: [50, 60, 78, 83] },
+        { name: "노원구", scores: [55, 65, 76, 76] },
+        { name: "도봉구", scores: [45, 52, 72, 76] },
+        { name: "동대문구", scores: [62, 70, 76, 72] },
+        { name: "동작구", scores: [62, 68, 71, 83] },
+        { name: "마포구", scores: [72, 78, 75, 70] },
+        { name: "서대문구", scores: [53, 65, 75, 76] },
+        { name: "서초구", scores: [78, 82, 75, 84] },
+        { name: "성동구", scores: [68, 74, 76, 78] },
+        { name: "성북구", scores: [48, 60, 78, 70] },
+        { name: "송파구", scores: [72, 78, 78, 81] },
+        { name: "양천구", scores: [65, 70, 77, 82] },
+        { name: "영등포구", scores: [68, 72, 76, 76] },
+        { name: "용산구", scores: [70, 72, 74, 75] },
+        { name: "은평구", scores: [50, 63, 76, 76] },
+        { name: "종로구", scores: [62, 71, 69, 78] },
+        { name: "중구", scores: [65, 80, 78, 75] },
+        { name: "중랑구", scores: [52, 62, 77, 77] },
       ];
 
       function scoreToColor(score) {
