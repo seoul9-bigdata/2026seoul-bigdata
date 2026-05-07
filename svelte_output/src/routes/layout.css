@@ -1,0 +1,127 @@
+@import 'tailwindcss';
+
+@theme {
+	/* ── 폰트 (KIM dashboard 톤) ── */
+	--font-sans: 'Noto Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+	--font-serif: 'Noto Serif KR', serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+	/* ── 라이트 베이스 (KIM) ── */
+	--color-bg: #f5f4f0;
+	--color-bg2: #f9f8f4;
+	--color-card: #ffffff;
+	--color-card-soft: #f5f4f0;
+	--color-text: #2c2c2a;
+	--color-text2: #5f5e5a;
+	--color-text3: #888780;
+	--color-text4: #b4b2a9;
+	--color-border: #d3d1c7;
+	--color-border-soft: #e8e6e0;
+
+	/* ── 다크 헤더/캔버스 ── */
+	--color-dark: #2c2c2a;
+	--color-dark-text: #f1efe8;
+	--color-canvas: #080a10;
+
+	/* ── 액센트 (main_ver1 + KIM 공통 #d85a30) ── */
+	--color-accent: #d85a30;
+	--color-gold: #f5b740;
+
+	/* ── 시맨틱 (KIM 변수) ── */
+	--color-heat: #ff8c00;
+	--color-cold: #4a90d9;
+	--color-slope: #8b5cf6;
+	--color-score-high: #1d9e75;
+	--color-score-mid: #f5a623;
+	--color-score-low: #e74c3c;
+
+	/* ── 도메인 액센트 ── */
+	--color-blue: #5aadff;
+	--color-teal: #3ecfa0;
+	--color-purple: #b48ef4;
+	--color-pink: #f472b6;
+	--color-red: #ff5f5f;
+	--color-amber: #f5b740;
+	--color-green: #7cd982;
+
+	/* ── pill / note ── */
+	--color-note-warm-bg: #faeeda;
+	--color-note-warm-border: #ef9f27;
+	--color-note-warm-text: #633806;
+	--color-note-cool-bg: #e8f4fd;
+	--color-note-cool-border: #3498db;
+	--color-note-cool-text: #1a5276;
+}
+
+html {
+	scroll-behavior: auto;
+	/* OS prefers-color-scheme: dark 일 때 브라우저가 native form 요소를 다크로 강제하는 것 차단.
+	   본 사이트는 라이트 톤 전용. */
+	color-scheme: light;
+}
+
+body {
+	font-family: var(--font-sans);
+	background: var(--color-bg);
+	color: var(--color-text);
+	font-size: 14px;
+	line-height: 1.5;
+	overflow-y: scroll;
+}
+
+/* native form 요소 라이트 강제 — input/select/button auto color 방지 */
+input,
+select,
+button,
+textarea {
+	color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+/* ── 재사용 유틸 ── */
+@utility ct-label {
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.06em;
+	color: var(--color-text3);
+	text-transform: uppercase;
+}
+
+@utility kicker {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	letter-spacing: 0.08em;
+	color: var(--color-text3);
+	text-transform: uppercase;
+}
+
+@utility card-shell {
+	background: var(--color-card);
+	border: 0.5px solid var(--color-border);
+	border-radius: 12px;
+	padding: 16px 18px;
+}
+
+@utility pill-btn {
+	font-size: 12px;
+	padding: 5px 14px;
+	border-radius: 20px;
+	border: 0.5px solid var(--color-text4);
+	background: transparent;
+	color: var(--color-text2);
+	cursor: pointer;
+	transition: all 0.14s;
+	font-family: inherit;
+	white-space: nowrap;
+}
+
+@utility pill-btn-on {
+	background: var(--color-dark);
+	color: var(--color-dark-text);
+	border-color: var(--color-dark);
+}

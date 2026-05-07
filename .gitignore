@@ -225,3 +225,8 @@ prompt.md
 YOO/260504_submit/cache/*.graphml
 YOO/260504_submit/cache/*.npy
 YOO/260504_submit/cache/*.pkl
+
+# === Svelte 앱 lib/ 예외 ===
+# 위 Python toptal 템플릿의 `lib/` 패턴이 svelte_output/src/lib/ (컴포넌트·데이터·nav) 까지 무시하는 문제 픽스
+!svelte_output/src/lib/
+!svelte_output/src/lib/**
