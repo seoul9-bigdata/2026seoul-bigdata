@@ -5,6 +5,112 @@
 	import StatCard from '$lib/components/StatCard.svelte';
 	import StatGrid from '$lib/components/StatGrid.svelte';
 	import Note from '$lib/components/Note.svelte';
+	import CountUp from '$lib/components/CountUp.svelte';
+	import { viewport } from '$lib/actions/viewport.js';
+	import { fade } from 'svelte/transition';
+	import { onMount, onDestroy } from 'svelte';
+
+	/* ── Leaflet choropleth (서울 25구 고령화율) ── */
+	let mapEl = $state();
+	/** @type {any} */
+	let lmap;
+	/** @type {any} */
+	let geoData = null;
+	/** @type {any} */
+	let agingLayer = null;
+	/** @type {any} */
+	let L = null;
+
+	function agingColor2026(r) {
+		if (r < 18) return '#fef3cd';
+		if (r < 22) return '#f5b740';
+		if (r < 25) return '#e87f2a';
+		return '#c0391b';
+	}
+	function agingColor2040(r) {
+		if (r < 15) return '#fff5e0';
+		if (r < 18) return '#fef3cd';
+		if (r < 22) return '#f5b740';
+		if (r < 25) return '#e87f2a';
+		if (r < 28) return '#c0391b';
+		if (r < 31) return '#7a1a08';
+		if (r < 34) return '#4d1006';
+		return '#200703';
+	}
+
+	function drawAgingLayer() {
+		if (!lmap || !L || !geoData) return;
+		if (agingLayer) lmap.removeLayer(agingLayer);
+		const data = year === 2026 ? AGING_2026 : AGING_2040;
+		const colorFn = year === 2026 ? agingColor2026 : agingColor2040;
+		agingLayer = L.geoJSON(geoData, {
+			style: (feat) => {
+				const nm = feat.properties.SIG_KOR_NM || feat.properties.name || '';
+				const r = data[nm] || 18;
+				return {
+					fillColor: colorFn(r),
+					weight: 1.2,
+					color: '#fff',
+					fillOpacity: 0.85
+				};
+			},
+			onEachFeature: (feat, layer) => {
+				const nm = feat.properties.SIG_KOR_NM || feat.properties.name || '';
+				const r = data[nm];
+				if (r != null) {
+					layer.bindTooltip(`<b>${nm}</b><br>${year}년 고령화율 ${r}%`, { sticky: true });
+				}
+				layer.on({
+					mouseover: (e) => e.target.setStyle({ fillOpacity: 1, weight: 2 }),
+					mouseout: (e) => e.target.setStyle({ fillOpacity: 0.85, weight: 1.2 })
+				});
+			}
+		}).addTo(lmap);
+	}
+
+	let mapInited = false;
+	async function initMap() {
+		if (mapInited || !mapEl) return;
+		mapInited = true;
+		await import('leaflet/dist/leaflet.css');
+		L = (await import('leaflet')).default;
+		lmap = L.map(mapEl, {
+			zoomControl: false,
+			attributionControl: false,
+			scrollWheelZoom: false,
+			dragging: false,
+			touchZoom: false,
+			doubleClickZoom: false,
+			keyboard: false,
+			boxZoom: false
+		}).setView([37.555, 127.0], 10);
+		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+			subdomains: 'abcd',
+			maxZoom: 18
+		}).addTo(lmap);
+		try {
+			const res = await fetch(
+				'https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json'
+			);
+			geoData = await res.json();
+			drawAgingLayer();
+		} catch (e) {
+			console.error('[introduce] GeoJSON load failed', e);
+		}
+	}
+
+	$effect(() => {
+		if (mapEl && !mapInited && typeof window !== 'undefined') initMap();
+	});
+
+	onDestroy(() => lmap?.remove());
+
+	// year 변경 시 layer 재그리기
+	$effect(() => {
+		// year 의존성 추적
+		year;
+		if (lmap && geoData) drawAgingLayer();
+	});
 
 	const domains = ROUTES.filter((r) => r.kind === 'domain');
 
@@ -73,9 +179,13 @@
 	}
 
 	/* ── 토글: 2026 / 2040 ── */
-	let year = $state(2040);
+	let year = $state(2026);
 	const yearData = $derived(year === 2026 ? AGING_2026 : AGING_2040);
-	const yearMax = $derived(Math.max(...Object.values(yearData)));
+	/** 두 시점 통합 최대값 — 토글 시 상대 크기 차이가 극적으로 보이게 (2026 → 2040 = 더 채워짐) */
+	const combinedMax = Math.max(
+		...Object.values(AGING_2026),
+		...Object.values(AGING_2040)
+	);
 	const yearAvg = $derived(year === 2026 ? avg2026 : avg2040);
 
 	const sortedByYear = $derived(
@@ -90,10 +200,10 @@
 	<div class="card-shell relative mb-3.5 overflow-hidden px-7 py-10">
 		<div
 			class="pointer-events-none absolute -right-32 -top-32 h-[420px] w-[420px] rounded-full"
-			style:background="radial-gradient(circle, rgba(245,183,64,0.16), transparent 65%)"
+			style:background="radial-gradient(circle, rgba(251,146,60,0.16), transparent 65%)"
 		></div>
 
-		<p class="kicker mb-4" style:color="var(--color-gold)">서론 · 시각화 배경</p>
+		<p class="kicker mb-4" style:color="var(--color-coral)">서론 · 시각화 배경</p>
 
 		<h1
 			class="mb-4 font-serif text-[34px] font-light leading-[1.2] sm:text-[44px]"
@@ -109,9 +219,21 @@
 		</p>
 
 		<StatGrid class="sm:grid-cols-3" cols={3}>
-			<StatCard label="서울 65세+ 인구 (2026)" value="194만 명" sub="자치구별장래인구추계" />
-			<StatCard label="서울 고령화율 (2026 평균)" value="{avg2026}%" sub="2040 → {avg2040}%" tone="orange" />
-			<StatCard label="보행보조 노인 시설 손실률" value="−53%" sub="일반인 대비 도달가능 점수" tone="red" />
+			<StatCard label="서울 65세+ 인구 (2026)" sub="자치구별장래인구추계">
+				{#snippet children()}
+					<CountUp value={194} suffix="만 명" />
+				{/snippet}
+			</StatCard>
+			<StatCard label="서울 고령화율 (2026 평균)" sub="2040 → {avg2040}%" tone="orange">
+				{#snippet children()}
+					<CountUp value={+avg2026} decimals={1} suffix="%" />
+				{/snippet}
+			</StatCard>
+			<StatCard label="보행보조 노인 시설 손실률" sub="일반인 대비 도달가능 점수" tone="red">
+				{#snippet children()}
+					<CountUp value={53} prefix="−" suffix="%" />
+				{/snippet}
+			</StatCard>
 		</StatGrid>
 	</div>
 
@@ -148,29 +270,46 @@
 			</div>
 		</div>
 
-		<!-- 25구 막대 그래프 -->
-		<div class="mb-3 rounded-[8px] p-4" style:background="var(--color-card-soft)">
-			<div class="flex flex-col gap-[5px]">
-				{#each sortedByYear as d (d.name)}
-					{@const w = (d.value / yearMax) * 100}
-					{@const bg = colorOf(d.value)}
-					<div class="grid grid-cols-[80px_1fr_60px] items-center gap-2.5">
-						<div class="text-[11.5px] font-medium" style:color="var(--color-text)">{d.name}</div>
-						<div class="relative h-[14px] rounded-[3px]" style:background="rgba(0,0,0,0.04)">
+		<!-- 지도 + 막대 2-column — year 토글이 양쪽 동시 변경 -->
+		<div class="mb-3 grid gap-3 lg:grid-cols-[1.05fr_1fr]">
+			<!-- Choropleth 지도 -->
+			<div class="rounded-[8px] p-3" style:background="var(--color-card-soft)">
+				<div
+					class="text-[11.5px] font-medium mb-2"
+					style:color="var(--color-text2)"
+				>
+					서울시 자치구별 고령화율 ({year}{year === 2040 ? ' 전망' : ''})
+				</div>
+				<div bind:this={mapEl} class="aging-map rounded-[6px]"></div>
+			</div>
+
+			<!-- 25구 막대 그래프 (year 토글 시 전체 재애니메이션) -->
+			<div class="rounded-[8px] p-3" style:background="var(--color-card-soft)">
+			{#key year}
+				<div class="flex flex-col gap-[5px]" in:fade={{ duration: 200 }}>
+					{#each sortedByYear as d, i (d.name)}
+						{@const w = (d.value / combinedMax) * 100}
+						{@const bg = colorOf(d.value)}
+						<div class="grid grid-cols-[80px_1fr_60px] items-center gap-2.5">
+							<div class="text-[11.5px] font-medium" style:color="var(--color-text)">{d.name}</div>
+							<div class="relative h-[14px] rounded-[3px]" style:background="rgba(0,0,0,0.04)">
+								<div
+									class="bar-fill h-full rounded-[3px]"
+									style:width="{w}%"
+									style:background={bg}
+									style:--ad="{i * 22}ms"
+								></div>
+							</div>
 							<div
-								class="h-full rounded-[3px] transition-all duration-500"
-								style:width="{w}%"
-								style:background={bg}
-							></div>
+								class="text-right font-mono text-[11.5px] tabular-nums"
+								style:color="var(--color-text2)"
+							>
+								{d.value.toFixed(1)}%
+							</div>
 						</div>
-						<div
-							class="text-right font-mono text-[11.5px] tabular-nums"
-							style:color="var(--color-text2)"
-						>
-							{d.value.toFixed(1)}%
-						</div>
-					</div>
-				{/each}
+					{/each}
+				</div>
+			{/key}
 			</div>
 		</div>
 
@@ -317,3 +456,34 @@
 	</Card>
 
 </section>
+
+<style>
+	/* 고령화 choropleth 지도 */
+	.aging-map {
+		height: 380px;
+		width: 100%;
+		background: #e8e4db;
+	}
+	/* 막대 reveal — GPU scaleX, will-change 힌트로 합성 레이어 분리 */
+	.bar-fill {
+		animation: bar-reveal 0.85s cubic-bezier(0.16, 0.84, 0.36, 1) both;
+		animation-delay: var(--ad, 0ms);
+		transform-origin: left center;
+		will-change: transform;
+		backface-visibility: hidden;
+		transform: translateZ(0);
+	}
+	@keyframes bar-reveal {
+		from {
+			transform: translateZ(0) scaleX(0);
+		}
+		to {
+			transform: translateZ(0) scaleX(1);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.bar-fill {
+			animation: none;
+		}
+	}
+</style>

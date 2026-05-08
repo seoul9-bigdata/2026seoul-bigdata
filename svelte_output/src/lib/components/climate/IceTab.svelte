@@ -50,6 +50,7 @@
 	});
 
 	// ── Canvas 레이어 클래스 빌더 (L 로딩 후 호출) ──
+	// Leaflet zoom anim 동기화: leaflet-zoom-animated 클래스 + _animateZoom 사용
 	function makeCovCanvasLayer(LL) {
 		return LL.Layer.extend({
 			initialize: function (buf) {
@@ -58,28 +59,34 @@
 			onAdd: function (m) {
 				this._map = m;
 				const cv = (this._cv = document.createElement('canvas'));
+				cv.className = 'leaflet-zoom-animated';
 				cv.style.cssText = 'position:absolute;pointer-events:none;z-index:350';
 				m.getPanes().overlayPane.appendChild(cv);
-				m.on('moveend zoomend viewreset', this._reset, this);
-				m.on('zoomanim', this._reset, this);
+				m.on('moveend viewreset zoomend', this._reset, this);
+				m.on('zoomanim', this._animateZoom, this);
 				this._reset();
 			},
 			onRemove: function (m) {
 				this._cv.remove();
-				m.off('moveend zoomend viewreset', this._reset, this);
-				m.off('zoomanim', this._reset, this);
+				m.off('moveend viewreset zoomend', this._reset, this);
+				m.off('zoomanim', this._animateZoom, this);
 			},
 			setBuf: function (buf) {
 				this._buf = buf;
 				if (this._map) this._reset();
+			},
+			_animateZoom: function (e) {
+				const m = this._map;
+				const scale = m.getZoomScale(e.zoom);
+				const offset = m._latLngBoundsToNewLayerBounds(m.getBounds(), e.zoom, e.center).min;
+				LL.DomUtil.setTransform(this._cv, offset, scale);
 			},
 			_reset: function () {
 				const m = this._map;
 				const tl = m.containerPointToLayerPoint([0, 0]);
 				const sz = m.getSize();
 				const cv = this._cv;
-				cv.style.left = tl.x + 'px';
-				cv.style.top = tl.y + 'px';
+				LL.DomUtil.setTransform(cv, tl, 1);
 				cv.width = sz.x;
 				cv.height = sz.y;
 				this._draw();
@@ -124,28 +131,34 @@
 			onAdd: function (m) {
 				this._map = m;
 				const cv = (this._cv = document.createElement('canvas'));
+				cv.className = 'leaflet-zoom-animated';
 				cv.style.cssText = 'position:absolute;pointer-events:none;z-index:400';
 				m.getPanes().overlayPane.appendChild(cv);
-				m.on('moveend zoomend viewreset', this._reset, this);
-				m.on('zoomanim', this._reset, this);
+				m.on('moveend viewreset zoomend', this._reset, this);
+				m.on('zoomanim', this._animateZoom, this);
 				this._reset();
 			},
 			onRemove: function (m) {
 				this._cv.remove();
-				m.off('moveend zoomend viewreset', this._reset, this);
-				m.off('zoomanim', this._reset, this);
+				m.off('moveend viewreset zoomend', this._reset, this);
+				m.off('zoomanim', this._animateZoom, this);
 			},
 			setBuf: function (buf) {
 				this._buf = buf;
 				if (this._map) this._reset();
+			},
+			_animateZoom: function (e) {
+				const m = this._map;
+				const scale = m.getZoomScale(e.zoom);
+				const offset = m._latLngBoundsToNewLayerBounds(m.getBounds(), e.zoom, e.center).min;
+				LL.DomUtil.setTransform(this._cv, offset, scale);
 			},
 			_reset: function () {
 				const m = this._map;
 				const tl = m.containerPointToLayerPoint([0, 0]);
 				const sz = m.getSize();
 				const cv = this._cv;
-				cv.style.left = tl.x + 'px';
-				cv.style.top = tl.y + 'px';
+				LL.DomUtil.setTransform(cv, tl, 1);
 				cv.width = sz.x;
 				cv.height = sz.y;
 				this._draw();
@@ -514,9 +527,12 @@
 		color: var(--color-text);
 	}
 	.btn.on {
-		background: var(--color-dark);
-		color: var(--color-dark-text);
-		border-color: var(--color-dark);
+		background: var(--pill-accent, var(--color-dark));
+		color: var(--pill-on-text, var(--color-dark-text));
+		border-color: var(--pill-accent, var(--color-dark));
+	}
+	.btn.on:hover {
+		filter: brightness(1.08);
 	}
 	.btn.bw {
 		border-radius: 8px;

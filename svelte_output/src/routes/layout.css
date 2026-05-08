@@ -26,6 +26,8 @@
 	/* ── 액센트 (main_ver1 + KIM 공통 #d85a30) ── */
 	--color-accent: #d85a30;
 	--color-gold: #f5b740;
+	/* 인트로 전용 — climate amber 와 구분되는 코랄/피치 톤 */
+	--color-coral: #fb923c;
 
 	/* ── 시맨틱 (KIM 변수) ── */
 	--color-heat: #ff8c00;

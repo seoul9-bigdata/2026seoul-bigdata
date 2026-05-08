@@ -1241,9 +1241,12 @@
 		color: var(--color-text);
 	}
 	.btn.on {
-		background: var(--color-dark);
-		color: var(--color-dark-text);
-		border-color: var(--color-dark);
+		background: var(--pill-accent, var(--color-dark));
+		color: var(--pill-on-text, var(--color-dark-text));
+		border-color: var(--pill-accent, var(--color-dark));
+	}
+	.btn.on:hover {
+		filter: brightness(1.08);
 	}
 	.btn.bw {
 		border-radius: 8px;

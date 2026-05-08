@@ -1,6 +1,8 @@
 <script>
 	import { base } from '$app/paths';
 	import { ROUTES } from '$lib/nav.js';
+	import CountUp from '$lib/components/CountUp.svelte';
+	import { viewport } from '$lib/actions/viewport.js';
 
 	const domains = ROUTES.filter((r) => r.kind === 'domain');
 
@@ -15,10 +17,10 @@
 
 	/** Hero 영역에 띄울 핵심 수치 */
 	const heroStats = [
-		{ num: '0.88', unit: 'm/s', label: '보행보조 노인 평균 보행속도' },
-		{ num: '44', unit: '분+', label: '청년 30분 → 노인 도달 시간' },
-		{ num: '32', unit: '%', label: '2040 서울 노인 인구 비율' },
-		{ num: '5', unit: '축', label: '환승·기후·인프라·복지·의료' }
+		{ num: 0.88, decimals: 2, unit: 'm/s', label: '보행보조 노인 평균 보행속도' },
+		{ num: 44, decimals: 0, unit: '분+', label: '청년 30분 → 노인 도달 시간' },
+		{ num: 32, decimals: 0, unit: '%', label: '2040 서울 노인 인구 비율' },
+		{ num: 5, decimals: 0, unit: '축', label: '환승·기후·인프라·복지·의료' }
 	];
 </script>
 
@@ -49,16 +51,20 @@
 
 		<!-- 핵심 수치 (HS 스타일을 라이트 톤으로) -->
 		<div class="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
-			{#each heroStats as s}
-				<div class="border-l-2 pl-4" style:border-color="rgba(216,90,48,0.32)">
+			{#each heroStats as s, i}
+				<div
+					class="hero-stat border-l-2 pl-4"
+					style:border-color="rgba(216,90,48,0.32)"
+					style:--ad="{i * 90}ms"
+				>
 					<div
 						class="font-mono text-[26px] font-medium leading-none tabular-nums sm:text-[30px]"
 						style:color="var(--color-text)"
 					>
-						{s.num}<span
-							class="ml-[3px] text-[0.42em] font-normal"
-							style:color="var(--color-accent)">{s.unit}</span
-						>
+						<CountUp value={s.num} decimals={s.decimals} duration={1100 + i * 80} />
+						<span class="ml-[3px] text-[0.42em] font-normal" style:color="var(--color-accent)">
+							{s.unit}
+						</span>
 					</div>
 					<div class="mt-1.5 text-[11px]" style:color="var(--color-text3)">{s.label}</div>
 				</div>
@@ -93,3 +99,25 @@
 	</div>
 
 </section>
+
+<style>
+	.hero-stat {
+		animation: stat-reveal 0.7s cubic-bezier(0.16, 0.84, 0.36, 1) both;
+		animation-delay: var(--ad, 0ms);
+	}
+	@keyframes stat-reveal {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.hero-stat {
+			animation: none;
+		}
+	}
+</style>

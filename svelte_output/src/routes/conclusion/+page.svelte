@@ -4,101 +4,107 @@
 	import StatCard from '$lib/components/StatCard.svelte';
 	import StatGrid from '$lib/components/StatGrid.svelte';
 	import Note from '$lib/components/Note.svelte';
+	import CountUp from '$lib/components/CountUp.svelte';
+	import { viewport } from '$lib/actions/viewport.js';
+	import conclusionData from '$lib/data/conclusion.json';
+	import {
+		DOMAINS_4,
+		scoreColor,
+		scoreBg,
+		applyChartTheme,
+		CHART_THEME,
+		COMPARE_COLORS
+	} from '$lib/theme.js';
+	import { onMount, onDestroy, untrack } from 'svelte';
+	import { fade } from 'svelte/transition';
 
 	/* ────────────────────────────────────────────────────────────
-	 *  4개 도메인 결론 CSV 데이터 (final_output/ENSEMBLE/conclusion-csv/)
-	 *  컬럼: 점수_노인_경사X, 점수_노인_경사O,
-	 *        점수_보행보조_경사X, 점수_보행보조_경사O,
-	 *        점수_하위15_경사X, 점수_하위15_경사O
-	 *  본 페이지는 "일반 노인(1.12 m/s) · 경사 미보정" 기준만 사용 → 점수_노인_경사X
-	 *  YOO 교통 도메인은 결론 CSV가 아직 없음 → 본 페이지에서는 4개 도메인만 결합
+	 *  실데이터: final_output/ENSEMBLE/conclusion-csv/ 4 CSV → conclusion.json
+	 *  컬럼: 노인_경사X / 노인_경사O / 보조_경사X / 보조_경사O / 하위15_경사X / 하위15_경사O
+	 *  본 페이지는 "일반 노인(1.12 m/s) · 경사 미보정" 기준 = 노인_경사X
+	 *  YOO 교통 도메인은 결론 CSV 미작성 → 4 도메인 결합
 	 * ──────────────────────────────────────────────────────────── */
 
-	/** [기후, 인프라, 복지, 의료] — 일반 노인(경사 미보정) 점수 */
-	const SCORES = {
-		종로구:    [75.6, 75.3, 77.6, 68.9],
-		중구:      [76.7, 77.8, 75.2, 77.7],
-		용산구:    [76.6, 77.6, 74.9, 74.1],
-		성동구:    [77.1, 72.9, 77.8, 76.0],
-		광진구:    [77.4, 78.5, 74.1, 79.7],
-		동대문구:  [72.3, 75.7, 71.9, 75.9],
-		중랑구:    [76.9, 80.2, 76.8, 76.6],
-		성북구:    [76.9, 77.1, 69.9, 77.7],
-		강북구:    [76.1, 79.9, 72.9, 76.7],
-		도봉구:    [77.8, 75.5, 76.4, 72.3],
-		노원구:    [76.0, 76.2, 75.9, 75.6],
-		은평구:    [80.8, 82.9, 75.8, 75.8],
-		서대문구:  [77.6, 75.7, 75.6, 74.5],
-		마포구:    [78.1, 79.9, 70.3, 74.9],
-		양천구:    [81.6, 78.8, 81.7, 77.2],
-		강서구:    [76.2, 80.1, 77.9, 77.5],
-		구로구:    [76.2, 78.9, 78.3, 74.4],
-		금천구:    [80.2, 81.3, 82.7, 78.2],
-		영등포구:  [77.0, 77.5, 75.6, 75.8],
-		동작구:    [76.0, 78.1, 82.5, 70.9],
-		관악구:    [76.6, 74.8, 71.1, 71.4],
-		서초구:    [76.9, 75.6, 84.1, 75.3],
-		강남구:    [76.1, 76.4, 68.6, 72.7],
-		송파구:    [77.8, 78.9, 80.7, 78.1],
-		강동구:    [79.9, 83.3, 76.0, 79.2]
-	};
+	/** 결론 4개 도메인 — theme.js 단일 진실 원천에서 import (네비/카드 동일 색) */
+	const DOMAINS = DOMAINS_4;
+	const DOMAIN_KEYS = DOMAINS.map((d) => d.key);
 
-	const DOMAINS = [
-		{ key: 'climate', label: '기후',     emoji: '🌡️', color: '#555452', accent: 'var(--color-amber)' },
-		{ key: 'infra',   label: '인프라',   emoji: '🏪', color: '#D85A30', accent: 'var(--color-accent)' },
-		{ key: 'bokji',   label: '복지',     emoji: '🌳', color: '#7B5EA7', accent: 'var(--color-purple)' },
-		{ key: 'medical', label: '의료',     emoji: '🏥', color: '#185FA5', accent: 'var(--color-blue)' }
+	/** 보행자 유형 (CSV 컬럼 prefix) — '일반인'은 CSV 없음 (기준선=100) */
+	const SPEEDS = [
+		{ key: '노인',     label: '일반 노인',     mps: 1.12, emoji: '🧓' },
+		{ key: '보조',     label: '보행보조 노인', mps: 0.88, emoji: '🦯' },
+		{ key: '하위15',   label: '보조 하위15%',  mps: 0.7,  emoji: '🦽' }
 	];
+	let speedIdx = $state(0); // 0:노인, 1:보조, 2:하위15
+	let slopeOn = $state(false);
+	const scoreKey = $derived(`${SPEEDS[speedIdx].key}_경사${slopeOn ? 'O' : 'X'}`);
+
+	/** CSV에서 (도메인, 구) → 점수 lookup */
+	function scoreOf(domainKey, gu, key) {
+		const row = conclusionData.domains[domainKey].find((r) => r.gu === gu);
+		return row ? row[key] : 0;
+	}
+
+	/** SCORES = 25구 × 4도메인 — scoreKey 변경 시 reactive */
+	const SCORES = $derived(
+		Object.fromEntries(
+			conclusionData.gus.map((gu) => [gu, DOMAIN_KEYS.map((k) => scoreOf(k, gu, scoreKey))])
+		)
+	);
 
 	/** 종합 점수 = 4개 도메인 평균 */
-	const ranked = Object.entries(SCORES)
-		.map(([name, arr]) => {
-			const avg = arr.reduce((s, v) => s + v, 0) / arr.length;
-			return {
-				name,
-				climate: arr[0],
-				infra:   arr[1],
-				bokji:   arr[2],
-				medical: arr[3],
-				composite: +avg.toFixed(1),
-				min: Math.min(...arr),
-				max: Math.max(...arr),
-				weakest: DOMAINS[arr.indexOf(Math.min(...arr))]
-			};
-		})
-		.sort((a, b) => b.composite - a.composite)
-		.map((d, i) => ({ ...d, rank: i + 1 }));
+	const ranked = $derived(
+		Object.entries(SCORES)
+			.map(([name, arr]) => {
+				const avg = arr.reduce((s, v) => s + v, 0) / arr.length;
+				return {
+					name,
+					climate: arr[0],
+					infra: arr[1],
+					bokji: arr[2],
+					medical: arr[3],
+					composite: +avg.toFixed(1),
+					min: Math.min(...arr),
+					max: Math.max(...arr),
+					weakest: DOMAINS[arr.indexOf(Math.min(...arr))]
+				};
+			})
+			.sort((a, b) => b.composite - a.composite)
+			.map((d, i) => ({ ...d, rank: i + 1 }))
+	);
 
-	const seoulAvg = +(
-		ranked.reduce((s, d) => s + d.composite, 0) / ranked.length
-	).toFixed(1);
-	const best = ranked[0];
-	const worst = ranked[ranked.length - 1];
+	const seoulAvg = $derived(+(ranked.reduce((s, d) => s + d.composite, 0) / ranked.length).toFixed(1));
+	const best = $derived(ranked[0]);
+	const worst = $derived(ranked[ranked.length - 1]);
 
 	/** 도메인별 서울 평균 */
-	const domainAvg = DOMAINS.map((d, idx) => {
-		const key = ['climate', 'infra', 'bokji', 'medical'][idx];
-		const v = ranked.reduce((s, r) => s + r[key], 0) / ranked.length;
-		return { ...d, avg: +v.toFixed(1) };
-	});
+	const domainAvg = $derived(
+		DOMAINS.map((d) => {
+			const v = ranked.reduce((s, r) => s + r[d.key], 0) / ranked.length;
+			return { ...d, avg: +v.toFixed(1) };
+		})
+	);
 
-	/** 점수 색상 (conclusion_ver2 와 동일 5단계) */
-	function scoreColor(s) {
-		if (s < 50) return '#9B1C1C';
-		if (s < 58) return '#D85A30';
-		if (s < 65) return '#f5b740';
-		if (s < 73) return '#1D9E75';
-		return '#0f6e56';
+	/** 보행속도 유형별 평균 점수 (4 도메인 평균) — CSV 실데이터 기반 */
+	function avgAcrossDomainsAndGus(scoreKey) {
+		let sum = 0, n = 0;
+		for (const k of DOMAIN_KEYS) {
+			for (const r of conclusionData.domains[k]) {
+				sum += r[scoreKey]; n++;
+			}
+		}
+		return +(sum / n).toFixed(1);
 	}
-	function scoreBg(s) {
-		if (s < 50) return '#fde8e8';
-		if (s < 58) return '#fdecd9';
-		if (s < 65) return '#fef3cd';
-		if (s < 73) return '#dcf3ea';
-		return '#d1ede0';
+	const seniorAvg = avgAcrossDomainsAndGus('노인_경사X');
+	const aidedAvg = avgAcrossDomainsAndGus('보조_경사X');
+	const bottom15Avg = avgAcrossDomainsAndGus('하위15_경사X');
+	function pctVsBaseline(score, base = 100) {
+		return Math.round((score / base - 1) * 100);
 	}
 
-	/** 정책 제안 — 도메인별 최취약 구 자동 추출 */
+	/* scoreColor / scoreBg 는 $lib/theme.js 에서 import (5단계 색조 표준) */
+
+	/** 정책 제안 — 도메인별 최저 구 자동 추출 */
 	const policySuggestions = DOMAINS.map((d, idx) => {
 		const key = ['climate', 'infra', 'bokji', 'medical'][idx];
 		const sorted = [...ranked].sort((a, b) => a[key] - b[key]);
@@ -106,13 +112,12 @@
 		return { ...d, key, bottom3 };
 	});
 
-	/* ── 보행보조 노인 / 일반 노인 손실 비교 (기후 CSV 평균 기준) ── */
-	// 평균 일반 노인(경사X) vs 평균 보행보조(경사X) — 기후 CSV: 노인 76.7 → 보조 47.0 (대표 격차 시각화)
+	/* ── 보행속도별 손실 비교 — 4 도메인 CSV 실데이터 평균 ── */
 	const speedComparison = [
-		{ label: '일반인',           score: 100, color: '#4a9eff', emoji: '🚶', desc: '기준선' },
-		{ label: '일반 노인',        score: 77,  color: '#1D9E75', emoji: '🧓', desc: '평균' },
-		{ label: '보행보조 노인',    score: 47,  color: '#f5b740', emoji: '🦯', desc: '−53%' },
-		{ label: '보행보조 하위 15%', score: 30, color: '#ef5555', emoji: '🦽', desc: '−70%' }
+		{ label: '일반인',           score: 100,        color: '#4a9eff', emoji: '🚶', desc: '기준선' },
+		{ label: '일반 노인',        score: seniorAvg,  color: '#1D9E75', emoji: '🧓', desc: pctVsBaseline(seniorAvg) + '%' },
+		{ label: '보행보조 노인',    score: aidedAvg,   color: '#f5b740', emoji: '🦯', desc: pctVsBaseline(aidedAvg) + '%' },
+		{ label: '보행보조 하위 15%', score: bottom15Avg, color: '#ef5555', emoji: '🦽', desc: pctVsBaseline(bottom15Avg) + '%' }
 	];
 
 	/** 정렬 모드 */
@@ -123,6 +128,187 @@
 			return b[sortKey] - a[sortKey];
 		})
 	);
+
+	/* ── Leaflet choropleth (종합 점수) + 클릭 시 detail card ── */
+	let mapEl = $state();
+	/** @type {any} */
+	let lmap;
+	/** @type {any} */
+	let geoData = null;
+	/** @type {any} */
+	let geoLayer = null;
+	/** @type {any} */
+	let L = null;
+	let selectedGuName = $state(/** @type {string|null} */ (null));
+
+	const rankedByName = $derived(Object.fromEntries(ranked.map((r) => [r.name, r])));
+	/** 클릭한 구의 최신 데이터 — scoreKey 변경 시 자동 재계산 */
+	const selectedGu = $derived(selectedGuName ? rankedByName[selectedGuName] : null);
+
+	// scoreKey 변경 시 지도 색만 다시 그림 (selectedGu 는 derived 라 자동 갱신)
+	$effect(() => {
+		scoreKey;
+		untrack(() => {
+			if (lmap && geoData) drawGeoLayer();
+		});
+	});
+
+	function getGuName(props) {
+		return props.SIG_KOR_NM || props.name || props.NAME || props.sig_kor_nm || '';
+	}
+
+	function drawGeoLayer() {
+		if (!lmap || !L || !geoData) return;
+		if (geoLayer) lmap.removeLayer(geoLayer);
+		geoLayer = L.geoJSON(geoData, {
+			style: (feat) => {
+				const nm = getGuName(feat.properties);
+				const r = rankedByName[nm];
+				const c = r ? scoreColor(r.composite) : '#ccc';
+				return { fillColor: c, weight: 1.2, color: '#fff', fillOpacity: 0.78 };
+			},
+			onEachFeature: (feat, layer) => {
+				const nm = getGuName(feat.properties);
+				const r = rankedByName[nm];
+				if (!r) return;
+				layer.bindTooltip(
+					`<b>${nm}</b><br>종합 ${r.composite}점 · ${r.rank}위<br>` +
+						DOMAINS.map((d) => `${d.emoji} ${d.label} ${r[d.key].toFixed(1)}`).join('<br>'),
+					{ sticky: true }
+				);
+				layer.on({
+					mouseover: (e) => e.target.setStyle({ fillOpacity: 0.95, weight: 2 }),
+					mouseout: (e) => {
+						if (selectedGuName !== nm) {
+							e.target.setStyle({ fillOpacity: 0.78, weight: 1.2 });
+						}
+					},
+					click: () => {
+						selectedGuName = nm;
+					}
+				});
+			}
+		}).addTo(lmap);
+	}
+
+	/** @type {any} */
+	let radarChartEl = $state();
+	/** @type {any} */
+	let radarChart = null;
+	/** @type {any} */
+	let Chart = null;
+
+	function drawRadar() {
+		if (!Chart || !radarChartEl || !selectedGu) return;
+		const seoulAvg = DOMAINS.map((d) => +(domainAvg.find((x) => x.key === d.key)?.avg ?? 0));
+		const data = DOMAINS.map((d) => +selectedGu[d.key].toFixed(1));
+		if (radarChart) radarChart.destroy();
+		radarChart = new Chart(radarChartEl, {
+			type: 'radar',
+			data: {
+				labels: DOMAINS.map((d) => d.label),
+				datasets: [
+					{
+						label: selectedGu.name,
+						data,
+						backgroundColor: COMPARE_COLORS.primary.fill,
+						borderColor: COMPARE_COLORS.primary.stroke,
+						pointBackgroundColor: COMPARE_COLORS.primary.point,
+						pointBorderColor: '#fff',
+						pointHoverRadius: 6,
+						pointRadius: 4,
+						borderWidth: 2
+					},
+					{
+						label: '서울 평균',
+						data: seoulAvg,
+						backgroundColor: COMPARE_COLORS.reference.fill,
+						borderColor: COMPARE_COLORS.reference.stroke,
+						pointBackgroundColor: COMPARE_COLORS.reference.point,
+						pointBorderColor: '#fff',
+						pointHoverRadius: 5,
+						pointRadius: 3,
+						borderWidth: 1.6,
+						borderDash: [5, 3]
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				scales: {
+					r: {
+						min: 0,
+						max: 100,
+						ticks: { stepSize: 25, font: { size: 9 }, color: CHART_THEME.textColorMuted },
+						pointLabels: { font: { size: 11, weight: '500' }, color: CHART_THEME.textColor },
+						grid: { color: CHART_THEME.gridColor },
+						angleLines: { color: CHART_THEME.gridColor }
+					}
+				},
+				plugins: {
+					legend: { labels: { font: { size: 11 }, boxWidth: 12, usePointStyle: true } },
+					tooltip: {
+						backgroundColor: CHART_THEME.tooltipBg,
+						titleColor: CHART_THEME.textColor,
+						bodyColor: CHART_THEME.textColor,
+						borderColor: CHART_THEME.tooltipBorder,
+						borderWidth: 1,
+						padding: 8,
+						titleFont: { size: 12, weight: '500' },
+						bodyFont: { size: 11 }
+					}
+				}
+			}
+		});
+	}
+
+	let mapInited = false;
+	async function initMap() {
+		if (mapInited || !mapEl) return;
+		mapInited = true;
+		await import('leaflet/dist/leaflet.css');
+		L = (await import('leaflet')).default;
+		Chart = await applyChartTheme();
+		lmap = L.map(mapEl, {
+			zoomControl: true,
+			attributionControl: false,
+			scrollWheelZoom: false
+		}).setView([37.555, 127.0], 11);
+		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+			subdomains: 'abcd',
+			maxZoom: 18
+		}).addTo(lmap);
+		try {
+			const res = await fetch(
+				'https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json'
+			);
+			geoData = await res.json();
+			drawGeoLayer();
+		} catch (e) {
+			console.error('[conclusion] GeoJSON load failed', e);
+		}
+	}
+
+	$effect(() => {
+		// mapEl 바인딩되면 초기화
+		if (mapEl && !mapInited && typeof window !== 'undefined') {
+			initMap();
+		}
+	});
+
+	onDestroy(() => {
+		radarChart?.destroy();
+		lmap?.remove();
+	});
+
+	$effect(() => {
+		// selectedGu 변경 시 radar 재그리기 (untrack 로 cycle 방지)
+		const sel = selectedGu;
+		untrack(() => {
+			if (Chart && radarChartEl && sel) drawRadar();
+		});
+	});
 </script>
 
 <section class="mx-auto max-w-[1340px] px-[18px] pb-[60px] pt-8">
@@ -159,10 +345,18 @@
 		</p>
 
 		<StatGrid class="sm:grid-cols-4" cols={4}>
-			<StatCard label="분석 도메인" value="4개" sub="기후·인프라·복지·의료" />
-			<StatCard label="서울 평균 종합 점수" value="{seoulAvg}" sub="점 (0~100)" tone="orange" />
-			<StatCard label="최양호 구" value={best.name} sub="{best.composite}점" tone="green" />
-			<StatCard label="최취약 구" value={worst.name} sub="{worst.composite}점" tone="red" />
+			<StatCard label="분석 도메인" sub="기후·인프라·복지·의료">
+				{#snippet children()}
+					<CountUp value={4} suffix="개" />
+				{/snippet}
+			</StatCard>
+			<StatCard label="서울 평균 종합 점수" sub="점 (0~100)" tone="orange">
+				{#snippet children()}
+					<CountUp value={seoulAvg} decimals={1} />
+				{/snippet}
+			</StatCard>
+			<StatCard label="최고 구" value={best.name} sub="{best.composite}점" tone="green" />
+			<StatCard label="최저 구" value={worst.name} sub="{worst.composite}점" tone="red" />
 		</StatGrid>
 	</div>
 
@@ -172,7 +366,7 @@
 			보행속도가 떨어질수록 시설 도달 노드가 급감한다. 본 페이지의 표·랭킹은 <strong>일반 노인 1.12&nbsp;m/s</strong>를 기준으로 한다.
 		</p>
 		<div class="space-y-2.5">
-			{#each speedComparison as s}
+			{#each speedComparison as s, i}
 				<div class="grid grid-cols-[140px_1fr_60px] items-center gap-3">
 					<div class="flex items-center gap-1.5">
 						<span class="text-[14px]">{s.emoji}</span>
@@ -180,10 +374,11 @@
 					</div>
 					<div class="relative h-[18px] rounded-[4px]" style:background="var(--color-card-soft)">
 						<div
-							class="h-full rounded-[4px] transition-all duration-500"
+							class="bar-fill h-full rounded-[4px]"
 							style:width="{s.score}%"
 							style:background={s.color}
 							style:opacity="0.85"
+							style:--ad="{i * 110}ms"
 						></div>
 						<span
 							class="absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10.5px]"
@@ -192,36 +387,167 @@
 							{s.desc}
 						</span>
 					</div>
-					<div
-						class="text-right font-mono text-[13px] font-medium tabular-nums"
-						style:color={s.color}
-					>
-						{s.score}점
+					<div class="text-right font-mono text-[13px] font-medium tabular-nums" style:color={s.color}>
+						<CountUp value={+s.score} decimals={Number.isInteger(s.score) ? 0 : 1} duration={1000 + i * 80} />점
 					</div>
 				</div>
 			{/each}
 		</div>
 	</Card>
 
-	<!-- ── 도메인 평균 ── -->
-	<Card title="도메인별 서울 전체 평균 · 일반 노인 기준" class="mb-3.5">
-		<div class="grid gap-2.5 sm:grid-cols-2 md:grid-cols-4">
-			{#each domainAvg as d}
-				<div
-					class="rounded-[8px] p-4 transition-shadow hover:shadow-[0_2px_10px_rgba(0,0,0,0.04)]"
-					style:background="var(--color-card-soft)"
-					style:border="0.5px solid {d.color}22"
-				>
-					<div class="mb-1 text-[20px]">{d.emoji}</div>
-					<div class="text-[11px]" style:color="var(--color-text3)">{d.label} 도메인 평균</div>
-					<div class="mt-1 font-mono text-[26px] font-medium leading-none tabular-nums" style:color={d.color}>
-						{d.avg}
+	<!-- ── 도메인 평균 — 보행자/경사 토글 변경 시 재애니메이션 ── -->
+	<Card title="도메인별 서울 전체 평균 · {SPEEDS[speedIdx].label}{slopeOn ? ' · 경사 보정' : ''}" class="mb-3.5">
+		{#key scoreKey}
+			<div class="grid gap-2.5 sm:grid-cols-2 md:grid-cols-4" in:fade={{ duration: 220 }}>
+				{#each domainAvg as d, i}
+					<div
+						class="rounded-[8px] p-4 transition-shadow hover:shadow-[0_4px_14px_rgba(0,0,0,0.05)]"
+						style:background={d.light}
+						style:border="0.5px solid {d.color}55"
+					>
+						<div class="mb-1 text-[20px]">{d.emoji}</div>
+						<div class="text-[11px]" style:color="var(--color-text3)">{d.label} 도메인 평균</div>
+						<div
+							class="mt-1 font-mono text-[26px] font-medium leading-none tabular-nums"
+							style:color={d.color}
+						>
+							<CountUp value={d.avg} decimals={1} duration={900 + i * 80} />
+						</div>
+						<div class="mt-0.5 text-[10.5px]" style:color="var(--color-text3)">점 (0~100)</div>
 					</div>
-					<div class="mt-0.5 text-[10.5px]" style:color="var(--color-text3)">점 (0~100)</div>
-				</div>
-			{/each}
+				{/each}
+			</div>
+		{/key}
+	</Card>
+
+	<!-- ── 보행자 / 경사 토글 (모든 점수·지도·표 동시 갱신) ── -->
+	<Card title="분석 조건 · 보행자 유형 + 경사도 보정" class="mb-3.5">
+		<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+			<div class="flex items-center gap-1.5">
+				<span class="kicker mr-1">보행자</span>
+				{#each SPEEDS as s, i}
+					<button
+						type="button"
+						class="pill-btn"
+						class:pill-btn-on={speedIdx === i}
+						style:background={speedIdx === i ? 'var(--pill-accent, var(--color-dark))' : '#fff'}
+						style:border-color={speedIdx === i ? 'var(--pill-accent, var(--color-dark))' : ''}
+						style:color={speedIdx === i ? 'var(--pill-on-text, var(--color-dark-text))' : ''}
+						onclick={() => (speedIdx = i)}
+					>
+						{s.emoji} {s.label} {s.mps}&nbsp;m/s
+					</button>
+				{/each}
+			</div>
+			<label class="toggle-item" title="Tobler 보행함수 기반 구별 경사도 보정">
+				<span class="kicker">경사도</span>
+				<span class="toggle-switch" class:on={slopeOn}>
+					<input type="checkbox" bind:checked={slopeOn} />
+					<span class="toggle-slider"></span>
+				</span>
+				<span class="toggle-label">⛰ 경사 보정 (Tobler)</span>
+				{#if slopeOn}
+					<span class="slope-tag">반영 중</span>
+				{/if}
+			</label>
+			<div class="ml-auto flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-[11px]">
+				{#key scoreKey}
+					<span style:color="var(--color-text3)" in:fade={{ duration: 280 }}>
+						서울 평균
+						<b class="ml-0.5 text-[13px] tabular-nums" style:color="var(--color-text)">
+							<CountUp value={seoulAvg} decimals={1} duration={750} />
+						</b>점
+					</span>
+					<span class="opacity-50">·</span>
+					<span style:color="var(--color-text3)" in:fade={{ duration: 280, delay: 60 }}>
+						🟢 최고 <b style:color="#1D9E75">{best?.name}</b>
+						<b class="ml-0.5 tabular-nums" style:color="#1D9E75">
+							<CountUp value={best?.composite ?? 0} decimals={1} duration={750} />
+						</b>
+					</span>
+					<span class="opacity-50">·</span>
+					<span style:color="var(--color-text3)" in:fade={{ duration: 280, delay: 120 }}>
+						🔴 최저 <b style:color="#C62828">{worst?.name}</b>
+						<b class="ml-0.5 tabular-nums" style:color="#C62828">
+							<CountUp value={worst?.composite ?? 0} decimals={1} duration={750} />
+						</b>
+					</span>
+				{/key}
+			</div>
 		</div>
 	</Card>
+
+	<!-- ── 25구 종합 점수 지도 + 상세 ── -->
+	<div class="mb-3.5 grid gap-3 lg:grid-cols-[1.4fr_1fr]">
+		<Card title="서울 25개 구 종합 도달가능 점수 · 클릭하면 상세">
+			<div bind:this={mapEl} class="conclusion-map rounded-[6px]"></div>
+			<div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]" style:color="var(--color-text2)">
+				<span style:color="var(--color-text3)">도달가능 점수:</span>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#9B1C1C"></span>~50 최저</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#D85A30"></span>50~58</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#f5b740"></span>58~65</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#1D9E75"></span>65~73</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#0f6e56"></span>73+ 양호</div>
+			</div>
+		</Card>
+
+		<Card title="구 상세 분석">
+			{#if !selectedGu}
+				<div class="flex h-[380px] flex-col items-center justify-center gap-2 text-center" style:color="var(--color-text3)">
+					<div class="text-[34px] opacity-70">🗺</div>
+					<div class="text-[13px] font-medium" style:color="var(--color-text2)">지도에서 구를 클릭하세요</div>
+					<div class="text-[11.5px]">4개 도메인 점수 + 서울 평균과 비교 (radar)</div>
+				</div>
+			{:else}
+				{#key selectedGuName + '|' + scoreKey}
+					<div class="flex flex-col gap-3" in:fade={{ duration: 220 }}>
+						<div>
+							<div class="font-serif text-[22px] font-medium leading-tight" style:color="var(--color-text)">
+								{selectedGu.name}
+							</div>
+							<div class="mt-0.5 flex items-baseline gap-2">
+								<span
+									class="font-mono text-[28px] font-medium tabular-nums"
+									style:color={scoreColor(selectedGu.composite)}
+								>
+									<CountUp value={selectedGu.composite} decimals={1} duration={900} />
+								</span>
+								<span class="text-[12px]" style:color="var(--color-text3)">
+									점 · <b style:color="var(--color-text)">{selectedGu.rank}위</b>
+								</span>
+							</div>
+						</div>
+
+						<div class="space-y-1.5">
+							{#each DOMAINS as d, i}
+								{@const v = +selectedGu[d.key].toFixed(1)}
+								<div class="grid grid-cols-[78px_1fr_50px] items-center gap-2">
+									<div class="text-[11.5px]" style:color="var(--color-text2)">
+										{d.emoji} {d.label}
+									</div>
+									<div class="relative h-[8px] rounded-full" style:background="rgba(0,0,0,0.05)">
+										<div
+											class="domain-bar h-full rounded-full"
+											style:width="{v}%"
+											style:background="{d.color}cc"
+											style:--ad="{i * 80}ms"
+										></div>
+									</div>
+									<div class="text-right font-mono text-[11.5px] tabular-nums" style:color={d.color}>
+										<CountUp value={v} decimals={1} duration={900 + i * 60} />
+									</div>
+								</div>
+							{/each}
+						</div>
+
+						<div class="radar-fade relative h-[200px]">
+							<canvas bind:this={radarChartEl}></canvas>
+						</div>
+					</div>
+				{/key}
+			{/if}
+		</Card>
+	</div>
 
 	<!-- ── 25구 랭킹 ── -->
 	<div class="mb-3.5 grid gap-3.5 lg:grid-cols-2">
@@ -378,7 +704,7 @@
 	<!-- ── 정책 제안 ── -->
 	<Card title="정책 제안 · 도메인별 우선 투입 자치구" class="mb-3.5">
 		<h2 class="mb-2 font-serif text-[22px] font-medium leading-[1.3]" style:color="var(--color-text)">
-			같은 예산이면 어디부터 — 도메인별 최취약 3개 구
+			같은 예산이면 어디부터 — 도메인별 최저 3개 구
 		</h2>
 		<p class="mb-4 text-[12.5px] leading-[1.7]" style:color="var(--color-text2)">
 			종합 점수가 평균 이상이라도 특정 도메인이 약한 구가 있다. 4개 도메인 각각의 하위 3개 구를 제시한다.
@@ -445,7 +771,7 @@
 			<div>
 				<div class="kicker mb-1.5">발견 1 · 종합 격차</div>
 				<p class="text-[12.5px] leading-[1.75]" style:color="var(--color-text2)">
-					최양호({best.name} {best.composite}점) ↔ 최취약({worst.name} {worst.composite}점) 사이의 종합 격차는
+					최고({best.name} {best.composite}점) ↔ 최저({worst.name} {worst.composite}점) 사이의 종합 격차는
 					<strong style:color="var(--color-accent)">
 						{(best.composite - worst.composite).toFixed(1)}점
 					</strong>.
@@ -500,3 +826,120 @@
 		</a>
 	</div>
 </section>
+
+<style>
+	.conclusion-map {
+		height: 380px;
+		width: 100%;
+		background: #e8e4db;
+	}
+
+	/* iOS 스타일 토글 스위치 */
+	.toggle-item {
+		display: inline-flex;
+		align-items: center;
+		gap: 9px;
+		cursor: pointer;
+		user-select: none;
+	}
+	.toggle-switch {
+		position: relative;
+		display: inline-block;
+		width: 38px;
+		height: 22px;
+		flex-shrink: 0;
+	}
+	.toggle-switch input {
+		opacity: 0;
+		width: 0;
+		height: 0;
+		position: absolute;
+	}
+	.toggle-slider {
+		position: absolute;
+		inset: 0;
+		background: #d3d1c7;
+		border-radius: 999px;
+		transition:
+			background 0.22s,
+			box-shadow 0.22s;
+	}
+	.toggle-slider::before {
+		content: '';
+		position: absolute;
+		left: 2px;
+		top: 2px;
+		width: 18px;
+		height: 18px;
+		background: #fff;
+		border-radius: 50%;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+		transition: transform 0.22s cubic-bezier(0.16, 0.84, 0.36, 1);
+	}
+	.toggle-switch.on .toggle-slider {
+		background: var(--pill-accent, var(--color-dark));
+	}
+	.toggle-switch.on .toggle-slider::before {
+		transform: translateX(16px);
+	}
+	.toggle-label {
+		font-size: 12.5px;
+		color: var(--color-text2);
+		font-weight: 500;
+		white-space: nowrap;
+	}
+	.slope-tag {
+		display: inline-block;
+		padding: 2px 8px;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		letter-spacing: 0.04em;
+		color: var(--color-accent);
+		background: rgba(216, 90, 48, 0.1);
+		border-radius: 999px;
+	}
+
+	.bar-fill,
+	.domain-bar {
+		animation: bar-reveal 1s cubic-bezier(0.16, 0.84, 0.36, 1) both;
+		animation-delay: var(--ad, 0ms);
+		transform-origin: left center;
+		will-change: transform;
+		backface-visibility: hidden;
+		transform: translateZ(0);
+	}
+	.domain-bar {
+		animation-duration: 0.7s;
+	}
+	.radar-fade {
+		animation: radar-in 0.55s ease-out 0.4s both;
+	}
+	@keyframes radar-in {
+		from {
+			opacity: 0;
+			transform: scale(0.92);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.radar-fade {
+			animation: none;
+		}
+	}
+	@keyframes bar-reveal {
+		from {
+			transform: translateZ(0) scaleX(0);
+		}
+		to {
+			transform: translateZ(0) scaleX(1);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.bar-fill {
+			animation: none;
+		}
+	}
+</style>
