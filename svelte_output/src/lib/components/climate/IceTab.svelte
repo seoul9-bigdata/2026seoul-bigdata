@@ -692,17 +692,21 @@
 	.ktbl th {
 		background: var(--color-card-soft);
 		padding: 8px 10px;
-		text-align: left;
+		text-align: right;
 		font-weight: 500;
 		color: var(--color-text2);
 		border-bottom: 1px solid var(--color-border);
 		white-space: nowrap;
+	}
+	.ktbl th:nth-child(2) {
+		text-align: left;
 	}
 	.ktbl td {
 		padding: 7px 10px;
 		border-bottom: 0.5px solid var(--color-border-soft);
 		color: var(--color-text);
 		text-align: right;
+		white-space: nowrap;
 	}
 	.ktbl td:nth-child(2) {
 		text-align: left;

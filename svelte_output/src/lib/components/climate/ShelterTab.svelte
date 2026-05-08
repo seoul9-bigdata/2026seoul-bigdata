@@ -1488,20 +1488,30 @@
 	.ktbl th {
 		background: var(--color-card-soft);
 		padding: 8px 10px;
-		text-align: left;
+		text-align: right;
 		font-weight: 500;
 		color: var(--color-text2);
 		border-bottom: 1px solid var(--color-border);
 		white-space: nowrap;
+	}
+	.ktbl th:first-child {
+		text-align: left;
+	}
+	.ktbl th:last-child {
+		text-align: center;
 	}
 	.ktbl td {
 		padding: 7px 10px;
 		border-bottom: 0.5px solid var(--color-border-soft);
 		color: var(--color-text);
 		text-align: right;
+		white-space: nowrap;
 	}
 	.ktbl td:first-child {
 		text-align: left;
+	}
+	.ktbl td:last-child {
+		text-align: center;
 	}
 	.ktbl tr:last-child td {
 		border-bottom: none;

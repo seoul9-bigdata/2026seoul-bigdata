@@ -14,6 +14,9 @@ importers:
       leaflet:
         specifier: ^1.9.4
         version: 1.9.4
+      pako:
+        specifier: ^2.1.0
+        version: 2.1.0
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^7.0.1
@@ -501,6 +504,9 @@ packages:
   obug@2.1.1:
     resolution: {integrity: sha512-uTqF9MuPraAQ+IsnPf366RG4cP9RtUi7MLO1N3KEc+wb0a6yKpeL0lmk2IB1jY5KHPAlTc6T/JRdC/YqxHNwkQ==}
 
+  pako@2.1.0:
+    resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -964,6 +970,8 @@ snapshots:
   nanoid@3.3.12: {}
 
   obug@2.1.1: {}
+
+  pako@2.1.0: {}
 
   picocolors@1.1.1: {}
 

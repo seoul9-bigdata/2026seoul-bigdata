@@ -8,6 +8,7 @@
 - **호스팅**: `@sveltejs/adapter-static` + prerender 전체
 - **지도**: Leaflet 1.9 + CartoDB Light tile
 - **차트**: Chart.js 4
+- **그래프 분석**: pako (gzip 해제) + 자체 Dijkstra/Convex Hull (`$lib/util/isochrone.js`)
 - **포트**: dev 5174 (`pnpm dev --port 5174`)
 
 ## 디렉토리
@@ -31,6 +32,7 @@ svelte_output/
 │   │   ├── nav.js                 # ROUTES (theme.js 참조)
 │   │   ├── data/                  # 도메인별 inline JSON (HTML 추출)
 │   │   ├── actions/viewport.js    # IO action ([data-in-view])
+│   │   ├── util/isochrone.js      # OSM Dijkstra + Convex Hull (infra)
 │   │   └── components/
 │   │       ├── Header.svelte      # 다크 sticky (z-index: 2000)
 │   │       ├── Footer.svelte      # 원형 이전/다음 (도메인 액센트 hover)
@@ -255,6 +257,42 @@ state 토글 시 자식 트리 destroy + remount → 애니메이션 재생.
 ### iOS 토글 스위치
 `conclusion/+page.svelte` 의 `.toggle-switch.on .toggle-slider` 참고. 38×22px, ON 시 `--pill-accent` 색.
 
+## OSM 보행 그래프 — Dijkstra 이소크론
+
+**원본 SHIM v6 동등 기능 — 실제 도로망 기반 도달 범위 폴리곤.**
+
+### 데이터
+- **파일**: `static/infra_graph.json.gz` (~3.2 MB gzipped, ~4.3 MB raw json)
+- **소스**: `final_output/ENSEMBLE/dashboard/2_Shim_infra.html` 의 `GRAPH_GZ` 추출
+- **노드**: 266,780 (전체 서울 보행 가능 segment)
+- **포맷**: CSR sparse matrix
+  - `n` (메타), `lat_base`, `lng_base` (좌표 기준점)
+  - `lats`, `lngs` (Uint16, base + i × 1e-5)
+  - `row` (Uint32, CSR row pointer), `col` (Uint32, neighbor index), `dist` (Uint16, edge weight m)
+  - 모두 base64 + raw deflate (pako 호환)
+
+### API (`$lib/util/isochrone.js`)
+```js
+import { loadGraph, computeIsochrone } from '$lib/util/isochrone.js';
+const G = await loadGraph();   // 모듈 캐시 — 1회만 fetch (~3 sec)
+const { ring, count, ms } = computeIsochrone(G, lat, lng, maxDistM);
+//   ring: [[lat, lng], ...] | null  (Convex Hull 폴리곤)
+//   count: 도달 노드 수
+//   ms: 계산 시간
+L.polygon(ring, { color, fillOpacity: 0.18 }).addTo(map);
+```
+
+### 알고리즘
+1. **nearestNode**: 클릭 lat/lng → 유클리드 근사로 최근접 그래프 노드
+2. **Dijkstra (Min-Heap)**: src → maxDistM 이내 reachable 노드 집합
+3. **Graham scan Convex Hull**: reachable의 lat/lng 점들 → 외곽 폴리곤 ring
+
+### Infra 페이지 통합
+- 점선 원 = 직선 반경 (참고용)
+- 채워진 폴리곤 = OSM 도로망 기반 실제 도달 범위
+- 보행자/시간/경사 토글 시 자동 재계산
+- 첫 진입 시 그래프 fetch (~3 sec) → 이후 클라이언트 메모리에 캐시 (페이지 이동해도 유지)
+
 ## 데이터 (`src/lib/data/`)
 
 ENSEMBLE 5개 HTML에서 inline JSON 추출 (Python state-machine 파서로 한글 키·single quote 처리).
@@ -269,7 +307,7 @@ ENSEMBLE 5개 HTML에서 inline JSON 추출 (Python state-machine 파서로 한�
 | `medical.json` | `4_Lee_medical.html` | COUNTS, DONG_META, GEOJSON, SPEEDS |
 | `conclusion.json` | `final_output/ENSEMBLE/conclusion-csv/*.csv` | gus + domains.{climate,infra,bokji,medical} |
 
-⚠️ `infra.json` 의 `GRAPH_GZ` (5MB+ base64 OSM 그래프) 는 의도적으로 제외됨. 도달가능 계산은 `DONG_REACH` precomputed 사용.
+📦 OSM 보행 그래프는 `infra.json` 에서 분리되어 **`static/infra_graph.json.gz` (~3.2 MB gzip)** 로 별도 호스팅. infra 페이지 진입 시 lazy fetch + `pako.inflate()` 해제 → `$lib/util/isochrone.js` 가 Dijkstra + Graham scan Convex Hull 실행 → **실제 도로망 기반 도달 폴리곤** 그림.
 
 ## 라우팅
 
@@ -301,6 +339,7 @@ ENSEMBLE 5개 HTML에서 inline JSON 추출 (Python state-machine 파서로 한�
 - **IceTab Canvas 레이어** — 줌 동기화 위해 `leaflet-zoom-animated` + `_animateZoom` 필수. 빼면 폴리곤 분리됨.
 - **dev 서버 reload 시 occasionally HMR 실패** → `pnpm dev` 재시작 필요.
 - **첫 진입 시 Leaflet GeoJSON fetch** (남한 raw GitHub URL). 오프라인이면 지도 빈 화면.
+- **Infra 페이지 첫 도달 시 OSM 그래프 ~3 MB fetch + 압축 해제 (~2~3 sec)** — Dijkstra 폴리곤 표시 지연. 이후 모듈 캐시.
 
 ## Build / Dev
 

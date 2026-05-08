@@ -7,6 +7,7 @@
 	import PillButton from '$lib/components/PillButton.svelte';
 	import PillTabs from '$lib/components/PillTabs.svelte';
 	import Note from '$lib/components/Note.svelte';
+	import { loadGraph, computeIsochrone } from '$lib/util/isochrone.js';
 
 	const {
 		ALL_DONG_DATA, BANK_SERIES, GU_BANK, GU_BANK_YEARS, CENTERS, CENTER_BY_GU,
@@ -92,6 +93,17 @@
 	let L;
 	let mktLyr, supLyr, bankLyr, centerLyr, radLyr;
 	let cMark = null;
+	/** @type {any} */
+	let clickMark = null;
+	/** @type {{lat:number, lng:number}|null} */
+	let clickPoint = $state(null);
+	/** @type {any} */
+	let isoLayer = null;
+	/** @type {any} */
+	let graph = null;
+	let graphLoading = $state(false);
+	let graphError = $state('');
+	let isoMeta = $state(/** @type {{count:number, ms:number}|null} */ (null));
 
 	const layerTabs = [
 		{ key: 'all', emoji: '🗺', label: '전체' },
@@ -105,7 +117,7 @@
 		if (typeof window === 'undefined') return;
 		L = (await import('leaflet')).default;
 		await import('leaflet/dist/leaflet.css');
-		map = L.map(mapEl, { zoomControl: true }).setView([37.5665, 126.978], 11);
+		map = L.map(mapEl, { zoomControl: true }).setView([37.5665, 126.978], 12);
 		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 			attribution: '© CARTO', subdomains: 'abcd', maxZoom: 19, detectRetina: true
 		}).addTo(map);
@@ -133,11 +145,39 @@
 			radius: 5, fillColor: '#2563a8', color: '#fff', weight: 0.8, fillOpacity: 0.85
 		}).bindPopup('<b>' + c.dong + '</b><br>' + c.gu + ' 주민센터').addTo(centerLyr));
 
+		// 지도 빈 곳 클릭 → 클릭 지점에서 점선 반경 + isochrone 재계산
+		map.on('click', (e) => {
+			const { lat, lng } = e.latlng;
+			clickPoint = { lat, lng };
+			if (clickMark) { map.removeLayer(clickMark); clickMark = null; }
+			clickMark = L.circleMarker([lat, lng], {
+				radius: 9, fillColor: '#ff3b30', color: '#fff',
+				weight: 2.5, fillOpacity: 1, pane: 'markerPane'
+			})
+				.bindTooltip(`클릭 지점<br>${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+				.addTo(map);
+			buildCanvasNearby(lat, lng, '클릭 지점');
+			// 점선 직선 반경도 클릭 지점으로 이동
+			const w = WS[cW];
+			const r = w.speed * (cSlope ? getToblerRatio(cD) : 1.0) * cT * 60;
+			radLyr.clearLayers();
+			L.circle([lat, lng], {
+				radius: r, color: w.color, weight: 1.2, dashArray: '5,5',
+				fill: false, fillOpacity: 0
+			})
+				.bindTooltip('직선 반경 ' + Math.round(r).toLocaleString() + 'm (참고)')
+				.addTo(radLyr);
+			drawIsochrone(lat, lng, r, w.color);
+		});
+
 		updateMap();
 		setTimeout(() => map.invalidateSize(), 150);
 	});
 
-	onDestroy(() => map?.remove());
+	onDestroy(() => {
+		if (isoLayer) { isoLayer = null; }
+		map?.remove();
+	});
 
 	function updateMap() {
 		if (!map || !L) return;
@@ -149,6 +189,9 @@
 
 		radLyr.clearLayers();
 		if (cMark) { map.removeLayer(cMark); cMark = null; }
+		// 컨트롤 변경 시 클릭 지점 해제 (원본 동작 동등)
+		if (clickMark) { map.removeLayer(clickMark); clickMark = null; }
+		clickPoint = null;
 		const d = ALL_DONG_DATA[cD];
 		if (!d || !d.lat) return;
 		cMark = L.circleMarker([d.lat, d.lng], {
@@ -159,8 +202,48 @@
 		const w = WS[cW];
 		const r = w.speed * (cSlope ? getToblerRatio(cD) : 1.0) * cT * 60;
 		L.circle([d.lat, d.lng], {
-			radius: r, color: w.color, weight: 2, fill: true, fillColor: w.color, fillOpacity: 0.07
-		}).bindTooltip(w.label + ' ' + Math.round(r).toLocaleString() + 'm' + (cSlope ? ' (경사보정)' : '')).addTo(radLyr);
+			radius: r, color: w.color, weight: 1.2, dashArray: '5,5',
+			fill: false, fillOpacity: 0
+		}).bindTooltip('직선 반경 ' + Math.round(r).toLocaleString() + 'm (참고)').addTo(radLyr);
+
+		// OSM 보행망 기반 실제 도달 폴리곤 (Convex Hull) — 비동기
+		drawIsochrone(d.lat, d.lng, r, w.color);
+	}
+
+	/** OSM 그래프 → Dijkstra → Convex Hull 도달 폴리곤 */
+	async function drawIsochrone(lat, lng, maxDistM, color) {
+		if (!map || !L) return;
+		// 이전 폴리곤 제거
+		if (isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
+		isoMeta = null;
+		try {
+			if (!graph) {
+				graphLoading = true;
+				graphError = '';
+				graph = await loadGraph();
+				graphLoading = false;
+			}
+			const { ring, count, ms } = computeIsochrone(graph, lat, lng, maxDistM);
+			if (!ring) {
+				graphError = '도달 노드 부족 — 다른 지점 선택';
+				return;
+			}
+			isoLayer = L.polygon(ring, {
+				color, weight: 2.5, opacity: 0.9,
+				fillColor: color, fillOpacity: 0.18,
+				smoothFactor: 1.2
+			})
+				.bindTooltip(
+					`OSM 보행망 ${count.toLocaleString()} 노드 도달 · 폴리곤 계산 ${ms}ms`
+				)
+				.addTo(map);
+			isoMeta = { count, ms };
+			graphError = '';
+		} catch (e) {
+			console.error('[infra] isochrone failed', e);
+			graphError = '그래프 로드 실패 — 직선 반경만 표시';
+			graphLoading = false;
+		}
 	}
 
 	$effect(() => {
@@ -547,7 +630,20 @@
 
 	<div class="r-map mb-4">
 		<Card title="서울시 생활 인프라 분포 — 행정동 단위">
-			<PillTabs tabs={layerTabs} value={cLayer} onChange={(k) => (cLayer = k)} class="mb-2" />
+			<div class="iso-meta-row">
+				<PillTabs tabs={layerTabs} value={cLayer} onChange={(k) => (cLayer = k)} class="mb-2" />
+				<div class="iso-meta">
+					{#if graphLoading}
+						<span class="iso-loading">⚙ OSM 보행망 로드 중…</span>
+					{:else if graphError}
+						<span class="iso-err">⚠ {graphError}</span>
+					{:else if isoMeta}
+						<span class="iso-ok">
+							OSM 보행망 <b>{isoMeta.count.toLocaleString()}</b> 노드 도달 · {isoMeta.ms}ms
+						</span>
+					{/if}
+				</div>
+			</div>
 			<MapShell
 				height="460px"
 				legend={[
@@ -556,7 +652,7 @@
 					{ color: '#7B5EA7', label: '은행', shape: 'square' },
 					{ color: '#2563a8', label: '주민센터', shape: 'square' }
 				]}
-				source="출처: 소상공인시장진흥공단 · 소상공인 상가정보 · 금융감독원 · 행정안전부 / 행정동 centroid 기준 보행반경 · SUP 31,024개소 중 샘플 3,000개 표시"
+				source="출처: 소상공인시장진흥공단 · 금융감독원 · 행정안전부 · OpenStreetMap (266,780 노드) / 점선 = 직선 반경 · 채워진 폴리곤 = OSM 보행망 Dijkstra + Convex Hull 도달 범위"
 			>
 				<div bind:this={mapEl} class="absolute inset-0"></div>
 			</MapShell>
@@ -685,6 +781,31 @@
 </div>
 
 <style>
+	.iso-meta-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+	.iso-meta {
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		color: var(--color-text3);
+		letter-spacing: 0.04em;
+		min-height: 16px;
+	}
+	.iso-loading {
+		color: var(--color-text3);
+		opacity: 0.85;
+	}
+	.iso-err {
+		color: #c0392b;
+	}
+	.iso-ok b {
+		color: var(--color-text);
+		font-weight: 600;
+	}
 	.infra-hero { background: var(--color-dark); color: var(--color-dark-text); padding: 18px 28px; }
 	.infra-hero-inner { max-width: 1340px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 	.hero-kicker { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; margin-bottom: 6px; }
