@@ -16,7 +16,7 @@
 		<div class="kicker-row">
 			<span class="kicker">{idx + 1} / {ROUTES.length}</span>
 			<span class="dot-sep">·</span>
-			<span class="kicker">서론 → 5 도메인 → 결론 (원형 흐름)</span>
+			<span class="kicker">서론 → 5 도메인 → 결론</span>
 		</div>
 
 		<div class="flow">

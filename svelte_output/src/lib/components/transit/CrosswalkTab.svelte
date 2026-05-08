@@ -4,7 +4,7 @@
 	import 'leaflet/dist/leaflet.css';
 
 	const ACC = cwData.ACC; // 노인 보행사고
-	const CW = cwData.CW; // 신호 없는 횡단보도
+	const CW = cwData.CW; // 횡단보도
 
 	let { active = true } = $props();
 
@@ -56,7 +56,7 @@
 	function popupCw(c) {
 		return `
 			<div style="font-family:inherit;min-width:180px">
-				<b style="font-size:12px;color:#5aadff">🚦 신호 없는 횡단보도</b>
+				<b style="font-size:12px;color:#5aadff">🚦 횡단보도</b>
 				<div style="font-size:11px;color:#888780;margin-top:2px">${c.gu}</div>
 				<div style="font-size:11px;color:#2c2c2a;margin-top:5px">
 					음향 신호 <b>${c['음향'] ? '있음' : '없음'}</b><br>
@@ -125,7 +125,7 @@
 						borderRadius: 2
 					},
 					{
-						label: '신호 없는 횡단보도',
+						label: '횡단보도',
 						data: top.map((g) => g.cwCnt),
 						backgroundColor: '#5aadffaa',
 						borderRadius: 2
@@ -191,7 +191,7 @@
 
 <div class="r2">
 	<div class="card">
-		<div class="ct">횡단보도 안전 — 노인 보행사고 + 신호 없는 횡단보도</div>
+		<div class="ct">횡단보도 안전 — 노인 보행사고 + 횡단보도</div>
 		<div class="ctrl">
 			<span class="lbl">자치구</span>
 			<select bind:value={selectedGu}>
@@ -201,19 +201,19 @@
 				<span class="chk-dot" style:background="#ff5f5f"></span>노인 사고 ({ACC.length.toLocaleString()})
 			</button>
 			<button type="button" class="chk-btn" class:on={showCw} onclick={() => (showCw = !showCw)}>
-				<span class="chk-dot" style:background="#5aadff"></span>신호 없는 횡단보도 ({CW.length.toLocaleString()})
+				<span class="chk-dot" style:background="#5aadff"></span>횡단보도 ({CW.length.toLocaleString()})
 			</button>
 		</div>
 		<div class="map-wrap">
 			<div bind:this={mapEl} class="lmap"></div>
 		</div>
 		<div class="src">
-			빨강 = 65세 이상 보행사고 · 파랑 = 신호 없는 횡단보도 — 사망사고는 큰 마커
+			빨강 = 65세 이상 보행사고 · 파랑 = 횡단보도 — 사망사고는 큰 마커
 		</div>
 	</div>
 
 	<div class="card side-card">
-		<div class="ct">자치구별 — 노인 사고수 vs 신호 없는 횡단보도</div>
+		<div class="ct">자치구별 — 노인 사고수 vs 횡단보도</div>
 		<div class="chart-wrap"><canvas bind:this={canvasGu}></canvas></div>
 		<div class="src" style:margin-top="6px">사고수 많은 순으로 25개 자치구 정렬</div>
 	</div>

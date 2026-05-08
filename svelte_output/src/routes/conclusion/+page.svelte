@@ -800,31 +800,6 @@
 		</Note>
 	</Card>
 
-	<!-- ── 다음 / 처음으로 ── -->
-	<div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-		<a
-			href="{base}/"
-			class="card-shell group flex items-center gap-4 no-underline transition-colors hover:border-[var(--color-accent)]"
-		>
-			<div class="text-[22px]">🌌</div>
-			<div class="flex-1">
-				<div class="kicker mb-0.5">처음으로 ←</div>
-				<div class="text-[14px] font-medium" style:color="var(--color-text)">메인 허브로 돌아가기</div>
-				<div class="text-[12px]" style:color="var(--color-text3)">5축 도메인 카드 다시 보기</div>
-			</div>
-		</a>
-		<a
-			href="{base}/introduce"
-			class="card-shell group flex items-center gap-4 no-underline transition-colors hover:border-[var(--color-accent)]"
-		>
-			<div class="text-[22px]" style:color="var(--color-gold)">✨</div>
-			<div class="flex-1">
-				<div class="kicker mb-0.5">서론 다시 보기 ←</div>
-				<div class="text-[14px] font-medium" style:color="var(--color-text)">왜 노인 도보 생활권인가</div>
-				<div class="text-[12px]" style:color="var(--color-text3)">2040 인구 변화 + 4종 보행 속도 기준</div>
-			</div>
-		</a>
-	</div>
 </section>
 
 <style>
