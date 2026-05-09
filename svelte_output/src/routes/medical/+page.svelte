@@ -1,11 +1,11 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
 	import medical from '$lib/data/medical.json';
+	import facilities from '$lib/data/medical_facilities.json';
 	import Card from '$lib/components/Card.svelte';
 	import MapShell from '$lib/components/MapShell.svelte';
 	import StatGrid from '$lib/components/StatGrid.svelte';
 	import StatCard from '$lib/components/StatCard.svelte';
-	import PillButton from '$lib/components/PillButton.svelte';
 	import Note from '$lib/components/Note.svelte';
 	import KickerLabel from '$lib/components/KickerLabel.svelte';
 
@@ -22,6 +22,10 @@
 	let cF = $state('all'); // 시설 유형 all/hosp/pharm
 	let cSlope = $state(false);
 	let cTop = $state('impact'); // impact | score
+
+	// ─── POI 지도 토글 상태 ───
+	let showHosp = $state(true);
+	let showPharm = $state(true);
 
 	// ─── 헬퍼 ───
 	/**
@@ -153,96 +157,125 @@
 
 	const scTitle = $derived(`일반인 vs ${SPEEDS[cB].label} 접근 가능 시설 수`);
 
-	// ─── Leaflet ───
+	// ─── Leaflet (POI 시설 지도) ───
 	/** @type {HTMLDivElement | undefined} */
-	let mapEl = $state();
+	let mapEl2 = $state();
 	/** @type {any} */
-	let leafletMap = null;
+	let facilityMap = null;
 	/** @type {any} */
-	let geoLayer = null;
+	let hospGroup = null;
+	/** @type {any} */
+	let pharmGroup = null;
 
-	/** @param {any} feat */
-	function styleFeature(feat) {
-		return {
-			fillColor: scoreColor(dongScore(feat.properties.dc)),
-			color: 'rgba(80,80,80,0.25)',
-			weight: 0.5,
-			fillOpacity: 0.82
-		};
-	}
-
-	/** @param {any} feat */
-	function tooltipContent(feat) {
-		const dc = feat.properties.dc;
-		const m = DONG_META[dc];
-		if (!m) return '';
-		const nYoung = getN('young', cT, cF, dc, cSlope);
-		const nB = getN(SPEEDS[cB].id, cT, cF, dc, cSlope);
-		const score = nYoung > 0 ? (nB / nYoung) * 100 : 100;
-		const impact = Math.round((Math.max(0, 100 - score) / 100) * m.el);
-		return (
-			`<b>${m.fn}</b><br>` +
-			`도달가능점수: <b>${score.toFixed(1)}점</b><br>` +
-			`일반인 ${nYoung}개 → ${SPEEDS[cB].label} ${nB}개<br>` +
-			`영향 노인 수: 약 ${impact.toLocaleString()}명`
-		);
-	}
+	/** @type {Record<string, string>} 병의원 분류별 색상 */
+	const HOSP_COLOR = {
+		'의원': '#f472b6',
+		'병원': '#e11d48',
+		'보건소': '#7c3aed',
+		'종합병원': '#1d4ed8'
+	};
 
 	onMount(async () => {
-		if (!mapEl) return;
-		const L = (await import('leaflet')).default;
-		await import('leaflet/dist/leaflet.css');
+		// POI 지도 초기화
+		if (mapEl2) {
+			const L = (await import('leaflet')).default;
+			await import('leaflet/dist/leaflet.css');
 
-		leafletMap = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView(
-			[37.5665, 126.978],
-			11
-		);
-		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-			subdomains: 'abcd',
-			maxZoom: 18
-		}).addTo(leafletMap);
+			facilityMap = L.map(mapEl2, { zoomControl: true, attributionControl: false }).setView(
+				[37.5665, 126.978],
+				11
+			);
+			L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+				subdomains: 'abcd',
+				maxZoom: 18
+			}).addTo(facilityMap);
 
-		geoLayer = L.geoJSON(GEOJSON, {
-			style: styleFeature,
-			onEachFeature: (feat, layer) => {
-				layer.bindTooltip(tooltipContent(feat), { sticky: true });
-				layer.on('mouseover', function () {
-					// @ts-ignore Leaflet 컨텍스트
-					this.setStyle({ weight: 2, color: '#FFD700', fillOpacity: 0.95 });
-				});
-				layer.on('mouseout', function () {
-					// @ts-ignore Leaflet 컨텍스트
-					geoLayer?.resetStyle(this);
-				});
-			}
-		}).addTo(leafletMap);
+			hospGroup = L.layerGroup();
+			pharmGroup = L.layerGroup();
 
-		// 첫 렌더 직후 차트도 초기화
+			facilities.HOSP.forEach((h) => {
+				const col = HOSP_COLOR[h.sub] || '#f472b6';
+				L.circleMarker([h.lat, h.lng], {
+					radius: 4,
+					fillColor: col,
+					color: '#fff',
+					weight: 0.8,
+					fillOpacity: 0.85
+				})
+					.bindTooltip(`<b>${h.name}</b><br><span style="color:#888780">${h.sub}</span>`, {
+						direction: 'top',
+						offset: [0, -4]
+					})
+					.addTo(hospGroup);
+			});
+
+			facilities.PHARM.forEach((p) => {
+				L.circleMarker([p.lat, p.lng], {
+					radius: 3.5,
+					fillColor: '#10b981',
+					color: '#fff',
+					weight: 0.8,
+					fillOpacity: 0.85
+				})
+					.bindTooltip(`<b>${p.name}</b><br><span style="color:#888780">약국</span>`, {
+						direction: 'top',
+						offset: [0, -4]
+					})
+					.addTo(pharmGroup);
+			});
+
+			hospGroup.addTo(facilityMap);
+			pharmGroup.addTo(facilityMap);
+		}
+
+		// 차트 초기화
 		await initCharts();
 	});
 
 	onDestroy(() => {
-		if (leafletMap) {
-			try {
-				leafletMap.remove();
-			} catch (e) {
-				// noop
-			}
+		if (facilityMap) {
+			try { facilityMap.remove(); } catch (e) {}
 		}
 		[scChart, gcChart, icChart].forEach((c) => c?.destroy?.());
 	});
 
-	// 컨트롤 변경 시 지도 재스타일 + 툴팁 업데이트
+	// 시설 레이어 토글
 	$effect(() => {
-		// 의존: cB cT cF cSlope
-		void cB;
-		void cT;
-		void cF;
-		void cSlope;
-		if (!geoLayer) return;
-		geoLayer.setStyle(styleFeature);
-		geoLayer.eachLayer((l) => l.setTooltipContent(tooltipContent(l.feature)));
+		if (!hospGroup || !pharmGroup || !facilityMap) return;
+		showHosp ? hospGroup.addTo(facilityMap) : hospGroup.remove();
+		showPharm ? pharmGroup.addTo(facilityMap) : pharmGroup.remove();
 	});
+
+	/*
+	 * ── CHOROPLETH_MAP_ARCHIVED ──────────────────────────────────────
+	 * 행정동 도달가능점수 choropleth 지도. 나중에 재활용 가능.
+	 *
+	 * let mapEl = $state();
+	 * let leafletMap = null;
+	 * let geoLayer = null;
+	 *
+	 * function styleFeature(feat) {
+	 *   return {
+	 *     fillColor: scoreColor(dongScore(feat.properties.dc)),
+	 *     color: 'rgba(80,80,80,0.25)', weight: 0.5, fillOpacity: 0.82
+	 *   };
+	 * }
+	 * function tooltipContent(feat) {
+	 *   const dc = feat.properties.dc;
+	 *   const m = DONG_META[dc];
+	 *   if (!m) return '';
+	 *   const nYoung = getN('young', cT, cF, dc, cSlope);
+	 *   const nB = getN(SPEEDS[cB].id, cT, cF, dc, cSlope);
+	 *   const score = nYoung > 0 ? (nB / nYoung) * 100 : 100;
+	 *   const impact = Math.round((Math.max(0, 100 - score) / 100) * m.el);
+	 *   return `<b>${m.fn}</b><br>도달가능점수: <b>${score.toFixed(1)}점</b><br>`
+	 *        + `일반인 ${nYoung}개 → ${SPEEDS[cB].label} ${nB}개<br>`
+	 *        + `영향 노인 수: 약 ${impact.toLocaleString()}명`;
+	 * }
+	 * // onMount: leafletMap 초기화 + L.geoJSON(GEOJSON, {...}).addTo(leafletMap)
+	 * // $effect: geoLayer.setStyle(styleFeature) + tooltipContent 업데이트
+	 * ────────────────────────────────────────────────────────────────
+	 */
 
 	// ─── Chart.js ───
 	/** @type {HTMLCanvasElement | undefined} */
@@ -482,6 +515,28 @@
 		{ idx: 3, emoji: '♿', text: '보행보조 노인 하위15%', speed: '0.70 m/s' }
 	];
 
+	/** @param {number|null} sc */
+	function gradePillClass(sc) {
+		if (sc == null) return 'pna';
+		if (sc >= 90) return 'phi';
+		if (sc >= 60) return 'pmd';
+		return 'plo';
+	}
+	/** @param {number|null} sc */
+	function gradeText(sc) {
+		if (sc == null) return '-';
+		if (sc >= 90) return '양호';
+		if (sc >= 60) return '보통';
+		return '미흡';
+	}
+	/** @param {number|null} sc */
+	function scoreBarStyle(sc) {
+		if (sc == null) return 'display:none';
+		const col = sc >= 70 ? '#2E7D32' : sc >= 50 ? '#F57F17' : '#C62828';
+		const w = Math.round((sc * 40) / 100);
+		return `background:${col};width:${w}px`;
+	}
+
 	const mapLegend = [
 		{ color: '#1a9850', label: '90점+' },
 		{ color: '#91cf60', label: '80–90점' },
@@ -490,6 +545,14 @@
 		{ color: '#fdae61', label: '50–60점' },
 		{ color: '#d73027', label: '40–50점' },
 		{ color: '#a50026', label: '40점 미만' }
+	];
+
+	const facilityLegend = [
+		{ color: '#f472b6', label: '의원' },
+		{ color: '#e11d48', label: '병원' },
+		{ color: '#7c3aed', label: '보건소' },
+		{ color: '#1d4ed8', label: '종합병원' },
+		{ color: '#10b981', label: '약국' }
 	];
 </script>
 
@@ -508,50 +571,40 @@
 	</div>
 
 	<!-- 컨트롤 -->
-	<Card class="mb-3.5">
-		<div class="flex flex-wrap items-center gap-2 mb-2.5">
-			<span class="ct-label" style:width="72px">비교 속도</span>
+	<div class="ctrl">
+		<div class="crow">
+			<span class="lbl">비교 속도</span>
 			{#each compareLabels as c (c.idx)}
-				<PillButton
-					variant="wide"
-					active={cB === c.idx}
-					onclick={() => (cB = c.idx)}
-					class={cB === c.idx ? 'speed-on' : ''}
-				>
+				<button type="button" class="btn bw" class:on={cB === c.idx} onclick={() => (cB = c.idx)}>
 					{c.emoji} {c.text} &nbsp;{c.speed}
-				</PillButton>
+				</button>
 			{/each}
-			<span class="text-[11px] ml-1.5" style:color="var(--color-text4)">
-				기준: 일반인 1.28 m/s 고정
-			</span>
+			<span class="text-[11px] ml-1.5" style:color="var(--color-text4)">기준: 일반인 1.28 m/s 고정</span>
 		</div>
-
-		<div class="flex flex-wrap items-center gap-2 mb-2.5">
-			<span class="ct-label" style:width="72px">경사 보정</span>
-			<PillButton variant="wide" active={!cSlope} onclick={() => (cSlope = false)}>
-				경사 없음 (평지)
-			</PillButton>
-			<PillButton variant="wide" active={cSlope} onclick={() => (cSlope = true)}>
-				경사 보정 (Tobler · NASA SRTM)
-			</PillButton>
+		<div class="crow">
+			<span class="lbl">경사 보정</span>
+			<button type="button" class="chk-btn slope" class:on={cSlope} onclick={() => (cSlope = !cSlope)}>
+				<span class="chk-dot" style="background:#8B5CF6"></span>경사로 보정 (Tobler · NASA SRTM)
+			</button>
 		</div>
-
-		<div class="my-2 h-px" style:background="var(--color-border-soft)"></div>
-
-		<div class="flex flex-wrap items-center gap-2">
-			<span class="ct-label">보행 시간</span>
+		<div class="crow">
+			<span class="lbl">시설 레이어</span>
+			<button type="button" class="chk-btn" class:on={showHosp} onclick={() => (showHosp = !showHosp)}>
+				<span class="chk-dot" style="background:#f472b6"></span>병의원
+			</button>
+			<button type="button" class="chk-btn" class:on={showPharm} onclick={() => (showPharm = !showPharm)}>
+				<span class="chk-dot" style="background:#10b981"></span>약국
+			</button>
+		</div>
+		<div class="crow">
+			<span class="lbl">보행 시간</span>
 			{#each [15, 30, 45] as t (t)}
-				<PillButton active={cT === t} onclick={() => (cT = t)}>{t}분</PillButton>
+				<button type="button" class="btn" class:on={cT === t} onclick={() => (cT = t)}>{t}분</button>
 			{/each}
-			<span class="flex-1"></span>
-			<span class="ct-label">시설 유형</span>
-			<PillButton variant="wide" active={cF === 'all'} onclick={() => (cF = 'all')}>전체</PillButton>
-			<PillButton variant="wide" active={cF === 'hosp'} onclick={() => (cF = 'hosp')}>
-				병의원
-			</PillButton>
-			<PillButton variant="wide" active={cF === 'pharm'} onclick={() => (cF = 'pharm')}>
-				약국
-			</PillButton>
+			<span class="lbl" style="margin-left:12px">시설 유형</span>
+			{#each [{v:'all',l:'전체'},{v:'hosp',l:'병의원'},{v:'pharm',l:'약국'}] as f (f.v)}
+				<button type="button" class="btn" class:on={cF === f.v} onclick={() => (cF = f.v)}>{f.l}</button>
+			{/each}
 		</div>
 
 		<!-- 통계 4열 -->
@@ -582,7 +635,7 @@
 
 		<!-- 거리 비교 막대 -->
 		<div class="mt-3.5 pt-3" style:border-top="0.5px solid var(--color-border-soft)">
-			<div class="ct-label mb-2.5">보행 가능 거리 비교 (경사 보정 평균 기준)</div>
+			<div class="lbl mb-2.5">보행 가능 거리 비교 (경사 보정 평균 기준)</div>
 			<div class="flex flex-col gap-2">
 				{#each distBars as b (b.id)}
 					<div class="flex items-center gap-2.5" style:opacity={b.opacity}>
@@ -602,17 +655,13 @@
 									class="text-[10px] font-medium px-1.5 py-px rounded-[10px]"
 									style:background="{b.color}20"
 									style:color={b.color}
-								>
-									기준
-								</span>
+								>기준</span>
 							{:else if b.isB}
 								<span
 									class="text-[10px] font-medium px-1.5 py-px rounded-[10px]"
 									style:background="{b.color}20"
 									style:color={b.color}
-								>
-									비교
-								</span>
+								>비교</span>
 							{/if}
 						</div>
 						<div
@@ -632,17 +681,17 @@
 							class="text-[11px] text-right flex-shrink-0"
 							style:color="var(--color-text2)"
 							style:width="72px"
-						>
-							{b.dist.toLocaleString()} m
-						</span>
+						>{b.dist.toLocaleString()} m</span>
 					</div>
 				{/each}
 			</div>
 		</div>
-	</Card>
+	</div>
 
-	<!-- 지도 + 산점도 -->
-	<div class="grid gap-3.5 mb-3.5" style:grid-template-columns="1.45fr 1fr">
+	<!--
+	CHOROPLETH_MAP_ARCHIVED — 행정동 도달가능점수 등급별 choropleth 지도
+	(언젠가 다시 쓸 일이 있을 때를 위해 보존)
+	<div class="mt-3.5">
 		<Card title={mapTitle}>
 			<MapShell
 				height="420px"
@@ -652,9 +701,26 @@
 				<div bind:this={mapEl} class="absolute inset-0 h-full w-full"></div>
 			</MapShell>
 		</Card>
+	</div>
+	-->
 
+	<!-- POI 지도: 병의원·약국 위치 -->
+	<div class="mt-3.5">
+		<Card title="병의원·약국 위치 (서울시 — 출처: 서울 열린데이터광장)">
+			<MapShell
+				height="460px"
+				legend={facilityLegend}
+				source="병의원 {facilities.HOSP.length.toLocaleString()}개 · 약국 {facilities.PHARM.length.toLocaleString()}개 · 의원/병원/보건소/종합병원 + 영업 중 약국"
+			>
+				<div bind:this={mapEl2} class="absolute inset-0 h-full w-full"></div>
+			</MapShell>
+		</Card>
+	</div>
+
+	<!-- 산점도 + 구별 차트 -->
+	<div class="r2b mt-3.5">
 		<Card title={scTitle}>
-			<div class="relative w-full" style:height="360px">
+			<div class="relative w-full" style:height="400px">
 				<canvas bind:this={scCanvas} class="block h-full w-full"></canvas>
 			</div>
 			<div class="mt-2 flex flex-wrap gap-2.5 text-[11px]" style:color="var(--color-text2)">
@@ -679,45 +745,35 @@
 				<span class="text-[10px]" style:color="var(--color-text3)">주황점선=이론선</span>
 			</div>
 		</Card>
-	</div>
 
-	<!-- 자치구별 + Top 차트 -->
-	<div class="grid gap-3.5 mb-3.5" style:grid-template-columns="1fr 1fr">
 		<Card title="구별 평균 의료 도달가능점수">
-			<div class="relative w-full" style:height="560px">
+			<div class="relative w-full" style:height="400px">
 				<canvas bind:this={gcCanvas} class="block h-full w-full"></canvas>
 			</div>
 		</Card>
+	</div>
 
+	<!-- Top 차트 -->
+	<div class="mt-3.5">
 		<Card>
 			<div class="flex flex-wrap gap-1 mb-2.5">
-				<button
-					type="button"
-					class="topbtn"
-					class:on={cTop === 'impact'}
-					onclick={() => (cTop = 'impact')}
-				>
+				<button type="button" class="btn bw" class:on={cTop === 'impact'} onclick={() => (cTop = 'impact')}>
 					영향 노인 수 TOP 10동
 				</button>
-				<button
-					type="button"
-					class="topbtn"
-					class:on={cTop === 'score'}
-					onclick={() => (cTop = 'score')}
-				>
+				<button type="button" class="btn bw" class:on={cTop === 'score'} onclick={() => (cTop = 'score')}>
 					도달가능점수 최하위 10동
 				</button>
 			</div>
-			<div class="relative w-full" style:height="520px">
+			<div class="relative w-full" style:height="360px">
 				<canvas bind:this={icCanvas} class="block h-full w-full"></canvas>
 			</div>
 		</Card>
 	</div>
 
 	<!-- 테이블 -->
-	<Card title="행정동별 의료 접근성 상세 (도달가능점수 낮은 순)">
-		<div class="overflow-x-auto overflow-y-auto" style:max-height="360px">
-			<table class="w-full border-collapse text-[12px]">
+	<Card title="행정동별 의료 접근성 상세 (도달가능점수 낮은 순)" class="mt-3.5">
+		<div class="tbl-wrap">
+			<table class="ktbl">
 				<thead>
 					<tr>
 						<th>행정동</th>
@@ -732,21 +788,14 @@
 					{#each tableRows as r (r.dc)}
 						<tr>
 							<td>{r.fn}</td>
-							<td><b>{r.score.toFixed(1)}점</b></td>
+							<td>
+								<b style="color:{scoreColor(r.score)}">{r.score.toFixed(1)}점</b>
+								<span class="score-bar" style={scoreBarStyle(r.score)}></span>
+							</td>
 							<td>{r.nYoung}</td>
 							<td>{r.nB}</td>
 							<td>{r.el > 0 ? r.impact.toLocaleString() + '명' : '-'}</td>
-							<td>
-								{#if r.score < 40}
-									<span class="pill plo">취약</span>
-								{:else if r.score < 60}
-									<span class="pill pmd">주의</span>
-								{:else if r.score >= 90}
-									<span class="pill phi">양호</span>
-								{:else}
-									<span class="pill phi">보통</span>
-								{/if}
-							</td>
+							<td><span class="pill {gradePillClass(r.score)}">{gradeText(r.score)}</span></td>
 						</tr>
 					{/each}
 				</tbody>
@@ -775,63 +824,82 @@
 		font-family: var(--font-serif);
 		font-weight: 500;
 	}
-	th {
-		padding: 6px 10px;
-		text-align: left;
+
+	/* 컨트롤 패널 */
+	.ctrl {
+		background: var(--color-card);
+		border: 0.5px solid var(--color-border);
+		border-radius: 12px;
+		padding: 16px 20px;
+		margin-bottom: 14px;
+	}
+	.crow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+	.crow:last-child { margin-bottom: 0; }
+	.lbl {
+		font-size: 11px;
 		font-weight: 500;
+		letter-spacing: 0.06em;
 		color: var(--color-text3);
-		border-bottom: 0.5px solid var(--color-border);
 		white-space: nowrap;
-		position: sticky;
-		top: 0;
-		background: #fff;
-		z-index: 1;
+		margin-right: 2px;
 	}
-	td {
-		padding: 7px 10px;
-		border-bottom: 0.5px solid #f1efe8;
+
+	/* 버튼 */
+	.btn {
+		font-size: 12px; padding: 5px 14px; border-radius: 20px;
+		border: 0.5px solid var(--color-text4); background: transparent;
+		color: var(--color-text2); cursor: pointer; transition: all 0.14s;
+		font-family: inherit; white-space: nowrap;
 	}
-	tbody tr:hover td {
-		background: #fafaf8;
+	.btn:hover { border-color: var(--color-text2); color: var(--color-text); }
+	.btn.on {
+		background: var(--pill-accent, var(--color-dark));
+		color: var(--pill-on-text, var(--color-dark-text));
+		border-color: var(--pill-accent, var(--color-dark));
 	}
-	.pill {
-		display: inline-block;
-		font-size: 10px;
-		font-weight: 500;
-		padding: 2px 8px;
-		border-radius: 10px;
+	.btn.on:hover { filter: brightness(1.08); }
+	.btn.bw { border-radius: 8px; }
+
+	.chk-btn {
+		font-size: 12px; padding: 5px 13px; border-radius: 20px;
+		border: 0.5px solid var(--color-text4); background: transparent;
+		color: var(--color-text2); cursor: pointer; transition: all 0.14s;
+		font-family: inherit; white-space: nowrap; display: flex; align-items: center; gap: 5px;
 	}
-	.phi {
-		background: #e1f5ee;
-		color: #0f6e56;
+	.chk-btn:hover { border-color: var(--color-text2); color: var(--color-text); }
+	.chk-btn.slope.on { background: #f0eafd; border-color: #8b5cf6; color: #5b21b6; }
+	.chk-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+	/* 레이아웃 */
+	.r2b { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+	@media (max-width: 900px) { .r2b { grid-template-columns: 1fr; } }
+
+	/* 테이블 */
+	.tbl-wrap { overflow-x: auto; }
+	.ktbl { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+	.ktbl th {
+		background: var(--color-card-soft); padding: 8px 10px; text-align: right;
+		font-weight: 500; color: var(--color-text2); border-bottom: 1px solid var(--color-border);
+		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 	}
-	.pmd {
-		background: #faeeda;
-		color: #854f0b;
+	.ktbl th:first-child { text-align: left; width: 88px; }
+	.ktbl th:last-child { text-align: center; }
+	.ktbl td {
+		padding: 7px 10px; border-bottom: 0.5px solid var(--color-border-soft);
+		color: var(--color-text); text-align: right; white-space: nowrap; overflow: hidden;
 	}
-	.plo {
-		background: #fcebeb;
-		color: #a32d2d;
-	}
-	.topbtn {
-		font-size: 12px;
-		padding: 4px 12px;
-		border-radius: 6px;
-		border: 0.5px solid transparent;
-		background: transparent;
-		color: var(--color-text3);
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.topbtn:hover {
-		background: var(--color-card-soft);
-	}
-	.topbtn.on {
-		background: #f1efe8;
-		color: var(--color-text);
-		font-weight: 500;
-		border-color: var(--color-border);
-	}
+	.ktbl td:first-child { text-align: left; }
+	.ktbl td:last-child { text-align: center; }
+	.ktbl tr:hover td { background: #fafaf8; }
+	.score-bar { display: inline-block; height: 5px; border-radius: 3px; vertical-align: middle; margin-left: 4px; }
+
+	/* 등급 필 */
+	.pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+	.phi { background: #d4edda; color: #155724; }
+	.pmd { background: #fff3cd; color: #856404; }
+	.plo { background: #f8d7da; color: #721c24; }
+	.pna { background: #ebebeb; color: #666; }
+
 	:global(.leaflet-container) {
 		background: #e8e4db !important;
 	}
