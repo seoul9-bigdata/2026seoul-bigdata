@@ -25,7 +25,7 @@
 	let cSlope = $state(false);
 	let cUnit = $state('dong');
 	let cLayer = $state('all');
-	let sortKey = $state('tot');
+	let sortKey = $state('score');
 	let sortDir = $state('desc');
 
 	function getToblerRatio(dongKey) {
@@ -44,11 +44,12 @@
 		const effSpeed = WS[cW].speed * r;
 		const dr = DONG_REACH[dongKey];
 		if (!dr) return Math.round(Math.max(0, Math.min(100, flatScore * r)) * 10) / 10;
+		const t30 = String(30);
 		const pts = [
-			{ s: 1.28, sc: 100 - (dr.general?.loss ?? 0) },
-			{ s: 1.12, sc: 100 - (dr.senior?.loss ?? 0) },
-			{ s: 0.88, sc: 100 - (dr.aided?.loss ?? 0) },
-			{ s: 0.7, sc: 100 - (dr.aided15?.loss ?? 0) }
+			{ s: 1.28, sc: 100 - (/** @type {any} */ (dr.general)?.[t30]?.loss ?? 0) },
+			{ s: 1.12, sc: 100 - (/** @type {any} */ (dr.senior)?.[t30]?.loss ?? 0) },
+			{ s: 0.88, sc: 100 - (/** @type {any} */ (dr.aided)?.[t30]?.loss ?? 0) },
+			{ s: 0.7,  sc: 100 - (/** @type {any} */ (dr.aided15)?.[t30]?.loss ?? 0) }
 		].sort((a, b) => a.s - b.s);
 		if (effSpeed <= pts[0].s) return Math.round(Math.max(0, pts[0].sc) * 10) / 10;
 		if (effSpeed >= pts[pts.length - 1].s) return Math.round(Math.max(0, pts[pts.length - 1].sc) * 10) / 10;
@@ -115,7 +116,7 @@
 	let clickMark = null;
 	/** @type {{lat:number, lng:number}|null} */
 	let clickPoint = $state(null);
-	/** @type {{mkt:number, sup:number, tot:number}|null} */
+	/** @type {{mkt:number, sup:number, center:number, bank:number, tot:number, score:number|null}|null} */
 	let clickReach = $state(null);
 	/** @type {any} */
 	let isoLayer = null;
@@ -165,7 +166,7 @@
 			radius: 5, fillColor: '#2563a8', color: '#fff', weight: 0.8, fillOpacity: 0.85
 		}).bindPopup('<b>' + c.dong + '</b><br>' + c.gu + ' 주민센터').addTo(centerLyr));
 
-		// 지도 빈 곳 클릭 → 클릭 지점에서 점선 반경 + isochrone 재계산
+		// 지도 클릭 → 클릭 지점 반경/isochrone + 가장 가까운 행정동 선택
 		map.on('click', (e) => {
 			const { lat, lng } = e.latlng;
 			clickPoint = { lat, lng };
@@ -177,7 +178,6 @@
 				.bindTooltip(`클릭 지점<br>${lat.toFixed(5)}, ${lng.toFixed(5)}`)
 				.addTo(map);
 			buildCanvasNearby(lat, lng, '클릭 지점');
-			// 점선 직선 반경도 클릭 지점으로 이동
 			const w = WS[cW];
 			const r = w.speed * (cSlope ? getToblerRatio(cD) : 1.0) * cT * 60;
 			map.fitBounds(L.latLng(lat, lng).toBounds(r * 2), { padding: [30, 30], animate: true });
@@ -189,6 +189,18 @@
 				.bindTooltip('직선 반경 ' + Math.round(r).toLocaleString() + 'm (참고)')
 				.addTo(radLyr);
 			drawIsochrone(lat, lng, r, w.color);
+			// 가장 가까운 행정동 선택 (click 마커는 유지)
+			let minDist = Infinity, nearestKey = null;
+			for (const [k, d] of Object.entries(/** @type {any} */ (ALL_DONG_DATA))) {
+				if (!d.lat) continue;
+				const dist = hav(lat, lng, d.lat, d.lng);
+				if (dist < minDist) { minDist = dist; nearestKey = k; }
+			}
+			if (nearestKey) {
+				fromMapClick = true;
+				cG = /** @type {any} */ (ALL_DONG_DATA)[nearestKey].gu;
+				cD = nearestKey;
+			}
 		});
 
 		updateMap();
@@ -266,12 +278,21 @@
 		}
 	}
 
-	// 행정동 변경 시에만 클릭 지점 해제
+	let fromMapClick = false; // 지도 클릭으로 인한 cD 변경 시 click 마커 유지
+
+	// 행정동 변경 시에만 클릭 지점 해제 (지도 클릭으로 인한 변경 제외)
 	$effect(() => {
 		cD;
+		if (fromMapClick) { fromMapClick = false; return; }
 		if (clickMark && map) { map.removeLayer(clickMark); clickMark = null; }
 		clickPoint = null;
 	});
+
+	function resetToCenter() {
+		if (clickMark && map) { map.removeLayer(clickMark); clickMark = null; }
+		clickPoint = null;
+		if (map) updateMap();
+	}
 
 	// 클릭 지점 도달 가능 지점 계산 (직선 반경 기준)
 	$effect(() => {
@@ -280,9 +301,21 @@
 		if (!cp) { clickReach = null; return; }
 		const dongKey = untrack(() => cD);
 		const r = WS[cW].speed * (cSlope ? getToblerRatio(dongKey) : 1.0) * cT * 60;
-		const mkt = MKT.filter(m => m.lat && hav(cp.lat, cp.lng, m.lat, m.lng) <= r).length;
-		const sup = SUP.filter(s => s.lat && hav(cp.lat, cp.lng, s.lat, s.lng) <= r).length;
-		clickReach = { mkt, sup, tot: mkt + sup };
+		const mkt    = MKT.filter(m => m.lat && hav(cp.lat, cp.lng, m.lat, m.lng) <= r).length;
+		const sup    = SUP.filter(s => s.lat && hav(cp.lat, cp.lng, s.lat, s.lng) <= r).length;
+		const center = CENTERS.filter(c => c.lat && hav(cp.lat, cp.lng, c.lat, c.lng) <= r).length;
+		const bank   = SEOUL_BANKS.filter(b => b.lat && hav(cp.lat, cp.lng, b.lat, b.lng) <= r).length;
+		const tot = mkt + sup + center + bank;
+		// 일반인 기준 카운트 (score 분모)
+		const generalWS = WS.find(w => w.id === 'general');
+		const rGen = (generalWS?.speed ?? 1.28) * cT * 60;
+		const genTot = MKT.filter(m => m.lat && hav(cp.lat, cp.lng, m.lat, m.lng) <= rGen).length
+			+ SUP.filter(s => s.lat && hav(cp.lat, cp.lng, s.lat, s.lng) <= rGen).length
+			+ CENTERS.filter(c => c.lat && hav(cp.lat, cp.lng, c.lat, c.lng) <= rGen).length
+			+ SEOUL_BANKS.filter(b => b.lat && hav(cp.lat, cp.lng, b.lat, b.lng) <= rGen).length;
+		const isGeneral = WS[cW].id === 'general';
+		const score = isGeneral ? 100 : (genTot > 0 ? Math.round(Math.max(0, (tot / genTot) * 100) * 10) / 10 : null);
+		clickReach = { mkt, sup, center, bank, tot, score };
 	});
 
 	$effect(() => {
@@ -486,8 +519,11 @@
 		if (!Chart || !gcCanvas) return;
 		const w = WS[cW];
 		const rows = Object.entries(DONG_REACH).filter(([, v]) => v['구'] === cG)
-			.map(([k, v]) => { const wd = v[w.id]?.[String(cT)] || {}; return { key: k, dong: v['동'], mkt: wd.mkt || 0, sup: wd.sup || 0 }; })
-			.sort((a, b) => b.mkt + b.sup - (a.mkt + a.sup));
+			.map(([k, v]) => {
+				const wd = /** @type {any} */ (v)[w.id]?.[String(cT)] || {};
+				return { key: k, dong: v['동'], mkt: wd.mkt || 0, sup: wd.sup || 0, bank: wd.bank || 0, center: wd.center || 0 };
+			})
+			.sort((a, b) => (b.mkt + b.sup + b.bank + b.center) - (a.mkt + a.sup + a.bank + a.center));
 		const sel = cD.split('_')[1] || '';
 		gcChart?.destroy();
 		gcChart = new Chart(gcCanvas, {
@@ -496,7 +532,9 @@
 				labels: rows.map((r) => r.dong),
 				datasets: [
 					{ label: '전통시장', data: rows.map((r) => r.mkt), backgroundColor: rows.map((r) => r.dong === sel ? '#1D9E75' : '#1D9E7540'), stack: 'a' },
-					{ label: '슈퍼마켓', data: rows.map((r) => r.sup), backgroundColor: rows.map((r) => r.dong === sel ? '#E8A838' : '#E8A83840'), stack: 'a' }
+					{ label: '슈퍼마켓', data: rows.map((r) => r.sup), backgroundColor: rows.map((r) => r.dong === sel ? '#E8A838' : '#E8A83840'), stack: 'a' },
+					{ label: '은행', data: rows.map((r) => r.bank), backgroundColor: rows.map((r) => r.dong === sel ? '#7B5EA7' : '#7B5EA740'), stack: 'a' },
+					{ label: '주민센터', data: rows.map((r) => r.center), backgroundColor: rows.map((r) => r.dong === sel ? '#2563a8' : '#2563a840'), stack: 'a' }
 				]
 			},
 			options: {
@@ -546,7 +584,8 @@
 				const loss = wd.loss != null ? wd.loss : (genTot > 0 ? Math.max(0, (1 - (wd.tot || 0) / genTot) * 100) : null);
 				return {
 					key: k, dong: v['동'], gu: v['구'], elder: v['elder'],
-					mkt: wd.mkt || 0, sup: wd.sup || 0, tot: wd.tot || 0, loss,
+					mkt: wd.mkt || 0, sup: wd.sup || 0, center: wd.center || 0, bank: wd.bank || 0,
+					tot: wd.tot || 0, loss,
 					score: calcScore(loss, k)
 				};
 			});
@@ -590,7 +629,7 @@
 
 <section class="wrap mx-auto px-[18px] pt-[18px] pb-[60px]" style:max-width="1340px">
 	<div class="mb-4">
-		<p class="kicker mb-1.5">SHIM · 행정동 단위 · 도달가능점수</p>
+		<p class="kicker mb-1.5">SHIM · 행정동 단위 · 도달 가능 점수</p>
 		<h1 class="serif-h text-[26px] font-medium" style:color="var(--color-teal)">생활 인프라</h1>
 		<p class="text-[12px]" style:color="var(--color-text3)">
 			전통시장 195개소 · 슈퍼/식료품 31,024개소 · 은행 1,579개소 · 주민센터 426개소 · 서울 428개 행정동
@@ -653,17 +692,17 @@
 		<div class="mt-3">
 			<StatGrid cols={4}>
 				<StatCard
+					label="도달 가능 지점 (클릭 지점)"
+					value={clickReach ? clickReach.tot + '개소 (' + (clickReach.score != null ? clickReach.score + '점)' : '—)') : '—'}
+					sub={clickReach ? '시장 ' + clickReach.mkt + ' · 슈퍼 ' + clickReach.sup + ' · 은행 ' + clickReach.bank + ' · 센터 ' + clickReach.center : '—'}
+				/>
+				<StatCard
 					label="도달 가능 지점 (동 중심점)"
 					value={wReach ? (wReach.tot ?? 0) + '개소' : '—'}
-					sub={'시장 ' + (wReach?.mkt ?? 0) + ' · 슈퍼 ' + (wReach?.sup ?? 0)}
+					sub={'시장 ' + (wReach?.mkt ?? 0) + ' · 슈퍼 ' + (wReach?.sup ?? 0) + ' · 은행 ' + (wReach?.bank ?? 0) + ' · 센터 ' + (wReach?.center ?? 0)}
 				/>
 				<StatCard
-					label="도달 가능 지점 (클릭 지점)"
-					value={clickReach ? clickReach.tot + '개소' : '—'}
-					sub={clickReach ? '시장 ' + clickReach.mkt + ' · 슈퍼 ' + clickReach.sup : '—'}
-				/>
-				<StatCard
-					label="도달가능점수"
+					label="도달 가능 점수"
 					value={score != null ? score + '점' : '—'}
 					sub={cSlope ? '경사 보정 반영' : '일반인 대비 도달가능 비율'}
 					tone="green"
@@ -697,12 +736,15 @@
 				legend={[
 					{ color: '#1D9E75', label: '전통시장', shape: 'circle' },
 					{ color: '#E8A838', label: '슈퍼마켓', shape: 'circle' },
-					{ color: '#7B5EA7', label: '은행', shape: 'square' },
-					{ color: '#2563a8', label: '주민센터', shape: 'square' }
+					{ color: '#7B5EA7', label: '은행', shape: 'circle' },
+					{ color: '#2563a8', label: '주민센터', shape: 'circle' }
 				]}
 				source="출처: 소상공인시장진흥공단 · 금융감독원 · 행정안전부 · OpenStreetMap (266,780 노드) / 점선 = 직선 반경 · 채워진 폴리곤 = OSM 보행망 Dijkstra + Convex Hull 도달 범위"
 			>
 				<div bind:this={mapEl} class="absolute inset-0"></div>
+				{#if clickPoint}
+					<button type="button" class="map-reset-btn" onclick={resetToCenter}>중심점</button>
+				{/if}
 			</MapShell>
 		</Card>
 
@@ -725,8 +767,8 @@
 				<div class="leg-row">
 					<div class="leg-it"><span class="leg-dot" style:background="#1D9E75"></span>전통시장</div>
 					<div class="leg-it"><span class="leg-dot" style:background="#E8A838"></span>슈퍼마켓</div>
-					<div class="leg-it"><span class="leg-dot leg-sq" style:background="#7B5EA7"></span>은행</div>
-					<div class="leg-it"><span class="leg-dot leg-sq" style:background="#2563a8"></span>주민센터</div>
+					<div class="leg-it"><span class="leg-dot" style:background="#7B5EA7"></span>은행</div>
+					<div class="leg-it"><span class="leg-dot" style:background="#2563a8"></span>주민센터</div>
 				</div>
 			</div>
 		</Card>
@@ -769,7 +811,7 @@
 				<table>
 					<thead>
 						<tr>
-							{#each [{ k: 'gu', label: '자치구' },{ k: 'dong', label: '행정동' },{ k: 'mkt', label: '전통시장' },{ k: 'sup', label: '슈퍼' },{ k: 'tot', label: '합계' },{ k: 'elder', label: '65세+' },{ k: 'score', label: '도달가능점수' }] as col}
+							{#each [{ k: 'gu', label: '자치구' },{ k: 'dong', label: '행정동' },{ k: 'mkt', label: '전통시장' },{ k: 'sup', label: '슈퍼' },{ k: 'bank', label: '은행' },{ k: 'center', label: '주민센터' },{ k: 'tot', label: '합계' },{ k: 'elder', label: '65세+' },{ k: 'score', label: '도달 가능 점수' }] as col}
 								<th class="th-sort" class:active={sortKey === col.k} onclick={() => setSort(col.k)}>
 									{col.label}
 									{#if sortKey === col.k}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
@@ -787,10 +829,12 @@
 								<td>{r.dong}</td>
 								<td>{r.mkt}</td>
 								<td>{r.sup}</td>
+								<td>{r.bank}</td>
+								<td>{r.center}</td>
 								<td>{r.tot}</td>
 								<td>{r.elder.toLocaleString()}</td>
 								<td>
-									<b style:color={scoreTextColor(r.score)}>{r.score != null ? r.score + '점' : 'N/A'}</b>
+									<b class="score-val" style:color={scoreTextColor(r.score)}>{r.score != null ? r.score.toFixed(1) + '점' : 'N/A'}</b>
 									<span class="score-bar" style={scoreBarStyle(r.score)}></span>
 								</td>
 								<td><span class="pill {accessCls}">{accessLabel}</span></td>
@@ -810,7 +854,7 @@
 	</Card>
 
 	<Note tone="cool" class="mb-4">
-		<b>방법론 (v6):</b> 보행자 유형(일반노인 1.12 / 보행보조 0.88 / 하위15% 0.70 m/s)과 시간(15·30·45분)에 따라 행정동 centroid에서 도달 가능한 시설 수를 OSM 보행그래프로 카운트. 경사보정(Tobler) 토글 시 동별 실측 ratio (tobler_ratio_LEE.csv, LEE 2026)를 유효속도에 반영하여 도달가능점수를 선형 보간으로 추정.
+		<b>방법론 (v6):</b> 보행자 유형(일반노인 1.12 / 보행보조 0.88 / 하위15% 0.70 m/s)과 시간(15·30·45분)에 따라 행정동 centroid에서 도달 가능한 시설 수를 OSM 보행그래프로 카운트. 경사보정(Tobler) 토글 시 동별 실측 ratio (tobler_ratio_LEE.csv, LEE 2026)를 유효속도에 반영하여 도달 가능 점수를 선형 보간으로 추정.
 	</Note>
 </section>
 
@@ -896,6 +940,25 @@
 	tbody tr { cursor: pointer; }
 	tr:hover td { background: #fafaf8; }
 	tr.hl td { background: var(--color-bg2); font-weight: 500; }
+	.map-reset-btn {
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		z-index: 1000;
+		padding: 5px 12px;
+		border-radius: 6px;
+		border: 0.5px solid var(--color-border);
+		background: rgba(255,255,255,0.92);
+		backdrop-filter: blur(4px);
+		font-size: 12px;
+		font-family: inherit;
+		color: var(--color-text);
+		cursor: pointer;
+		box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+		transition: background 0.14s;
+	}
+	.map-reset-btn:hover { background: #fff; }
+
 	.tbl-overlay {
 		position: absolute;
 		inset: 0;
@@ -919,7 +982,8 @@
 		padding: 8px 14px;
 	}
 
-	.score-bar { display: inline-block; height: 8px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+	.score-val { display: inline-block; min-width: 46px; font-family: var(--font-mono); font-size: 11px; }
+	.score-bar { display: inline-block; height: 8px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
 	.pill { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; font-weight: 500; }
 	.pill.phi { background: #2e7d3218; color: #2e7d32; }
 	.pill.pmd { background: #f57f1718; color: #f57f17; }
