@@ -1,17 +1,17 @@
 <script>
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import infraData from '$lib/data/infra.json';
 	import Card from '$lib/components/Card.svelte';
 	import StatCard from '$lib/components/StatCard.svelte';
 	import MapShell from '$lib/components/MapShell.svelte';
-	import PillButton from '$lib/components/PillButton.svelte';
+	import StatGrid from '$lib/components/StatGrid.svelte';
 	import PillTabs from '$lib/components/PillTabs.svelte';
 	import Note from '$lib/components/Note.svelte';
 	import { loadGraph, computeIsochrone } from '$lib/util/isochrone.js';
 
 	const {
 		ALL_DONG_DATA, BANK_SERIES, GU_BANK, GU_BANK_YEARS, CENTERS, CENTER_BY_GU,
-		DONG_REACH, MKT, SUP, SEOUL_BANKS, TOBLER_DONG, TOP10_VULNERABLE, WS
+		DONG_REACH, MKT, SUP, SEOUL_BANKS, TOBLER_DONG, WS
 	} = infraData;
 
 	const GU_ORDER = [
@@ -23,6 +23,7 @@
 	let cG = $state('중구');
 	let cD = $state('중구_소공동');
 	let cSlope = $state(false);
+	let cUnit = $state('dong');
 	let cLayer = $state('all');
 	let sortKey = $state('tot');
 	let sortDir = $state('desc');
@@ -64,12 +65,29 @@
 	const currentW = $derived(WS[cW]);
 	const currentDong = $derived(ALL_DONG_DATA[cD] || null);
 	const currentReach = $derived(DONG_REACH[cD] || null);
-	const wReach = $derived(currentReach ? currentReach[currentW.id] : null);
+	const wReach = $derived.by(() => {
+		if (!currentReach) return null;
+		const wid = currentW.id;
+		const t = String(cT);
+		const wd = currentReach[wid]?.[t];
+		if (!wd) return null;
+		if (wd.loss != null) return wd;
+		const genTot = currentReach['general']?.[t]?.tot ?? 0;
+		const loss = genTot > 0 ? Math.max(0, (1 - (wd.tot ?? 0) / genTot) * 100) : null;
+		return { ...wd, loss };
+	});
 	const ratio = $derived(cSlope ? getToblerRatio(cD) : 1.0);
-	const radiusM = $derived(Math.round(currentW.speed * ratio * cT * 60));
 	const effSpeedDisplay = $derived((currentW.speed * ratio).toFixed(2));
 	const score = $derived(wReach ? calcScore(wReach.loss, cD) : null);
-	const scoreColor = $derived(score == null ? '#2c2c2a' : score >= 70 ? '#0f6e56' : score >= 45 ? '#854f0b' : '#9B1C1C');
+
+	function scoreBarStyle(sc) {
+		if (sc == null) return 'display:none';
+		const col = sc >= 70 ? '#0f6e56' : sc >= 45 ? '#854f0b' : '#9B1C1C';
+		return `background:${col};width:${Math.round((sc * 40) / 100)}px`;
+	}
+	function scoreTextColor(sc) {
+		return sc == null ? 'var(--color-text3)' : sc >= 70 ? '#0f6e56' : sc >= 45 ? '#854f0b' : '#9B1C1C';
+	}
 
 	const dongList = $derived(
 		Object.entries(DONG_REACH).filter(([, v]) => v['구'] === cG)
@@ -97,6 +115,8 @@
 	let clickMark = null;
 	/** @type {{lat:number, lng:number}|null} */
 	let clickPoint = $state(null);
+	/** @type {{mkt:number, sup:number, tot:number}|null} */
+	let clickReach = $state(null);
 	/** @type {any} */
 	let isoLayer = null;
 	/** @type {any} */
@@ -160,6 +180,7 @@
 			// 점선 직선 반경도 클릭 지점으로 이동
 			const w = WS[cW];
 			const r = w.speed * (cSlope ? getToblerRatio(cD) : 1.0) * cT * 60;
+			map.fitBounds(L.latLng(lat, lng).toBounds(r * 2), { padding: [30, 30], animate: true });
 			radLyr.clearLayers();
 			L.circle([lat, lng], {
 				radius: r, color: w.color, weight: 1.2, dashArray: '5,5',
@@ -189,25 +210,24 @@
 
 		radLyr.clearLayers();
 		if (cMark) { map.removeLayer(cMark); cMark = null; }
-		// 컨트롤 변경 시 클릭 지점 해제 (원본 동작 동등)
-		if (clickMark) { map.removeLayer(clickMark); clickMark = null; }
-		clickPoint = null;
 		const d = ALL_DONG_DATA[cD];
 		if (!d || !d.lat) return;
 		cMark = L.circleMarker([d.lat, d.lng], {
 			radius: 10, fillColor: '#2c2c2a', color: '#fff', weight: 2.5, fillOpacity: 1
 		}).bindPopup('<b>' + d.dong + '</b><br>65세+ ' + d.elder.toLocaleString() + '명').addTo(map);
-		map.panTo([d.lat, d.lng]);
 
 		const w = WS[cW];
 		const r = w.speed * (cSlope ? getToblerRatio(cD) : 1.0) * cT * 60;
-		L.circle([d.lat, d.lng], {
+		const cp = untrack(() => clickPoint);
+		const origin = cp ?? { lat: d.lat, lng: d.lng };
+		map.fitBounds(L.latLng(origin.lat, origin.lng).toBounds(r * 2), { padding: [30, 30], animate: true });
+		L.circle([origin.lat, origin.lng], {
 			radius: r, color: w.color, weight: 1.2, dashArray: '5,5',
 			fill: false, fillOpacity: 0
 		}).bindTooltip('직선 반경 ' + Math.round(r).toLocaleString() + 'm (참고)').addTo(radLyr);
 
 		// OSM 보행망 기반 실제 도달 폴리곤 (Convex Hull) — 비동기
-		drawIsochrone(d.lat, d.lng, r, w.color);
+		drawIsochrone(origin.lat, origin.lng, r, w.color);
 	}
 
 	/** OSM 그래프 → Dijkstra → Convex Hull 도달 폴리곤 */
@@ -245,6 +265,25 @@
 			graphLoading = false;
 		}
 	}
+
+	// 행정동 변경 시에만 클릭 지점 해제
+	$effect(() => {
+		cD;
+		if (clickMark && map) { map.removeLayer(clickMark); clickMark = null; }
+		clickPoint = null;
+	});
+
+	// 클릭 지점 도달 가능 지점 계산 (직선 반경 기준)
+	$effect(() => {
+		const cp = clickPoint;
+		cW; cT; cSlope;
+		if (!cp) { clickReach = null; return; }
+		const dongKey = untrack(() => cD);
+		const r = WS[cW].speed * (cSlope ? getToblerRatio(dongKey) : 1.0) * cT * 60;
+		const mkt = MKT.filter(m => m.lat && hav(cp.lat, cp.lng, m.lat, m.lng) <= r).length;
+		const sup = SUP.filter(s => s.lat && hav(cp.lat, cp.lng, s.lat, s.lng) <= r).length;
+		clickReach = { mkt, sup, tot: mkt + sup };
+	});
 
 	$effect(() => {
 		cLayer; cD; cW; cT; cSlope;
@@ -400,7 +439,7 @@
 		ctx.lineWidth = 2;
 		ctx.stroke();
 
-		const srcLabel = canvasSrcLabel || (ALL_DONG_DATA[cD] ? ALL_DONG_DATA[cD].dong : cG);
+		const srcLabel = canvasSrcLabel || (cUnit === 'gu' ? cG : (/** @type {any} */ (ALL_DONG_DATA)[cD]?.dong || cG));
 		ctx.font = 'bold 11px sans-serif';
 		const tw2 = ctx.measureText(srcLabel).width;
 		ctx.fillStyle = 'rgba(255,255,255,.88)';
@@ -418,7 +457,8 @@
 
 	$effect(() => {
 		const d = ALL_DONG_DATA[cD];
-		if (d && d.lat) buildCanvasNearby(d.lat, d.lng, d.dong);
+		const label = cUnit === 'gu' ? (d?.gu || cG) : d?.dong;
+		if (d && d.lat) buildCanvasNearby(d.lat, d.lng, label);
 	});
 	$effect(() => {
 		canvasNearby; cW; cT; cSlope;
@@ -446,7 +486,7 @@
 		if (!Chart || !gcCanvas) return;
 		const w = WS[cW];
 		const rows = Object.entries(DONG_REACH).filter(([, v]) => v['구'] === cG)
-			.map(([k, v]) => { const wd = v[w.id] || {}; return { key: k, dong: v['동'], mkt: wd.mkt || 0, sup: wd.sup || 0 }; })
+			.map(([k, v]) => { const wd = v[w.id]?.[String(cT)] || {}; return { key: k, dong: v['동'], mkt: wd.mkt || 0, sup: wd.sup || 0 }; })
 			.sort((a, b) => b.mkt + b.sup - (a.mkt + a.sup));
 		const sel = cD.split('_')[1] || '';
 		gcChart?.destroy();
@@ -494,18 +534,20 @@
 		});
 	}
 
-	$effect(() => { cW; cG; cD; if (Chart && gcCanvas) renderGc(); });
+	$effect(() => { cW; cT; cG; cD; if (Chart && gcCanvas) renderGc(); });
 	$effect(() => { cG; if (Chart && bankCanvas) renderBankChart(); });
 
 	const tableRows = $derived.by(() => {
 		const w = WS[cW];
 		const rows = Object.entries(DONG_REACH).filter(([, v]) => v['구'] === cG)
 			.map(([k, v]) => {
-				const wd = v[w.id] || {};
+				const wd = /** @type {any} */ (v)[w.id]?.[String(cT)] || {};
+				const genTot = /** @type {any} */ (v['general'])?.[String(cT)]?.tot ?? 0;
+				const loss = wd.loss != null ? wd.loss : (genTot > 0 ? Math.max(0, (1 - (wd.tot || 0) / genTot) * 100) : null);
 				return {
 					key: k, dong: v['동'], gu: v['구'], elder: v['elder'],
-					mkt: wd.mkt || 0, sup: wd.sup || 0, tot: wd.tot || 0, loss: wd.loss || 0,
-					score: calcScore(wd.loss || 0, k)
+					mkt: wd.mkt || 0, sup: wd.sup || 0, tot: wd.tot || 0, loss,
+					score: calcScore(loss, k)
 				};
 			});
 		const dir = sortDir === 'desc' ? -1 : 1;
@@ -530,9 +572,6 @@
 		map.setView([d.lat, d.lng], 14, { animate: true });
 	}
 
-	const top10MaxImpact = TOP10_VULNERABLE[0]?.impact || 1;
-	const top10Colors = ['#9B1C1C','#b02020','#c03030','#c54040','#ca5050','#7c2d12','#922f12','#a33515','#b34018','#c04c20'];
-
 	const bankPeak = $derived.by(() => {
 		const c = BANK_SERIES.counts;
 		const idx = c.indexOf(Math.max(...c));
@@ -546,90 +585,101 @@
 </script>
 
 <svelte:head>
-	<title>④ 생활 인프라 — 노인 보행일상권 분석</title>
+	<title>생활 인프라</title>
 </svelte:head>
 
-<section class="infra-hero">
-	<div class="infra-hero-inner">
-		<div class="hero-text">
-			<p class="hero-kicker">SHIM · 행정동 단위 · 도달가능점수</p>
-			<h1 class="hero-title">④ 생활 인프라 — 노인 보행일상권 분석</h1>
-			<p class="hero-sub">
-				전통시장 195개소 · 슈퍼/식료품 31,024개소 · 은행 1,579개소 · 주민센터 426개소 · 서울 428개 행정동
-			</p>
-		</div>
+<section class="wrap mx-auto px-[18px] pt-[18px] pb-[60px]" style:max-width="1340px">
+	<div class="mb-4">
+		<p class="kicker mb-1.5">SHIM · 행정동 단위 · 도달가능점수</p>
+		<h1 class="serif-h text-[26px] font-medium" style:color="var(--color-teal)">생활 인프라</h1>
+		<p class="text-[12px]" style:color="var(--color-text3)">
+			전통시장 195개소 · 슈퍼/식료품 31,024개소 · 은행 1,579개소 · 주민센터 426개소 · 서울 428개 행정동
+		</p>
 	</div>
-</section>
 
-<div class="wrap">
-	<div class="ctrl-bar mb-4">
-		<div class="ctrl-left card-shell">
-			<div class="ctrl-row">
-				<span class="ct-label">보행자 유형</span>
-				{#each WS as w, i}
-					<PillButton active={cW === i} onclick={() => (cW = i)}>
-						{i === 0 ? '🧓' : i === 1 ? '🦯' : '🦽'}
-						{w.label}
-						{w.speed} m/s
-					</PillButton>
-				{/each}
-			</div>
-
-			<div class="ctrl-row mt-2.5">
-				<span class="ct-label">보행 시간</span>
-				<PillButton active={cT === 15} onclick={() => (cT = 15)}>15분</PillButton>
-				<PillButton active={cT === 30} onclick={() => (cT = 30)}>30분</PillButton>
-				<PillButton active={cT === 45} onclick={() => (cT = 45)}>45분</PillButton>
-				<span class="flex-1"></span>
-				<span class="ct-label">환경 보정</span>
-				<button type="button" class="switch" class:on={cSlope} onclick={() => (cSlope = !cSlope)} aria-label="경사도 보정 (Tobler)">
-					<span class="switch-knob"></span>
-					<span class="switch-label">경사 보정 (Tobler)</span>
+	<div class="ctrl mb-4">
+		<div class="crow">
+			<span class="lbl">보행자 유형</span>
+			{#each WS as w, i}
+				<button type="button" class="btn bw" class:on={cW === i} onclick={() => (cW = i)}>
+					{i === 0 ? '🚶' : i === 1 ? '🧓' : i === 2 ? '🦯' : '🦽'}
+					{w.label} {w.speed} m/s
 				</button>
-			</div>
+			{/each}
+		</div>
 
-			<div class="ctrl-row mt-2.5">
-				<span class="ct-label">기준 행정동</span>
-				<select class="sel" value={cG} onchange={onGuChange}>
-					{#each GU_ORDER as g}
-						<option value={g}>{g}</option>
-					{/each}
-				</select>
-				<select class="sel" value={cD} onchange={onDongChange}>
+		<div class="crow">
+			<span class="lbl">보행 시간</span>
+			<button type="button" class="btn bw" class:on={cT === 15} onclick={() => (cT = 15)}>15분</button>
+			<button type="button" class="btn bw" class:on={cT === 30} onclick={() => (cT = 30)}>30분</button>
+			<button type="button" class="btn bw" class:on={cT === 45} onclick={() => (cT = 45)}>45분</button>
+		</div>
+
+		<div class="crow">
+			<span class="lbl">행정 단위</span>
+			<button type="button" class="btn" class:on={cUnit === 'gu'} onclick={() => (cUnit = 'gu')}>자치구</button>
+			<button type="button" class="btn" class:on={cUnit === 'dong'} onclick={() => (cUnit = 'dong')}>행정동</button>
+			<span class="crow-sep">|</span>
+			<span class="lbl">레이어</span>
+			<button type="button" class="chk-btn slope" class:on={cSlope} onclick={() => (cSlope = !cSlope)}>
+				<span class="chk-dot" style="background:#3ecfa0"></span>경사 보정 (Tobler)
+			</button>
+			{#if cSlope && currentDong}
+				<span class="text-[11px] tobler-tag">ratio {ratio.toFixed(3)} · {effSpeedDisplay} m/s</span>
+			{/if}
+		</div>
+
+		<div class="crow">
+			<span class="lbl">기준 지역</span>
+			<select value={cG} onchange={onGuChange}>
+				{#each GU_ORDER as g}
+					<option value={g}>{g}</option>
+				{/each}
+			</select>
+			{#if cUnit === 'dong'}
+				<select value={cD} onchange={onDongChange}>
 					{#each dongList as d}
 						<option value={d.key}>{d.dong}</option>
 					{/each}
 				</select>
-				<span class="text-[11px]" style:color="var(--color-text3)">
-					{#if currentDong}
+				{#if currentDong}
+					<span class="text-[11px]" style:color="var(--color-text3)">
 						65세+ {currentDong.elder.toLocaleString()}명 · centroid({currentDong.lat?.toFixed(4)}, {currentDong.lng?.toFixed(4)})
-					{/if}
-				</span>
-				{#if cSlope && currentDong}
-					<span class="text-[11px] tobler-tag">
-						ratio {ratio.toFixed(3)} · 유효속도 {effSpeedDisplay} m/s
 					</span>
 				{/if}
-			</div>
+			{/if}
 		</div>
 
-		<div class="ctrl-right">
-			<div class="big-stat">
-				<div class="bs-label">도달가능점수</div>
-				<div class="bs-val" style:color={scoreColor}>{score != null ? score + '점' : '—'}</div>
-				<div class="bs-sub">{cSlope ? '경사 보정 반영' : '일반인 대비 도달가능 비율'}</div>
-			</div>
-			<StatCard
-				label="65세+ 인구"
-				value={(currentDong ? currentDong.elder.toLocaleString() : '-') + '명'}
-				sub={cG + ' 주민센터 ' + (CENTER_BY_GU[cG] || 0) + '개소'}
-				tone="blue"
-			/>
+		<div class="mt-3">
+			<StatGrid cols={4}>
+				<StatCard
+					label="도달 가능 지점 (동 중심점)"
+					value={wReach ? (wReach.tot ?? 0) + '개소' : '—'}
+					sub={'시장 ' + (wReach?.mkt ?? 0) + ' · 슈퍼 ' + (wReach?.sup ?? 0)}
+				/>
+				<StatCard
+					label="도달 가능 지점 (클릭 지점)"
+					value={clickReach ? clickReach.tot + '개소' : '—'}
+					sub={clickReach ? '시장 ' + clickReach.mkt + ' · 슈퍼 ' + clickReach.sup : '—'}
+				/>
+				<StatCard
+					label="도달가능점수"
+					value={score != null ? score + '점' : '—'}
+					sub={cSlope ? '경사 보정 반영' : '일반인 대비 도달가능 비율'}
+					tone="green"
+				/>
+				<StatCard
+					label="65세+ 인구"
+					value={(currentDong ? currentDong.elder.toLocaleString() : '-') + '명'}
+					sub={cG + ' 주민센터 ' + (CENTER_BY_GU[cG] || 0) + '개소'}
+					tone="blue"
+				/>
+			</StatGrid>
 		</div>
 	</div>
 
 	<div class="r-map mb-4">
-		<Card title="서울시 생활 인프라 분포 — 행정동 단위">
+		<Card title="서울시 생활 인프라 분포">
 			<div class="iso-meta-row">
 				<PillTabs tabs={layerTabs} value={cLayer} onChange={(k) => (cLayer = k)} class="mb-2" />
 				<div class="iso-meta">
@@ -638,9 +688,7 @@
 					{:else if graphError}
 						<span class="iso-err">⚠ {graphError}</span>
 					{:else if isoMeta}
-						<span class="iso-ok">
-							OSM 보행망 <b>{isoMeta.count.toLocaleString()}</b> 노드 도달 · {isoMeta.ms}ms
-						</span>
+						<span class="iso-ok">OSM 보행망 <b>{isoMeta.count.toLocaleString()}</b> 노드 도달 · {isoMeta.ms}ms</span>
 					{/if}
 				</div>
 			</div>
@@ -660,7 +708,10 @@
 
 		<Card title="보행 반경 모식도">
 			<div class="radar-sub">
-				{canvasSrcLabel || (currentDong ? currentDong.dong : cG)} · {cT}분 보행반경{cSlope ? ' · 경사보정' : ''}
+				{canvasSrcLabel || (cUnit === 'gu' ? cG : (currentDong ? currentDong.dong : cG))} · {cT}분 보행반경{cSlope ? ' · 경사보정' : ''}
+			</div>
+			<div class="radar-radius">
+				{currentW.label} · {Math.round(currentW.speed * ratio * cT * 60).toLocaleString()} m
 			</div>
 			<canvas bind:this={radarCanvas} width="340" height="340" class="radar-canvas"></canvas>
 			<div class="radar-leg">
@@ -712,73 +763,56 @@
 		</Card>
 	</div>
 
-	<Card title="인프라 확충 우선순위 — 영향 노인 수 TOP 10 동" class="mb-4">
-		<p class="mb-2.5 text-[11px]" style:color="var(--color-text3)">
-			손실률(하위15% vs 일반인) × 65세+ 인구 = 영향받는 노인 수 · 30분 기준
-		</p>
-		<div class="space-y-1.5">
-			{#each TOP10_VULNERABLE as d, i}
-				{@const pct = Math.round((d.impact / top10MaxImpact) * 100)}
-				{@const lossColor = d.loss > 80 ? '#9B1C1C' : d.loss > 60 ? '#D85A30' : '#854f0b'}
-				{@const sc = Math.round(100 - d.loss)}
-				<div class="t10r">
-					<div class="t10l" title={d['구'] + ' ' + d['동']}>
-						{d['구']} <b>{d['동']}</b>
-					</div>
-					<div class="t10bg">
-						<div class="t10bar" style:width={pct + '%'} style:background={top10Colors[i]}></div>
-					</div>
-					<div class="t10v">{d.impact.toLocaleString()}명</div>
-					<div class="t10loss" style:background={lossColor + '18'} style:color={lossColor}>
-						{sc}점
-					</div>
-				</div>
-			{/each}
-		</div>
-		<p class="mt-2.5 text-[11px]" style:color="var(--color-text3)">
-			방법론: 행정동 centroid 기준 30분 보행반경 내 POI 카운트 · OSM 보행그래프 + 경사보정 (LEE 2026)<br />
-			출처: 통계청 등록인구 2025.4Q
-		</p>
-	</Card>
-
 	<Card title={'서울 행정동 생활인프라 접근성 — ' + currentW.label + ' · ' + cG + ' 행정동'} class="mb-4">
-		<div class="tbl-wrap">
-			<table>
-				<thead>
-					<tr>
-						{#each [{ k: 'gu', label: '자치구' },{ k: 'dong', label: '행정동' },{ k: 'mkt', label: '전통시장' },{ k: 'sup', label: '슈퍼' },{ k: 'tot', label: '합계' },{ k: 'elder', label: '65세+' },{ k: 'score', label: '도달가능점수' }] as col}
-							<th class="th-sort" class:active={sortKey === col.k} onclick={() => setSort(col.k)}>
-								{col.label}
-								{#if sortKey === col.k}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
-							</th>
-						{/each}
-						<th>접근성</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each tableRows as r}
-						{@const accessCls = r.score >= 70 ? 'phi' : r.score >= 40 ? 'pmd' : 'plo'}
-						{@const accessLabel = r.score >= 70 ? '양호' : r.score >= 40 ? '보통' : '미흡'}
-						<tr class:hl={r.key === cD} onclick={() => panToRow(r)}>
-							<td>{r.gu}</td>
-							<td>{r.dong}</td>
-							<td>{r.mkt}</td>
-							<td>{r.sup}</td>
-							<td>{r.tot}</td>
-							<td>{r.elder.toLocaleString()}</td>
-							<td><span class="pill {accessCls}">{r.score}점</span></td>
-							<td><span class="pill {accessCls}">{accessLabel}</span></td>
+		<div class="tbl-outer" style="position:relative">
+			<div class="tbl-wrap">
+				<table>
+					<thead>
+						<tr>
+							{#each [{ k: 'gu', label: '자치구' },{ k: 'dong', label: '행정동' },{ k: 'mkt', label: '전통시장' },{ k: 'sup', label: '슈퍼' },{ k: 'tot', label: '합계' },{ k: 'elder', label: '65세+' },{ k: 'score', label: '도달가능점수' }] as col}
+								<th class="th-sort" class:active={sortKey === col.k} onclick={() => setSort(col.k)}>
+									{col.label}
+									{#if sortKey === col.k}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+								</th>
+							{/each}
+							<th>접근성</th>
 						</tr>
-					{/each}
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						{#each tableRows as r}
+							{@const accessCls = (r.score ?? 0) >= 70 ? 'phi' : (r.score ?? 0) >= 45 ? 'pmd' : 'plo'}
+							{@const accessLabel = (r.score ?? 0) >= 70 ? '양호' : (r.score ?? 0) >= 45 ? '보통' : '미흡'}
+							<tr class:hl={r.key === cD} onclick={() => panToRow(r)}>
+								<td>{r.gu}</td>
+								<td>{r.dong}</td>
+								<td>{r.mkt}</td>
+								<td>{r.sup}</td>
+								<td>{r.tot}</td>
+								<td>{r.elder.toLocaleString()}</td>
+								<td>
+									<b style:color={scoreTextColor(r.score)}>{r.score != null ? r.score + '점' : 'N/A'}</b>
+									<span class="score-bar" style={scoreBarStyle(r.score)}></span>
+								</td>
+								<td><span class="pill {accessCls}">{accessLabel}</span></td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+			{#if cW === 0}
+				<div class="tbl-overlay">
+					<div style="font-size:28px">📋</div>
+					<div style="font-size:13px;font-weight:500;color:#5f5e5a">보행자 유형을 선택하세요</div>
+					<div class="tbl-overlay-sub">일반인은 비교 기준값(분모)이므로<br />모든 구가 <b>100점</b> — 비교 의미 없음</div>
+				</div>
+			{/if}
 		</div>
 	</Card>
 
 	<Note tone="cool" class="mb-4">
 		<b>방법론 (v6):</b> 보행자 유형(일반노인 1.12 / 보행보조 0.88 / 하위15% 0.70 m/s)과 시간(15·30·45분)에 따라 행정동 centroid에서 도달 가능한 시설 수를 OSM 보행그래프로 카운트. 경사보정(Tobler) 토글 시 동별 실측 ratio (tobler_ratio_LEE.csv, LEE 2026)를 유효속도에 반영하여 도달가능점수를 선형 보간으로 추정.
 	</Note>
-</div>
+</section>
 
 <style>
 	.iso-meta-row {
@@ -806,35 +840,33 @@
 		color: var(--color-text);
 		font-weight: 600;
 	}
-	.infra-hero { background: var(--color-dark); color: var(--color-dark-text); padding: 18px 28px; }
-	.infra-hero-inner { max-width: 1340px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
-	.hero-kicker { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; margin-bottom: 6px; }
-	.hero-title { font-size: 17px; font-weight: 500; margin-bottom: 4px; }
-	.hero-sub { font-size: 12px; opacity: 0.55; }
-	.wrap { max-width: 1340px; margin: 0 auto; padding: 18px 18px 60px; }
-
-	.ctrl-bar { display: grid; grid-template-columns: 1fr 320px; gap: 12px; align-items: stretch; }
-	@media (max-width: 1100px) { .ctrl-bar { grid-template-columns: 1fr; } }
-	.ctrl-right { display: flex; flex-direction: column; gap: 8px; }
-	.big-stat { background: var(--color-card-soft); border-radius: 8px; padding: 14px 16px; }
-	.bs-label { font-size: 11px; color: var(--color-text3); margin-bottom: 4px; }
-	.bs-val { font-family: var(--font-mono); font-size: 32px; font-weight: 500; line-height: 1.1; }
-	.bs-sub { font-size: 11px; color: var(--color-text3); margin-top: 4px; }
-	.ctrl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-	.sel { font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 0.5px solid var(--color-border); background: #fff; color: var(--color-text); font-family: inherit; }
-	select.sel:focus { outline: none; border-color: var(--color-text2); }
+	.serif-h { font-family: var(--font-serif); }
+	.ctrl {
+		background: var(--color-card);
+		border: 0.5px solid var(--color-border);
+		border-radius: 12px;
+		padding: 16px 20px;
+	}
+	.crow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+	.crow:last-child { margin-bottom: 0; }
+	.crow-sep { color: var(--color-border); margin: 0 2px; font-size: 14px; }
+	.lbl { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--color-text3); white-space: nowrap; margin-right: 2px; }
+	select { font-size: 12px; padding: 5px 10px; border-radius: 8px; border: 0.5px solid var(--color-text4); background: #fff; color: var(--color-text); font-family: inherit; cursor: pointer; outline: none; }
+	select:focus { border-color: var(--color-text2); }
+	.btn { font-size: 12px; padding: 5px 14px; border-radius: 20px; border: 0.5px solid var(--color-text4); background: transparent; color: var(--color-text2); cursor: pointer; transition: all 0.14s; font-family: inherit; white-space: nowrap; }
+	.btn:hover { border-color: var(--color-text2); color: var(--color-text); }
+	.btn.on { background: var(--pill-accent, var(--color-dark)); color: var(--pill-on-text, var(--color-dark-text)); border-color: var(--pill-accent, var(--color-dark)); }
+	.btn.bw { border-radius: 8px; }
+	.chk-btn { font-size: 12px; padding: 5px 13px; border-radius: 20px; border: 0.5px solid var(--color-text4); background: transparent; color: var(--color-text2); cursor: pointer; transition: all 0.14s; font-family: inherit; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+	.chk-btn:hover { border-color: var(--color-text2); color: var(--color-text); }
+	.chk-btn.slope.on { background: #edfaf5; border-color: #3ecfa0; color: #0f6e56; }
+	.chk-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 	.tobler-tag { font-family: var(--font-mono); padding: 2px 8px; border-radius: 10px; color: var(--color-slope); background: color-mix(in srgb, var(--color-slope) 10%, transparent); }
-
-	.switch { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 6px; border-radius: 18px; border: 0.5px solid var(--color-border); background: #fff; cursor: pointer; font-family: inherit; font-size: 12px; color: var(--color-text2); transition: all 0.16s; }
-	.switch-knob { display: inline-block; width: 28px; height: 16px; border-radius: 12px; background: var(--color-border); position: relative; transition: background 0.18s; }
-	.switch-knob::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: transform 0.18s; }
-	.switch.on { border-color: var(--color-slope); color: var(--color-text); background: color-mix(in srgb, var(--color-slope) 8%, white); }
-	.switch.on .switch-knob { background: var(--color-slope); }
-	.switch.on .switch-knob::after { transform: translateX(12px); }
 
 	.r-map { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
 	@media (max-width: 1100px) { .r-map { grid-template-columns: 1fr; } }
-	.radar-sub { font-size: 12px; color: var(--color-text2); margin-bottom: 6px; }
+	.radar-sub { font-size: 12px; color: var(--color-text2); margin-bottom: 4px; }
+	.radar-radius { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--color-text); text-align: center; margin-bottom: 8px; }
 	.radar-canvas { display: block; width: 100%; max-width: 340px; margin: 0 auto; }
 	.radar-leg { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; align-items: center; }
 	.leg-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; font-size: 11px; color: var(--color-text2); }
@@ -852,14 +884,6 @@
 	.bst-l { font-size: 10px; color: var(--color-text3); margin-top: 2px; }
 	.src-note { margin-top: 8px; font-size: 11px; color: var(--color-text3); }
 
-	.t10r { display: grid; grid-template-columns: 130px 1fr 80px 50px; align-items: center; gap: 8px; font-size: 12px; }
-	.t10l { color: var(--color-text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.t10l b { color: var(--color-text); font-weight: 500; }
-	.t10bg { height: 16px; border-radius: 3px; background: var(--color-border-soft); overflow: hidden; }
-	.t10bar { height: 100%; border-radius: 3px; transition: width 0.3s; }
-	.t10v { font-family: var(--font-mono); text-align: right; font-size: 11px; color: var(--color-text2); }
-	.t10loss { font-size: 11px; text-align: center; padding: 2px 0; border-radius: 3px; font-weight: 500; }
-
 	.tbl-wrap { max-height: 520px; overflow-y: auto; }
 	table { width: 100%; font-size: 12px; border-collapse: collapse; }
 	thead { position: sticky; top: 0; background: #fff; z-index: 1; }
@@ -872,6 +896,30 @@
 	tbody tr { cursor: pointer; }
 	tr:hover td { background: #fafaf8; }
 	tr.hl td { background: var(--color-bg2); font-weight: 500; }
+	.tbl-overlay {
+		position: absolute;
+		inset: 0;
+		border-radius: 8px;
+		background: rgba(245, 244, 240, 0.92);
+		backdrop-filter: blur(3px);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		padding: 20px;
+	}
+	.tbl-overlay-sub {
+		font-size: 11px;
+		color: #aaa9a5;
+		text-align: center;
+		line-height: 1.7;
+		background: #fff;
+		border-radius: 8px;
+		padding: 8px 14px;
+	}
+
+	.score-bar { display: inline-block; height: 8px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
 	.pill { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; font-weight: 500; }
 	.pill.phi { background: #2e7d3218; color: #2e7d32; }
 	.pill.pmd { background: #f57f1718; color: #f57f17; }
