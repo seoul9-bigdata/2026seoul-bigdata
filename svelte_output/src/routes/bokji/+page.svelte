@@ -345,7 +345,7 @@
 					x: { grid: { display: false }, ticks: { font: { size: 10 } } },
 					y: {
 						min: 0,
-						max: 105,
+						max: 100,
 						grid: { color: '#f1efe8' },
 						title: { display: true, text: '도달가능점수 (%)', font: { size: 10 } },
 						ticks: { font: { size: 10 }, callback: (v) => v + '점' }
