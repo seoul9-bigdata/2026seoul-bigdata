@@ -250,7 +250,8 @@
 		if (untrack(() => cUnit) === 'gu') {
 			const gc = guCenter(untrack(() => cG));
 			if (!gc) return;
-			origin = gc;
+			const cp = untrack(() => clickPoint);
+			origin = cp ?? gc;
 			cMark = L.circleMarker([gc.lat, gc.lng], {
 				radius: 10, fillColor: '#2c2c2a', color: '#fff', weight: 2.5, fillOpacity: 1
 			}).bindPopup('<b>' + untrack(() => cG) + '</b><br>구 중심점').addTo(map);
@@ -313,9 +314,9 @@
 
 	let fromMapClick = false; // 지도 클릭으로 인한 cD 변경 시 click 마커 유지
 
-	// 행정동 변경 시에만 클릭 지점 해제 (지도 클릭으로 인한 변경 제외)
+	// 행정동 변경 또는 단위(자치구↔행정동) 전환 시 클릭 해제 (지도 클릭으로 인한 변경 제외)
 	$effect(() => {
-		cD;
+		cD; cUnit;
 		if (fromMapClick) { fromMapClick = false; return; }
 		if (clickMark && map) { map.removeLayer(clickMark); clickMark = null; }
 		clickPoint = null;
@@ -553,17 +554,17 @@
 				return { key: k, dong: v['동'], mkt: wd.mkt || 0, sup: wd.sup || 0, bank: wd.bank || 0, center: wd.center || 0 };
 			})
 			.sort((a, b) => (b.mkt + b.sup + b.bank + b.center) - (a.mkt + a.sup + a.bank + a.center));
-		const sel = cD.split('_')[1] || '';
+		const sel = cUnit === 'gu' ? null : (cD.split('_')[1] || '');
 		gcChart?.destroy();
 		gcChart = new Chart(gcCanvas, {
 			type: 'bar',
 			data: {
 				labels: rows.map((r) => r.dong),
 				datasets: [
-					{ label: '전통시장', data: rows.map((r) => r.mkt), backgroundColor: rows.map((r) => r.dong === sel ? '#1D9E75' : '#1D9E7540'), stack: 'a' },
-					{ label: '슈퍼마켓', data: rows.map((r) => r.sup), backgroundColor: rows.map((r) => r.dong === sel ? '#E8A838' : '#E8A83840'), stack: 'a' },
-					{ label: '은행', data: rows.map((r) => r.bank), backgroundColor: rows.map((r) => r.dong === sel ? '#7B5EA7' : '#7B5EA740'), stack: 'a' },
-					{ label: '주민센터', data: rows.map((r) => r.center), backgroundColor: rows.map((r) => r.dong === sel ? '#2563a8' : '#2563a840'), stack: 'a' }
+					{ label: '전통시장', data: rows.map((r) => r.mkt), backgroundColor: rows.map((r) => !sel || r.dong === sel ? '#1D9E75' : '#1D9E754D'), stack: 'a' },
+					{ label: '슈퍼마켓', data: rows.map((r) => r.sup), backgroundColor: rows.map((r) => !sel || r.dong === sel ? '#E8A838' : '#E8A8384D'), stack: 'a' },
+					{ label: '은행', data: rows.map((r) => r.bank), backgroundColor: rows.map((r) => !sel || r.dong === sel ? '#7B5EA7' : '#7B5EA74D'), stack: 'a' },
+					{ label: '주민센터', data: rows.map((r) => r.center), backgroundColor: rows.map((r) => !sel || r.dong === sel ? '#2563a8' : '#2563a84D'), stack: 'a' }
 				]
 			},
 			options: {
@@ -634,17 +635,22 @@
 
 	const guRankRows = $derived.by(() => {
 		const w = WS[cW];
-		/** @type {Record<string, {scores: number[], elder: number, dongCount: number}>} */
+		/** @type {Record<string, {scores: number[], elder: number, dongCount: number, mkt: number, sup: number, bank: number, center: number, tot: number}>} */
 		const byGu = {};
 		for (const [k, v] of Object.entries(DONG_REACH)) {
 			const gu = /** @type {any} */ (v)['구'];
-			if (!byGu[gu]) byGu[gu] = { scores: [], elder: 0, dongCount: 0 };
+			if (!byGu[gu]) byGu[gu] = { scores: [], elder: 0, dongCount: 0, mkt: 0, sup: 0, bank: 0, center: 0, tot: 0 };
 			const wd = /** @type {any} */ (v)[w.id]?.[String(cT)] || {};
 			const genTot = /** @type {any} */ (v['general'])?.[String(cT)]?.tot ?? 0;
 			const loss = wd.loss != null ? wd.loss : (genTot > 0 ? Math.max(0, (1 - (wd.tot || 0) / genTot) * 100) : null);
 			const sc = calcScore(loss, k);
 			if (sc != null) byGu[gu].scores.push(sc);
 			byGu[gu].elder += (/** @type {any} */ (v)['elder'] || 0);
+			byGu[gu].mkt += (wd.mkt || 0);
+			byGu[gu].sup += (wd.sup || 0);
+			byGu[gu].bank += (wd.bank || 0);
+			byGu[gu].center += (wd.center || 0);
+			byGu[gu].tot += (wd.tot || 0);
 			byGu[gu].dongCount++;
 		}
 		return Object.entries(byGu)
@@ -652,7 +658,12 @@
 				gu,
 				score: d.scores.length ? parseFloat((d.scores.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0) / d.scores.length).toFixed(1)) : null,
 				elder: d.elder,
-				dongCount: d.dongCount
+				dongCount: d.dongCount,
+				mkt: Math.round(d.mkt / d.dongCount * 10) / 10,
+				sup: Math.round(d.sup / d.dongCount * 10) / 10,
+				bank: Math.round(d.bank / d.dongCount * 10) / 10,
+				center: Math.round(d.center / d.dongCount * 10) / 10,
+				tot: Math.round(d.tot / d.dongCount * 10) / 10,
 			}))
 			.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 	});
@@ -701,8 +712,9 @@
 				<span class="chip teal">🛒 전통시장 195개소</span>
 				<span class="chip teal">🏦 은행 1,579개소</span>
 				<span class="chip teal">🏛 주민센터 426개소</span>
+				<span class="chip teal">🏪 슈퍼마켓 31,024개소</span>
 				<span class="chip-sep">·</span>
-				<span class="chip muted">슈퍼마켓 31,024개소 · 428개 행정동 · OSM 보행 네트워크 · 서울시 2025</span>
+				<span class="chip muted">428개 행정동 · OSM 보행 네트워크 · 서울시 2025</span>
 			</div>
 		</div>
 	</div>
@@ -722,9 +734,9 @@
 
 		<div class="crow">
 			<span class="lbl">보행 시간</span>
-			<button type="button" class="btn bw" class:on={cT === 15} onclick={() => (cT = 15)}>15분</button>
-			<button type="button" class="btn bw" class:on={cT === 30} onclick={() => (cT = 30)}>30분</button>
-			<button type="button" class="btn bw" class:on={cT === 45} onclick={() => (cT = 45)}>45분</button>
+			<button type="button" class="btn" class:on={cT === 15} onclick={() => (cT = 15)}>15분</button>
+			<button type="button" class="btn" class:on={cT === 30} onclick={() => (cT = 30)}>30분</button>
+			<button type="button" class="btn" class:on={cT === 45} onclick={() => (cT = 45)}>45분</button>
 		</div>
 
 		<div class="crow">
@@ -912,9 +924,13 @@
 							<tr>
 								<th class="rank-th">순위</th>
 								<th>자치구</th>
-								<th>행정동 수</th>
+								<th>전통시장</th>
+								<th>슈퍼</th>
+								<th>은행</th>
+								<th>주민센터</th>
+								<th>합계</th>
 								<th>65세+</th>
-								<th>구 접근가능 점수 (행정동 평균)</th>
+								<th>도달가능점수 (동 평균)</th>
 								<th>접근성</th>
 							</tr>
 						</thead>
@@ -925,7 +941,11 @@
 								<tr class:hl={r.gu === cG} onclick={() => (cG = r.gu)}>
 									<td class="rank-num" style:color={i === 0 ? 'var(--color-teal)' : i < 3 ? 'var(--color-text2)' : undefined}>{i + 1}</td>
 									<td style="font-weight:500">{r.gu}</td>
-									<td>{r.dongCount}</td>
+									<td>{r.mkt}</td>
+									<td>{r.sup}</td>
+									<td>{r.bank}</td>
+									<td>{r.center}</td>
+									<td>{r.tot}</td>
 									<td>{r.elder.toLocaleString()}</td>
 									<td>
 										<b class="score-val" style:color={scoreTextColor(r.score)}>{r.score != null ? r.score.toFixed(1) + '점' : 'N/A'}</b>
@@ -986,7 +1006,10 @@
 	</Card>
 
 	<Note tone="cool" class="mb-4">
-		<b>방법론 (v6):</b> 보행자 유형(건강 노인 1.12 / 보행보조 노인 0.88 / 보행보조 하위15% 0.70 m/s)과 시간(15·30·45분)에 따라 행정동 centroid에서 도달 가능한 시설 수를 OSM 보행그래프로 카운트. 경사보정(Tobler) 토글 시 동별 실측 ratio (tobler_ratio_LEE.csv, LEE 2026)를 유효속도에 반영하여 도달 가능 점수를 선형 보간으로 추정.
+		※ 도달가능점수 = (선택 유형 도달 시설 수 / 일반인 도달 시설 수) × 100<br />
+		※ 보행자 유형: 일반인 1.28 · 건강 노인 1.12 · 보행보조 노인 0.88 · 보행보조 하위15% 0.70 m/s<br />
+		※ 경사 보정: {cSlope ? 'Tobler hiking function 기반 동별 속도 보정 (tobler_ratio_LEE.csv, LEE 2026)' : '평지 기준 (보정 없음)'}<br />
+		※ 거리 측정: 행정동 centroid 기준 OSM 보행 네트워크(다익스트라) · 시설: 전통시장 · 슈퍼마켓 · 은행 · 주민센터
 	</Note>
 </section>
 
