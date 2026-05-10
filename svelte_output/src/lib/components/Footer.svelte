@@ -44,7 +44,7 @@
 			<span class="dot-sep">·</span>
 			<span>2026 Seoul Big-Data · 시각화 부문</span>
 			<span class="dot-sep">·</span>
-			<span>분(分)의 격차</span>
+			<span>절반의 서울</span>
 		</div>
 	</div>
 </footer>

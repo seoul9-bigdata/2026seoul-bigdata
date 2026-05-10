@@ -136,18 +136,18 @@
 	/** 4종 보행 유형 — introduce_ver2.html 동일 (출처 한음 외 2020) */
 	const SPEEDS = [
 		{ label: '일반인',           mps: 1.28, color: '#4a9eff', emoji: '🚶', score: 100, note: '기준선' },
-		{ label: '일반 노인',        mps: 1.12, color: '#1D9E75', emoji: '🧓', score: 77,  note: '평균' },
+		{ label: '건강 노인',        mps: 1.12, color: '#3ecfa0', emoji: '🧓', score: 77,  note: '평균' },
 		{ label: '보행보조 노인',    mps: 0.88, color: '#f5b740', emoji: '🦯', score: 47,  note: '−53%' },
 		{ label: '보행보조 하위 15%', mps: 0.70, color: '#ef5555', emoji: '🦽', score: 30, note: '−70%' }
 	];
 
-	/** 5축 분석 프레임 — 인트로에서 도메인 페이지 5개를 짧게 미리보기 */
+	/** 1+4축 분석 프레임 — 인트로에서 도메인 페이지 5개를 짧게 미리보기 */
 	const FRAMES = [
 		{ slug: 'transit',  no: '01', emoji: '🚇', title: '교통·이동',     desc: '환승 대기·정류장·OD 흐름. 노인 교통카드 trip 505K 분석.' },
-		{ slug: 'climate',  no: '02', emoji: '🌡️', title: '기후 재난',     desc: '폭염·한파쉼터 100m 내 정류장·시설 연계율 진단.' },
+		{ slug: 'climate',  no: '02', emoji: '🌡️', title: '기후 재난',     desc: '폭염쉼터·한파쉼터·결빙위험구역 내 정류장·시설 연계율 살펴봅니다.' },
 		{ slug: 'infra',    no: '03', emoji: '🏪', title: '생활 인프라',   desc: '시장·마트·약국 등 생활 기점 도달가능 점수.' },
-		{ slug: 'bokji',    no: '04', emoji: '🏛️', title: '복지·녹지',     desc: '경로당·노인복지관·공원 분포와 보행 도달성.' },
-		{ slug: 'medical',  no: '05', emoji: '🏥', title: '의료 접근성',   desc: '1차 진료기관·약국·보건소 30분 도달 반경.' }
+		{ slug: 'bokji',    no: '04', emoji: '🏛️', title: '복지/녹지',     desc: '경로당·노인복지관·공원 분포와 보행 도달성.' },
+		{ slug: 'medical',  no: '05', emoji: '🏥', title: '의료 접근성',   desc: '병의원·약국 접근성을 30분 도보권 기준으로 살펴봅니다.' }
 	];
 
 	/* ── 2040 그래프용: 25구 정렬 (높은 순) ── */
@@ -206,16 +206,17 @@
 		<p class="kicker mb-4" style:color="var(--color-coral)">서론 · 시각화 배경</p>
 
 		<h1
-			class="mb-4 font-serif text-[34px] font-light leading-[1.2] sm:text-[44px]"
+			class="mb-4 text-[34px] leading-[1.2] sm:text-[44px]"
 			style:color="var(--color-text)"
+			style:font-family="var(--font-display)"
 		>
 			노인의 걸음으로<br />
 			<span style:color="var(--color-accent)">좁아진 서울</span>
 		</h1>
 
 		<p class="mb-6 max-w-[640px] text-[13.5px] leading-[1.85]" style:color="var(--color-text2)">
-			일반인이 30분이면 닿는 병원이, 마트가, 지하철역이 — 노인에게는 닿지 않는다.<br />
-			서울 25개 자치구, 5개 분야 시설의 도보 접근성을 노인 보행속도 기준으로 진단한다.
+			일반인이 30분이면 닿는 병원이, 마트가, 지하철역이 — 노인에게는 닿지 않습니다.<br />
+			서울 25개 자치구, 1+4축 5개 분야 시설의 도보 접근성을 노인 보행속도 기준으로 살펴봅니다.
 		</p>
 
 		<StatGrid class="sm:grid-cols-3" cols={3}>
@@ -242,7 +243,7 @@
 		<div class="mb-3 flex flex-wrap items-end justify-between gap-3">
 			<div>
 				<h2
-					class="mb-1.5 font-serif text-[22px] font-medium leading-[1.3]"
+					class="mb-1.5 font-sans text-[22px] font-medium leading-[1.3]"
 					style:color="var(--color-text)"
 				>
 					서울, 이미 고령사회 — 2040년 초고령사회 진입
@@ -331,12 +332,12 @@
 
 	<!-- ── SECTION 2: 4개 보행 유형 ── -->
 	<Card title="분석 기준 · 4개 보행 속도 유형" class="mb-3.5">
-		<h2 class="mb-1.5 font-serif text-[22px] font-medium leading-[1.3]" style:color="var(--color-text)">
+		<h2 class="mb-1.5 font-sans text-[22px] font-medium leading-[1.3]" style:color="var(--color-text)">
 			같은 30분, 4개의 다른 세상
 		</h2>
 		<p class="mb-4 text-[12.5px] leading-[1.7]" style:color="var(--color-text2)">
-			노인의 보행속도는 단일하지 않다. 보행보조기를 쓰는 하위 15% 노인은 일반인 대비 도달 노드 수가 70% 가까이 줄어든다.
-			네 가지 속도 기준으로 같은 지도 위 다른 반경을 측정한다.
+			노인의 보행속도는 단일하지 않습니다. 보행보조기를 쓰는 하위 15% 노인은 일반인 대비 도달 노드 수가 70% 가까이 줄어듭니다.
+			네 가지 속도 기준으로 같은 지도 위 다른 반경을 측정합니다.
 		</p>
 
 		<div class="overflow-x-auto rounded-[8px]" style:background="var(--color-card-soft)">
@@ -416,20 +417,20 @@
 			<div class="rounded-[8px] p-4" style:background="var(--color-card-soft)">
 				<div class="kicker mb-2">데이터의 부재</div>
 				<p class="text-[12.5px] leading-[1.7]" style:color="var(--color-text2)">
-					기존 생활권 분석은 단일 보행속도와 직선거리에 의존한다. 본 분석은 OSM 보행 네트워크 + 4단계 속도 + Tobler 경사 보정으로 <strong style:color="var(--color-text)">실측 도달가능성</strong>을 정량화한다.
+					기존 생활권 분석은 단일 보행속도와 직선거리에 의존합니다. 본 분석은 OSM 보행 네트워크 + 4단계 속도 + Tobler 경사 보정으로 <strong style:color="var(--color-text)">실측 도달가능성</strong>을 정량화합니다.
 				</p>
 			</div>
 		</div>
 	</Card>
 
 	<!-- ── SECTION 4: 5축 분석 프레임 ── -->
-	<Card title="분석 프레임 · 5축 도메인" class="mb-3.5">
-		<h2 class="mb-1.5 font-serif text-[22px] font-medium leading-[1.3]" style:color="var(--color-text)">
-			5개 축으로 다시 측정하는 서울
+	<Card title="분석 프레임 · 1+4축 도메인" class="mb-3.5">
+		<h2 class="mb-1.5 font-sans text-[22px] font-medium leading-[1.3]" style:color="var(--color-text)">
+			1+4축으로 다시 측정하는 서울
 		</h2>
 		<p class="mb-4 text-[12.5px] leading-[1.7]" style:color="var(--color-text2)">
-			교통·기후·인프라·복지·의료 5개 도메인에서 같은 보행속도 기준으로 측정한다.
-			각 축의 점수와 25구 분포가 결합되어 결론 페이지의 종합 진단을 구성한다.
+			교통·기후·인프라·복지/녹지·의료 1+4축 5개 도메인에서 같은 보행속도 기준으로 측정합니다.
+			각 축의 점수와 25구 분포가 결합되어 결론 페이지의 종합 분석을 구성합니다.
 		</p>
 
 		<div class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5">

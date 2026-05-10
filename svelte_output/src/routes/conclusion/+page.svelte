@@ -31,7 +31,7 @@
 
 	/** 보행자 유형 (CSV 컬럼 prefix) — '일반인'은 CSV 없음 (기준선=100) */
 	const SPEEDS = [
-		{ key: '노인',     label: '일반 노인',     mps: 1.12, emoji: '🧓' },
+		{ key: '노인',     label: '건강 노인',     mps: 1.12, emoji: '🧓' },
 		{ key: '보조',     label: '보행보조 노인', mps: 0.88, emoji: '🦯' },
 		{ key: '하위15',   label: '보조 하위15%',  mps: 0.7,  emoji: '🦽' }
 	];
@@ -115,7 +115,7 @@
 	/* ── 보행속도별 손실 비교 — 4 도메인 CSV 실데이터 평균 ── */
 	const speedComparison = [
 		{ label: '일반인',           score: 100,        color: '#4a9eff', emoji: '🚶', desc: '기준선' },
-		{ label: '일반 노인',        score: seniorAvg,  color: '#1D9E75', emoji: '🧓', desc: pctVsBaseline(seniorAvg) + '%' },
+		{ label: '건강 노인',        score: seniorAvg,  color: '#3ecfa0', emoji: '🧓', desc: pctVsBaseline(seniorAvg) + '%' },
 		{ label: '보행보조 노인',    score: aidedAvg,   color: '#f5b740', emoji: '🦯', desc: pctVsBaseline(aidedAvg) + '%' },
 		{ label: '보행보조 하위 15%', score: bottom15Avg, color: '#ef5555', emoji: '🦽', desc: pctVsBaseline(bottom15Avg) + '%' }
 	];
@@ -332,20 +332,21 @@
 		</div>
 
 		<h1
-			class="mb-4 font-serif text-[34px] font-light leading-[1.2] sm:text-[44px]"
+			class="mb-4 text-[34px] leading-[1.2] sm:text-[44px]"
 			style:color="var(--color-text)"
+			style:font-family="var(--font-display)"
 		>
 			서울 25개 구,<br />
 			<span style:color="var(--color-accent)">노인 도보 생활권</span> 종합 성적표
 		</h1>
 
 		<p class="mb-7 max-w-[640px] text-[13.5px] leading-[1.85]" style:color="var(--color-text2)">
-			기후·인프라·복지·의료 4개 도메인 도달가능 점수를 결합한 25개 자치구 종합 진단.<br />
-			일반 노인(1.12&nbsp;m/s) 기준, 경사 미보정 점수.
+			기후·인프라·복지/녹지·의료 4개 도메인 도달가능 점수를 결합한 25개 자치구 종합 진단.<br />
+			건강 노인(1.12&nbsp;m/s) 기준, 경사 미보정 점수.
 		</p>
 
 		<StatGrid class="sm:grid-cols-4" cols={4}>
-			<StatCard label="분석 도메인" sub="기후·인프라·복지·의료">
+			<StatCard label="분석 도메인" sub="기후·인프라·복지/녹지·의료">
 				{#snippet children()}
 					<CountUp value={4} suffix="개" />
 				{/snippet}
@@ -363,7 +364,7 @@
 	<!-- ── 보행 속도별 손실 비교 ── -->
 	<Card title="속도별 손실 · 일반인 대비 평균 도달가능 점수" class="mb-3.5">
 		<p class="mb-4 text-[12.5px] leading-[1.7]" style:color="var(--color-text2)">
-			보행속도가 떨어질수록 시설 도달 노드가 급감한다. 본 페이지의 표·랭킹은 <strong>일반 노인 1.12&nbsp;m/s</strong>를 기준으로 한다.
+			보행속도가 떨어질수록 시설 도달 노드가 급감합니다. 본 페이지의 표·랭킹은 <strong>건강 노인 1.12&nbsp;m/s</strong>를 기준으로 합니다.
 		</p>
 		<div class="space-y-2.5">
 			{#each speedComparison as s, i}
@@ -460,8 +461,8 @@
 					</span>
 					<span class="opacity-50">·</span>
 					<span style:color="var(--color-text3)" in:fade={{ duration: 280, delay: 60 }}>
-						🟢 최고 <b style:color="#1D9E75">{best?.name}</b>
-						<b class="ml-0.5 tabular-nums" style:color="#1D9E75">
+						🟢 최고 <b style:color="#3ecfa0">{best?.name}</b>
+						<b class="ml-0.5 tabular-nums" style:color="#3ecfa0">
 							<CountUp value={best?.composite ?? 0} decimals={1} duration={750} />
 						</b>
 					</span>
@@ -502,7 +503,7 @@
 				{#key selectedGuName + '|' + scoreKey}
 					<div class="flex flex-col gap-3" in:fade={{ duration: 220 }}>
 						<div>
-							<div class="font-serif text-[22px] font-medium leading-tight" style:color="var(--color-text)">
+							<div class="font-sans text-[22px] font-medium leading-tight" style:color="var(--color-text)">
 								{selectedGu.name}
 							</div>
 							<div class="mt-0.5 flex items-baseline gap-2">
@@ -614,13 +615,13 @@
 				{/each}
 			</div>
 			<Note tone="warm" class="mt-3">
-				하위 5개 구는 4개 도메인 평균이 서울 평균({seoulAvg}점)에 못 미친다. 도메인별 가장 약한 축이 어디인가에 따라 정책 우선순위가 달라진다 (아래 정책 제안 표 참고).
+				하위 5개 구는 4개 도메인 평균이 서울 평균({seoulAvg}점)에 못 미칩니다. 도메인별 가장 약한 축이 어디인가에 따라 정책 우선순위가 달라집니다 (아래 정책 제안 표 참고).
 			</Note>
 		</Card>
 	</div>
 
 	<!-- ── 25구 상세 데이터 테이블 ── -->
-	<Card title="전체 25개 구 상세 점수 · 일반 노인 1.12 m/s · 경사 미보정" class="mb-3.5">
+	<Card title="전체 25개 구 상세 점수 · 건강 노인 1.12 m/s · 경사 미보정" class="mb-3.5">
 		<div class="mb-3 flex flex-wrap items-center gap-2">
 			<span class="kicker">정렬</span>
 			{#each [
@@ -695,20 +696,20 @@
 		</div>
 
 		<p class="mt-3 text-[11px] leading-[1.7]" style:color="var(--color-text3)">
-			* 도메인 점수 = (일반 노인 도달 노드 수 / 일반인 도달 노드 수) × 100. 기준 시간 30분 고정.<br />
-			** 종합 점수 = 4개 도메인 산술 평균. 본 페이지는 경사 미보정 기준이며, 경사 보정 적용 시 강북·도봉·관악·성북 등 가파른 구는 추가 하락한다.<br />
-			*** 교통·이동 도메인은 결론 CSV가 별도 분석 단계에 있어 본 종합 점수에서 제외됨 (도메인 페이지 별도 진단).
+			* 도메인 점수 = (건강 노인 도달 노드 수 / 일반인 도달 노드 수) × 100. 기준 시간 30분 고정.<br />
+			** 종합 점수 = 4개 도메인 산술 평균. 본 페이지는 경사 미보정 기준이며, 경사 보정 적용 시 강북·도봉·관악·성북 등 가파른 구는 추가 하락합니다.<br />
+			*** 교통·이동 도메인은 결론 CSV가 별도 분석 단계에 있어 본 종합 점수에서 제외됨 (도메인 페이지에서 별도 살펴봅니다).
 		</p>
 	</Card>
 
 	<!-- ── 정책 제안 ── -->
 	<Card title="정책 제안 · 도메인별 우선 투입 자치구" class="mb-3.5">
-		<h2 class="mb-2 font-serif text-[22px] font-medium leading-[1.3]" style:color="var(--color-text)">
+		<h2 class="mb-2 font-sans text-[22px] font-medium leading-[1.3]" style:color="var(--color-text)">
 			같은 예산이면 어디부터 — 도메인별 최저 3개 구
 		</h2>
 		<p class="mb-4 text-[12.5px] leading-[1.7]" style:color="var(--color-text2)">
-			종합 점수가 평균 이상이라도 특정 도메인이 약한 구가 있다. 4개 도메인 각각의 하위 3개 구를 제시한다.
-			같은 노인 인구라도 어느 축이 무너졌는지에 따라 처방이 달라진다.
+			종합 점수가 평균 이상이라도 특정 도메인이 약한 구가 있습니다. 4개 도메인 각각의 하위 3개 구를 제시합니다.
+			같은 노인 인구라도 어느 축이 무너졌는지에 따라 처방이 달라집니다.
 		</p>
 
 		<div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -751,13 +752,13 @@
 					<div class="kicker mt-3">정책 키워드</div>
 					<p class="mt-1 text-[11.5px] leading-[1.6]" style:color="var(--color-text2)">
 						{#if p.key === 'climate'}
-							무더위·한파쉼터 추가 배치, 정류장 100m 내 쉼터 연계, 그늘막·보행쉘터 보강.
+							폭염쉼터·한파쉼터 추가 배치, 정류장 100m 내 쉼터 연계, 그늘막·보행쉘터 보강.
 						{:else if p.key === 'infra'}
 							전통시장·약국·생활편의 시설 보행 접근성 개선, 보행 네트워크 연속성 확보.
 						{:else if p.key === 'bokji'}
 							경로당·노인복지관 신설 또는 이전, 공원·녹지 보행로 정비.
 						{:else if p.key === 'medical'}
-							1차 진료기관·보건소 접근성 보완, 응급 도달 사각지대 해소 (방문 의료·셔틀).
+							병의원·약국 접근성 보완, 응급 도달 사각지대 해소 (방문 의료·셔틀).
 						{/if}
 					</p>
 				</div>
@@ -766,7 +767,7 @@
 	</Card>
 
 	<!-- ── 종합 결론 ── -->
-	<Card title="결론 · 분(分)의 격차" class="mb-3.5">
+	<Card title="결론 · 절반의 서울" class="mb-3.5">
 		<div class="grid gap-3 md:grid-cols-3">
 			<div>
 				<div class="kicker mb-1.5">발견 1 · 종합 격차</div>
@@ -775,28 +776,28 @@
 					<strong style:color="var(--color-accent)">
 						{(best.composite - worst.composite).toFixed(1)}점
 					</strong>.
-					같은 서울 안에서 4개 축 평균 도달가능성이 가시적인 차이로 갈린다.
+					같은 서울 안에서 4개 축 평균 도달가능성이 가시적인 차이로 갈립니다.
 				</p>
 			</div>
 			<div>
 				<div class="kicker mb-1.5">발견 2 · 보행보조 시 절벽</div>
 				<p class="text-[12.5px] leading-[1.75]" style:color="var(--color-text2)">
 					일반 노인 평균 77점이 보행보조 노인 기준에서는 <strong style:color="var(--color-accent)">47점</strong>으로 떨어진다.
-					기준 보행속도 0.24&nbsp;m/s 차이가 도달 노드 수의 절반을 잘라낸다.
+					기준 보행속도 0.24&nbsp;m/s 차이가 도달 노드 수의 절반을 잘라냅니다.
 				</p>
 			</div>
 			<div>
 				<div class="kicker mb-1.5">발견 3 · 도메인 비대칭</div>
 				<p class="text-[12.5px] leading-[1.75]" style:color="var(--color-text2)">
-					같은 자치구라도 도메인별 점수는 비대칭이다. 종합 점수만으로는 보이지 않는 약한 축(기후/인프라/복지/의료)이 정책의 진짜 진입점이다.
+					같은 자치구라도 도메인별 점수는 비대칭입니다. 종합 점수만으로는 보이지 않는 약한 축(기후/인프라/복지/녹지/의료)이 정책의 진짜 진입점입니다.
 				</p>
 			</div>
 		</div>
 
 		<Note tone="warm" class="mt-4">
 			<strong>다음 분석 → 경사 보정.</strong>
-			Tobler's Hiking Function 기반 경사 감쇄를 적용하면 강북·도봉·관악·성북 등 구도심 가파른 구의 실질 도달가능성은 추가로 하락한다.
-			도메인별 페이지에서 경사 보정 토글을 확인할 수 있다 (확인 필요 — 도메인 페이지 작업 진행 중).
+			Tobler's Hiking Function 기반 경사 감쇄를 적용하면 강북·도봉·관악·성북 등 구도심 가파른 구의 실질 도달가능성은 추가로 하락합니다.
+			도메인별 페이지에서 경사 보정 토글을 확인할 수 있습니다.
 		</Note>
 	</Card>
 
