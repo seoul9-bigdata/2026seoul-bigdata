@@ -16,14 +16,20 @@
 </svelte:head>
 
 <section class="climate-hero">
+	<div class="hero-glow"></div>
 	<div class="climate-hero-inner">
 		<div class="hero-text">
-			<p class="hero-kicker">KIM · 폭염·한파·빙결 취약</p>
-			<h1 class="hero-title">③ 기후 — 노인 기후안전권 분석</h1>
-			<p class="hero-sub">
-				더위쉼터 4,107개 · 한파쉼터 1,642개 · 행정동 426개 · OSM 보행 네트워크 + 다익스트라 ·
-				서울시 2025
-			</p>
+			<p class="hero-kicker">② 기후 · 김성령</p>
+			<h1 class="hero-title">
+				노인 <em>기후안전권</em> 분석
+			</h1>
+			<div class="hero-chips">
+				<span class="chip amber">☀️ 더위쉼터 4,107개</span>
+				<span class="chip blue">❄️ 한파쉼터 1,642개</span>
+				<span class="chip ice">🧊 결빙위험구역</span>
+				<span class="chip-sep">·</span>
+				<span class="chip muted">행정동 426개 · OSM 보행 네트워크 · 서울시 2025</span>
+			</div>
 		</div>
 	</div>
 </section>
@@ -44,35 +50,83 @@
 
 <style>
 	.climate-hero {
+		position: relative;
 		background: var(--color-dark);
 		color: var(--color-dark-text);
-		padding: 18px 28px;
+		padding: 22px 28px;
+		overflow: hidden;
+	}
+	.hero-glow {
+		pointer-events: none;
+		position: absolute;
+		top: -60px;
+		right: -80px;
+		width: 340px;
+		height: 340px;
+		border-radius: 50%;
+		background: radial-gradient(circle, rgba(245,183,64,0.18), transparent 65%);
 	}
 	.climate-hero-inner {
+		position: relative;
 		max-width: 1340px;
 		margin: 0 auto;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 14px;
-		flex-wrap: wrap;
 	}
 	.hero-kicker {
 		font-family: var(--font-mono);
 		font-size: 11px;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		opacity: 0.55;
-		margin-bottom: 6px;
+		color: var(--color-amber);
+		opacity: 0.85;
+		margin-bottom: 8px;
 	}
 	.hero-title {
-		font-size: 17px;
-		font-weight: 500;
-		margin-bottom: 4px;
+		font-family: var(--font-display);
+		font-size: 26px;
+		line-height: 1.2;
+		margin-bottom: 12px;
+		color: var(--color-dark-text);
 	}
-	.hero-sub {
-		font-size: 12px;
-		opacity: 0.55;
+	.hero-title em {
+		font-style: normal;
+		color: var(--color-amber);
+	}
+	.hero-chips {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+	}
+	.chip {
+		font-size: 11px;
+		padding: 3px 9px;
+		border-radius: 12px;
+		background: rgba(255,255,255,0.07);
+		color: rgba(241,239,232,0.65);
+		white-space: nowrap;
+	}
+	.chip.amber {
+		background: rgba(245,183,64,0.15);
+		color: #f5b740;
+		border: 0.5px solid rgba(245,183,64,0.3);
+	}
+	.chip.blue {
+		background: rgba(74,144,217,0.15);
+		color: #82bcf0;
+		border: 0.5px solid rgba(74,144,217,0.3);
+	}
+	.chip.ice {
+		background: rgba(0,229,255,0.1);
+		color: #7fecff;
+		border: 0.5px solid rgba(0,229,255,0.25);
+	}
+	.chip.muted {
+		background: transparent;
+		color: rgba(241,239,232,0.35);
+	}
+	.chip-sep {
+		color: rgba(241,239,232,0.25);
+		font-size: 11px;
 	}
 	.wrap {
 		max-width: 1340px;

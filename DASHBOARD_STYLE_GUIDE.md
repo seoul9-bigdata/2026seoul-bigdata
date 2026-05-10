@@ -170,3 +170,116 @@ medical:  { label: '의료',       emoji: '🏥', author: '이정태' }
 - [ ] Hero 강조 제목(한 줄) → `style:font-family="var(--font-display)"` 적용 가능
 - [ ] `font-weight: 600` + Black Han Sans 조합 → weight 제거 (900 단일이라 무의미)
 - [ ] 도메인 author 이름 → theme.js 기준 full name 사용 (위 §4 참조)
+
+---
+
+## 9. 도메인 대시보드 추가 수정 기준 (2026-05-10 업데이트)
+
+> §1–8은 메인/introduce/conclusion 기준. 아래는 각 도메인 분석 대시보드에 적용한 추가 패턴.
+
+---
+
+### 9-1. 건강 노인 색상 보정
+
+스타일 가이드 §2에서 건강 노인 = `--color-blue` (`#5aadff`)로 정의했으나,  
+**일반인(`#4a9eff`)과 시각적으로 구분이 안 됨** → 초록 계열로 변경.
+
+| 대상           | 변경 전                                                           | 변경 후                        |
+| -------------- | ----------------------------------------------------------------- | ------------------------------ |
+| 건강 노인 색상 | `#5aadff` / `#1D9E75`                                             | **`#3ecfa0`** (`--color-teal`) |
+| 적용 범위      | introduce SPEEDS, conclusion speedComparison, climate.json SPEEDS | 동일                           |
+
+`climate.json` SPEEDS 배열도 업데이트 완료 (`g1.color`).
+
+---
+
+### 9-2. 도메인 히어로 섹션 패턴 (기후 기준 → 전체 도메인 준용)
+
+기존 히어로는 다크 배경 + 작은 텍스트만 있었음. 기후 대시보드 기준으로 개선된 패턴:
+
+```svelte
+<section class="climate-hero">
+  <div class="hero-glow"></div>  <!-- 도메인 액센트 색 radial-gradient -->
+  <div class="climate-hero-inner">
+    <div class="hero-text">
+      <p class="hero-kicker">② 기후 · 김성령</p>  <!-- 번호 · 작성자 -->
+      <h1 class="hero-title">
+        노인 <em>기후안전권</em> 분석   <!-- em = 도메인 액센트 색 -->
+      </h1>
+      <div class="hero-chips">
+        <span class="chip amber">☀️ 데이터소스 N개</span>
+        <span class="chip muted">메타 정보</span>
+      </div>
+    </div>
+  </div>
+</section>
+```
+
+**히어로 구성 규칙:**
+
+| 요소      | 규칙                                                         |
+| --------- | ------------------------------------------------------------ |
+| kicker    | `② 도메인명 · 작성자명` (번호는 아래 §9-3 참조)              |
+| h1 폰트   | `font-family: var(--font-display)` (Black Han Sans)          |
+| h1 강조어 | `<em style="color: var(--color-도메인액센트)">`              |
+| 배경 glow | `radial-gradient` — 도메인 액센트색 18% opacity, 우상단 고정 |
+| data chip | 데이터 소스·규모를 색 chip으로 표시 (아래 §9-4)              |
+
+---
+
+### 9-3. 도메인 번호 체계
+
+| 도메인            | 번호 |
+| ----------------- | ---- |
+| transit (교통)    | ①    |
+| climate (기후)    | ②    |
+| infra (인프라)    | ③    |
+| bokji (복지/녹지) | ④    |
+| medical (의료)    | ⑤    |
+
+---
+
+### 9-4. 데이터 소스 Chip 패턴
+
+히어로 하단에 데이터 소스·규모를 색 chip으로 표시. 도메인 탭 색과 연동:
+
+```css
+.chip {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(241, 239, 232, 0.65);
+}
+.chip.amber {
+  background: rgba(245, 183, 64, 0.15);
+  color: #f5b740;
+  border: 0.5px solid rgba(245, 183, 64, 0.3);
+}
+.chip.blue {
+  background: rgba(74, 144, 217, 0.15);
+  color: #82bcf0;
+  border: 0.5px solid rgba(74, 144, 217, 0.3);
+}
+.chip.ice {
+  background: rgba(0, 229, 255, 0.1);
+  color: #7fecff;
+  border: 0.5px solid rgba(0, 229, 255, 0.25);
+}
+.chip.muted {
+  background: transparent;
+  color: rgba(241, 239, 232, 0.35);
+}
+.chip-sep {
+  color: rgba(241, 239, 232, 0.25);
+}
+```
+
+주요 데이터(시설 수·규모)는 색 chip, 출처·날짜 등 메타는 `.chip.muted` 처리.
+
+---
+
+### 9-6. 기타 수정 사항
+
+| 항목                   | 내용                                                         |
+| ---------------------- | ------------------------------------------------------------ |
+| Footer 프로젝트명      | `분(分)의 격차` → **`절반의 서울`**                          |
+| 결론 Card 제목         | `결론 · 분(分)의 격차` → **`결론 · 절반의 서울`**            |
+| climate.json SPEEDS g1 | label `일반 노인` → `건강 노인`, color `#185FA5` → `#3ecfa0` |
