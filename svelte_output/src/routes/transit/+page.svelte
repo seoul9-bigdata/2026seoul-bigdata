@@ -18,18 +18,24 @@
 </script>
 
 <svelte:head>
-	<title>① 교통·이동 — 노인 환승·OD·거점·횡단보도</title>
+	<title>① 교통·이동 — 노인 대중교통 동선 분석</title>
 </svelte:head>
 
 <section class="transit-hero">
+	<div class="hero-glow"></div>
 	<div class="transit-hero-inner">
 		<div class="hero-text">
-			<p class="hero-kicker">YOO · 환승·OD·거점·횡단보도</p>
-			<h1 class="hero-title">① 교통·이동 — 노인 대중교통 동선 분석</h1>
-			<p class="hero-sub">
-				버스·지하철 정류장 3,290 · 노인 환승 OD · 거점 시설 347 · 노인 보행사고 1,963 ·
-				서울시 2025
-			</p>
+			<p class="hero-kicker">① 교통·이동 · 유호준</p>
+			<h1 class="hero-title">
+				노인 대중교통 <em>동선</em> 분석
+			</h1>
+			<div class="hero-chips">
+				<span class="chip blue">🚇 정류장 3,290개</span>
+				<span class="chip blue">🛒 거점시설 347개</span>
+				<span class="chip blue">🚦 보행사고 1,963건</span>
+				<span class="chip-sep">·</span>
+				<span class="chip muted">환승 OD · 서울 열린데이터광장 · 서울시 2025</span>
+			</div>
 		</div>
 	</div>
 </section>
@@ -58,37 +64,73 @@
 
 <style>
 	.transit-hero {
+		position: relative;
 		background: var(--color-dark);
 		color: var(--color-dark-text);
-		padding: 18px 28px;
-		border-bottom: 1px solid #1a1a18;
+		padding: 22px 28px;
+		overflow: hidden;
+	}
+	.hero-glow {
+		pointer-events: none;
+		position: absolute;
+		top: -60px;
+		right: -80px;
+		width: 340px;
+		height: 340px;
+		border-radius: 50%;
+		background: radial-gradient(circle, rgba(90,173,255,0.18), transparent 65%);
 	}
 	.transit-hero-inner {
+		position: relative;
 		max-width: 1340px;
 		margin: 0 auto;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 14px;
-		flex-wrap: wrap;
 	}
 	.hero-kicker {
 		font-family: var(--font-mono);
 		font-size: 11px;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		opacity: 0.55;
-		margin-bottom: 6px;
 		color: var(--color-blue);
+		opacity: 0.85;
+		margin-bottom: 8px;
 	}
 	.hero-title {
-		font-size: 17px;
-		font-weight: 500;
-		margin-bottom: 4px;
+		font-family: var(--font-display);
+		font-size: 26px;
+		line-height: 1.2;
+		margin-bottom: 12px;
+		color: var(--color-dark-text);
 	}
-	.hero-sub {
-		font-size: 12px;
-		opacity: 0.55;
+	.hero-title em {
+		font-style: normal;
+		color: var(--color-blue);
+	}
+	.hero-chips {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+	}
+	.chip {
+		font-size: 11px;
+		padding: 3px 9px;
+		border-radius: 12px;
+		background: rgba(255,255,255,0.07);
+		color: rgba(241,239,232,0.65);
+		white-space: nowrap;
+	}
+	.chip.blue {
+		background: rgba(90,173,255,0.15);
+		color: #5aadff;
+		border: 0.5px solid rgba(90,173,255,0.3);
+	}
+	.chip.muted {
+		background: transparent;
+		color: rgba(241,239,232,0.35);
+	}
+	.chip-sep {
+		color: rgba(241,239,232,0.25);
+		font-size: 11px;
 	}
 	.wrap {
 		max-width: 1340px;
