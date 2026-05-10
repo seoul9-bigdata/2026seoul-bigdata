@@ -624,18 +624,29 @@
 </script>
 
 <svelte:head>
-	<title>생활 인프라</title>
+	<title>③ 인프라 — 노인 생활인프라 접근성 분석</title>
 </svelte:head>
 
-<section class="wrap mx-auto px-[18px] pt-[18px] pb-[60px]" style:max-width="1340px">
-	<div class="mb-4">
-		<p class="kicker mb-1.5">SHIM · 행정동 단위 · 도달 가능 점수</p>
-		<h1 class="serif-h text-[26px] font-medium" style:color="var(--color-teal)">생활 인프라</h1>
-		<p class="text-[12px]" style:color="var(--color-text3)">
-			전통시장 195개소 · 슈퍼/식료품 31,024개소 · 은행 1,579개소 · 주민센터 426개소 · 서울 428개 행정동
-		</p>
+<section class="infra-hero">
+	<div class="hero-glow"></div>
+	<div class="infra-hero-inner">
+		<div class="hero-text">
+			<p class="hero-kicker">③ 인프라 · 심재현</p>
+			<h1 class="hero-title">
+				노인 생활<em>인프라</em> 접근성
+			</h1>
+			<div class="hero-chips">
+				<span class="chip teal">🛒 전통시장 195개소</span>
+				<span class="chip teal">🏦 은행 1,579개소</span>
+				<span class="chip teal">🏛 주민센터 426개소</span>
+				<span class="chip-sep">·</span>
+				<span class="chip muted">슈퍼마켓 31,024개소 · 428개 행정동 · OSM 보행 네트워크 · 서울시 2025</span>
+			</div>
+		</div>
 	</div>
+</section>
 
+<section class="wrap mx-auto px-[18px] pt-[18px] pb-[60px]" style:max-width="1340px">
 	<div class="ctrl mb-4">
 		<div class="crow">
 			<span class="lbl">보행자 유형</span>
@@ -854,7 +865,7 @@
 	</Card>
 
 	<Note tone="cool" class="mb-4">
-		<b>방법론 (v6):</b> 보행자 유형(일반노인 1.12 / 보행보조 0.88 / 하위15% 0.70 m/s)과 시간(15·30·45분)에 따라 행정동 centroid에서 도달 가능한 시설 수를 OSM 보행그래프로 카운트. 경사보정(Tobler) 토글 시 동별 실측 ratio (tobler_ratio_LEE.csv, LEE 2026)를 유효속도에 반영하여 도달 가능 점수를 선형 보간으로 추정.
+		<b>방법론 (v6):</b> 보행자 유형(건강 노인 1.12 / 보행보조 노인 0.88 / 보행보조 하위15% 0.70 m/s)과 시간(15·30·45분)에 따라 행정동 centroid에서 도달 가능한 시설 수를 OSM 보행그래프로 카운트. 경사보정(Tobler) 토글 시 동별 실측 ratio (tobler_ratio_LEE.csv, LEE 2026)를 유효속도에 반영하여 도달 가능 점수를 선형 보간으로 추정.
 	</Note>
 </section>
 
@@ -884,7 +895,75 @@
 		color: var(--color-text);
 		font-weight: 600;
 	}
-	.serif-h { font-family: var(--font-serif); }
+	.infra-hero {
+		position: relative;
+		background: var(--color-dark);
+		color: var(--color-dark-text);
+		padding: 22px 28px;
+		overflow: hidden;
+	}
+	.hero-glow {
+		pointer-events: none;
+		position: absolute;
+		top: -60px;
+		right: -80px;
+		width: 340px;
+		height: 340px;
+		border-radius: 50%;
+		background: radial-gradient(circle, rgba(62,207,160,0.18), transparent 65%);
+	}
+	.infra-hero-inner {
+		position: relative;
+		max-width: 1340px;
+		margin: 0 auto;
+	}
+	.hero-kicker {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-teal);
+		opacity: 0.85;
+		margin-bottom: 8px;
+	}
+	.hero-title {
+		font-family: var(--font-display);
+		font-size: 26px;
+		line-height: 1.2;
+		margin-bottom: 12px;
+		color: var(--color-dark-text);
+	}
+	.hero-title em {
+		font-style: normal;
+		color: var(--color-teal);
+	}
+	.hero-chips {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+	}
+	.chip {
+		font-size: 11px;
+		padding: 3px 9px;
+		border-radius: 12px;
+		background: rgba(255,255,255,0.07);
+		color: rgba(241,239,232,0.65);
+		white-space: nowrap;
+	}
+	.chip.teal {
+		background: rgba(62,207,160,0.15);
+		color: #3ecfa0;
+		border: 0.5px solid rgba(62,207,160,0.3);
+	}
+	.chip.muted {
+		background: transparent;
+		color: rgba(241,239,232,0.35);
+	}
+	.chip-sep {
+		color: rgba(241,239,232,0.25);
+		font-size: 11px;
+	}
 	.ctrl {
 		background: var(--color-card);
 		border: 0.5px solid var(--color-border);

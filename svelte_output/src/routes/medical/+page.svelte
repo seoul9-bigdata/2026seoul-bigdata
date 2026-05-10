@@ -732,7 +732,7 @@
 	// ─── 버튼 라벨/상태 ───
 	const compareLabels = [
 		{ idx: 0, emoji: '🚶', text: '일반인', speed: '1.28 m/s' },
-		{ idx: 1, emoji: '🧓', text: '일반 노인', speed: '1.12 m/s' },
+		{ idx: 1, emoji: '🧓', text: '건강 노인', speed: '1.12 m/s' },
 		{ idx: 2, emoji: '🦽', text: '보행보조 노인', speed: '0.88 m/s' },
 		{ idx: 3, emoji: '♿', text: '보행보조 노인 하위15%', speed: '0.70 m/s' }
 	];
@@ -799,17 +799,23 @@
 </script>
 
 <svelte:head>
-	<title>의료 — 노인 보행일상권 의료 접근성 분석</title>
+	<title>⑤ 의료 — 노인 병의원·약국 접근성 분석</title>
 </svelte:head>
 
 <section class="medical-hero">
+	<div class="hero-glow"></div>
 	<div class="medical-hero-inner">
 		<div class="hero-text">
-			<p class="hero-kicker">LEE · 병의원·접근성</p>
-			<h1 class="hero-title">의료 — 노인 보행일상권 의료 접근성 분석</h1>
-			<p class="hero-sub">
-				병의원·보건소·약국 대상 · 서울 426개 행정동 · OSM 보행 네트워크 + Tobler 경사 보정 (EPSG:5179)
-			</p>
+			<p class="hero-kicker">⑤ 의료 · 이정태</p>
+			<h1 class="hero-title">
+				노인 <em>병의원·약국</em> 접근성
+			</h1>
+			<div class="hero-chips">
+				<span class="chip pink">🏥 병의원 {facilities.HOSP.length.toLocaleString()}개</span>
+				<span class="chip pink">💊 약국 {facilities.PHARM.length.toLocaleString()}개</span>
+				<span class="chip-sep">·</span>
+				<span class="chip muted">서울 426개 행정동 · OSM 보행 네트워크 · Tobler 경사보정 · 건강보험심사평가원 2025</span>
+			</div>
 		</div>
 	</div>
 </section>
@@ -1042,29 +1048,74 @@
 <style>
 	/* 히어로 */
 	.medical-hero {
+		position: relative;
 		background: var(--color-dark);
 		color: var(--color-dark-text);
-		padding: 18px 28px;
+		padding: 22px 28px;
+		overflow: hidden;
+	}
+	.hero-glow {
+		pointer-events: none;
+		position: absolute;
+		top: -60px;
+		right: -80px;
+		width: 340px;
+		height: 340px;
+		border-radius: 50%;
+		background: radial-gradient(circle, rgba(244,114,182,0.18), transparent 65%);
 	}
 	.medical-hero-inner {
+		position: relative;
 		max-width: 1340px;
 		margin: 0 auto;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 14px;
-		flex-wrap: wrap;
 	}
 	.hero-kicker {
 		font-family: var(--font-mono);
 		font-size: 11px;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		opacity: 0.55;
-		margin-bottom: 6px;
+		color: var(--color-pink);
+		opacity: 0.85;
+		margin-bottom: 8px;
 	}
-	.hero-title { font-size: 17px; font-weight: 500; margin-bottom: 4px; }
-	.hero-sub { font-size: 12px; opacity: 0.55; }
+	.hero-title {
+		font-family: var(--font-display);
+		font-size: 26px;
+		line-height: 1.2;
+		margin-bottom: 12px;
+		color: var(--color-dark-text);
+	}
+	.hero-title em {
+		font-style: normal;
+		color: var(--color-pink);
+	}
+	.hero-chips {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+	}
+	.chip {
+		font-size: 11px;
+		padding: 3px 9px;
+		border-radius: 12px;
+		background: rgba(255,255,255,0.07);
+		color: rgba(241,239,232,0.65);
+		white-space: nowrap;
+	}
+	.chip.pink {
+		background: rgba(244,114,182,0.15);
+		color: #f472b6;
+		border: 0.5px solid rgba(244,114,182,0.3);
+	}
+	.chip.muted {
+		background: transparent;
+		color: rgba(241,239,232,0.35);
+	}
+	.chip-sep {
+		color: rgba(241,239,232,0.25);
+		font-size: 11px;
+	}
 
 	/* 통계 카드 그리드 */
 	.sgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
