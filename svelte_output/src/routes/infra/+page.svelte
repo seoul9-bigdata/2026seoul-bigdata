@@ -81,6 +81,27 @@
 	const effSpeedDisplay = $derived((currentW.speed * ratio).toFixed(2));
 	const score = $derived(wReach ? calcScore(wReach.loss, cD) : null);
 
+	const guReach = $derived.by(() => {
+		if (cUnit !== 'gu') return null;
+		const gc = guCenter(cG);
+		if (!gc) return null;
+		const w = WS[cW];
+		const r = w.speed * cT * 60;
+		const mkt    = MKT.filter((m) => m.lat && hav(gc.lat, gc.lng, m.lat, m.lng) <= r).length;
+		const sup    = SUP.filter((s) => s.lat && hav(gc.lat, gc.lng, s.lat, s.lng) <= r).length;
+		const center = CENTERS.filter((c) => c.lat && hav(gc.lat, gc.lng, c.lat, c.lng) <= r).length;
+		const bank   = SEOUL_BANKS.filter((b) => b.lat && hav(gc.lat, gc.lng, b.lat, b.lng) <= r).length;
+		const tot = mkt + sup + center + bank;
+		const rGen = (WS.find((w) => w.id === 'general')?.speed ?? 1.28) * cT * 60;
+		const genTot = MKT.filter((m) => m.lat && hav(gc.lat, gc.lng, m.lat, m.lng) <= rGen).length
+			+ SUP.filter((s) => s.lat && hav(gc.lat, gc.lng, s.lat, s.lng) <= rGen).length
+			+ CENTERS.filter((c) => c.lat && hav(gc.lat, gc.lng, c.lat, c.lng) <= rGen).length
+			+ SEOUL_BANKS.filter((b) => b.lat && hav(gc.lat, gc.lng, b.lat, b.lng) <= rGen).length;
+		const isGeneral = WS[cW].id === 'general';
+		const sc = isGeneral ? 100 : (genTot > 0 ? Math.round(Math.max(0, (tot / genTot) * 100) * 10) / 10 : null);
+		return { mkt, sup, center, bank, tot, score: sc };
+	});
+
 	function scoreBarStyle(sc) {
 		if (sc == null) return 'display:none';
 		const col = sc >= 70 ? '#0f6e56' : sc >= 45 ? '#854f0b' : '#9B1C1C';
@@ -222,16 +243,28 @@
 
 		radLyr.clearLayers();
 		if (cMark) { map.removeLayer(cMark); cMark = null; }
-		const d = ALL_DONG_DATA[cD];
-		if (!d || !d.lat) return;
-		cMark = L.circleMarker([d.lat, d.lng], {
-			radius: 10, fillColor: '#2c2c2a', color: '#fff', weight: 2.5, fillOpacity: 1
-		}).bindPopup('<b>' + d.dong + '</b><br>65세+ ' + d.elder.toLocaleString() + '명').addTo(map);
 
 		const w = WS[cW];
+		let origin;
+
+		if (untrack(() => cUnit) === 'gu') {
+			const gc = guCenter(untrack(() => cG));
+			if (!gc) return;
+			origin = gc;
+			cMark = L.circleMarker([gc.lat, gc.lng], {
+				radius: 10, fillColor: '#2c2c2a', color: '#fff', weight: 2.5, fillOpacity: 1
+			}).bindPopup('<b>' + untrack(() => cG) + '</b><br>구 중심점').addTo(map);
+		} else {
+			const d = ALL_DONG_DATA[cD];
+			if (!d || !d.lat) return;
+			cMark = L.circleMarker([d.lat, d.lng], {
+				radius: 10, fillColor: '#2c2c2a', color: '#fff', weight: 2.5, fillOpacity: 1
+			}).bindPopup('<b>' + d.dong + '</b><br>65세+ ' + d.elder.toLocaleString() + '명').addTo(map);
+			const cp = untrack(() => clickPoint);
+			origin = cp ?? { lat: d.lat, lng: d.lng };
+		}
+
 		const r = w.speed * (cSlope ? getToblerRatio(cD) : 1.0) * cT * 60;
-		const cp = untrack(() => clickPoint);
-		const origin = cp ?? { lat: d.lat, lng: d.lng };
 		map.fitBounds(L.latLng(origin.lat, origin.lng).toBounds(r * 2), { padding: [30, 30], animate: true });
 		L.circle([origin.lat, origin.lng], {
 			radius: r, color: w.color, weight: 1.2, dashArray: '5,5',
@@ -319,7 +352,7 @@
 	});
 
 	$effect(() => {
-		cLayer; cD; cW; cT; cSlope;
+		cLayer; cD; cW; cT; cSlope; cUnit; cG;
 		if (map) updateMap();
 	});
 
@@ -482,10 +515,6 @@
 		ctx.fillStyle = '#2c2c2a';
 		ctx.textAlign = 'center';
 		ctx.fillText(srcLabel, cx, cy - 13);
-		ctx.font = 'bold 10px sans-serif';
-		ctx.fillStyle = w.color;
-		ctx.textAlign = 'center';
-		ctx.fillText(w.label + ' ' + Math.round(r_avg).toLocaleString() + 'm', cx, 12);
 	}
 
 	$effect(() => {
@@ -603,12 +632,45 @@
 		else { sortKey = k; sortDir = (k === 'dong' || k === 'gu') ? 'asc' : 'desc'; }
 	}
 
+	const guRankRows = $derived.by(() => {
+		const w = WS[cW];
+		/** @type {Record<string, {scores: number[], elder: number, dongCount: number}>} */
+		const byGu = {};
+		for (const [k, v] of Object.entries(DONG_REACH)) {
+			const gu = /** @type {any} */ (v)['구'];
+			if (!byGu[gu]) byGu[gu] = { scores: [], elder: 0, dongCount: 0 };
+			const wd = /** @type {any} */ (v)[w.id]?.[String(cT)] || {};
+			const genTot = /** @type {any} */ (v['general'])?.[String(cT)]?.tot ?? 0;
+			const loss = wd.loss != null ? wd.loss : (genTot > 0 ? Math.max(0, (1 - (wd.tot || 0) / genTot) * 100) : null);
+			const sc = calcScore(loss, k);
+			if (sc != null) byGu[gu].scores.push(sc);
+			byGu[gu].elder += (/** @type {any} */ (v)['elder'] || 0);
+			byGu[gu].dongCount++;
+		}
+		return Object.entries(byGu)
+			.map(([gu, d]) => ({
+				gu,
+				score: d.scores.length ? parseFloat((d.scores.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0) / d.scores.length).toFixed(1)) : null,
+				elder: d.elder,
+				dongCount: d.dongCount
+			}))
+			.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+	});
+
 	function panToRow(r) {
 		if (!map || !L) return;
 		const d = ALL_DONG_DATA[r.key];
 		if (!d || !d.lat) return;
 		cD = r.key;
 		map.setView([d.lat, d.lng], 14, { animate: true });
+	}
+
+	function guCenter(/** @type {string} */ gu) {
+		const dongs = Object.values(ALL_DONG_DATA).filter((d) => /** @type {any} */ (d).gu === gu && d.lat && d.lng);
+		if (!dongs.length) return null;
+		const lat = dongs.reduce((s, d) => s + d.lat, 0) / dongs.length;
+		const lng = dongs.reduce((s, d) => s + d.lng, 0) / dongs.length;
+		return { lat, lng };
 	}
 
 	const bankPeak = $derived.by(() => {
@@ -702,28 +764,53 @@
 
 		<div class="mt-3">
 			<StatGrid cols={4}>
-				<StatCard
-					label="도달 가능 지점 (클릭 지점)"
-					value={clickReach ? clickReach.tot + '개소 (' + (clickReach.score != null ? clickReach.score + '점)' : '—)') : '—'}
-					sub={clickReach ? '시장 ' + clickReach.mkt + ' · 슈퍼 ' + clickReach.sup + ' · 은행 ' + clickReach.bank + ' · 센터 ' + clickReach.center : '—'}
-				/>
-				<StatCard
-					label="도달 가능 지점 (동 중심점)"
-					value={wReach ? (wReach.tot ?? 0) + '개소' : '—'}
-					sub={'시장 ' + (wReach?.mkt ?? 0) + ' · 슈퍼 ' + (wReach?.sup ?? 0) + ' · 은행 ' + (wReach?.bank ?? 0) + ' · 센터 ' + (wReach?.center ?? 0)}
-				/>
-				<StatCard
-					label="도달 가능 점수"
-					value={score != null ? score + '점' : '—'}
-					sub={cSlope ? '경사 보정 반영' : '일반인 대비 도달가능 비율'}
-					tone="green"
-				/>
-				<StatCard
-					label="65세+ 인구"
-					value={(currentDong ? currentDong.elder.toLocaleString() : '-') + '명'}
-					sub={cG + ' 주민센터 ' + (CENTER_BY_GU[cG] || 0) + '개소'}
-					tone="blue"
-				/>
+				{#if cUnit === 'gu'}
+					<StatCard
+						label="도달 가능 지점 (클릭 지점)"
+						value={clickReach ? clickReach.tot + '개소' + (cW !== 0 && clickReach.score != null ? ' (' + clickReach.score + '점)' : '') : '—'}
+						sub={clickReach ? '시장 ' + clickReach.mkt + ' · 슈퍼 ' + clickReach.sup + ' · 은행 ' + clickReach.bank + ' · 센터 ' + clickReach.center : '지도 클릭 시 표시'}
+					/>
+					<StatCard
+						label={'도달 가능 지점 (' + cG + ' 중심점)'}
+						value={guReach ? guReach.tot + '개소' : '—'}
+						sub={guReach ? '시장 ' + guReach.mkt + ' · 슈퍼 ' + guReach.sup + ' · 은행 ' + guReach.bank + ' · 센터 ' + guReach.center : '—'}
+					/>
+					<StatCard
+						label="도달 가능 점수"
+						value={cW === 0 ? '—' : (guReach?.score != null ? guReach.score + '점' : '—')}
+						sub={cW === 0 ? '노인 보행자 선택 시 표시' : '일반인 대비 도달가능 비율 (구 중심점)'}
+						tone="green"
+					/>
+					<StatCard
+						label="65세+ 인구"
+						value={(guRankRows.find((r) => r.gu === cG)?.elder.toLocaleString() ?? '-') + '명'}
+						sub={cG + ' 주민센터 ' + (CENTER_BY_GU[cG] || 0) + '개소'}
+						tone="blue"
+					/>
+				{:else}
+					<StatCard
+						label="도달 가능 지점 (클릭 지점)"
+						value={clickReach ? clickReach.tot + '개소' + (cW !== 0 && clickReach.score != null ? ' (' + clickReach.score + '점)' : '') : '—'}
+						sub={clickReach ? '시장 ' + clickReach.mkt + ' · 슈퍼 ' + clickReach.sup + ' · 은행 ' + clickReach.bank + ' · 센터 ' + clickReach.center : '지도 클릭 시 표시'}
+					/>
+					<StatCard
+						label="도달 가능 지점 (동 중심점)"
+						value={wReach ? (wReach.tot ?? 0) + '개소' : '—'}
+						sub={'시장 ' + (wReach?.mkt ?? 0) + ' · 슈퍼 ' + (wReach?.sup ?? 0) + ' · 은행 ' + (wReach?.bank ?? 0) + ' · 센터 ' + (wReach?.center ?? 0)}
+					/>
+					<StatCard
+						label="도달 가능 점수"
+						value={cW === 0 ? '—' : (score != null ? score + '점' : '—')}
+						sub={cW === 0 ? '노인 보행자 선택 시 표시' : (cSlope ? '경사 보정 반영' : '일반인 대비 도달가능 비율')}
+						tone="green"
+					/>
+					<StatCard
+						label="65세+ 인구"
+						value={(currentDong ? currentDong.elder.toLocaleString() : '-') + '명'}
+						sub={cG + ' 주민센터 ' + (CENTER_BY_GU[cG] || 0) + '개소'}
+						tone="blue"
+					/>
+				{/if}
 			</StatGrid>
 		</div>
 	</div>
@@ -816,44 +903,78 @@
 		</Card>
 	</div>
 
-	<Card title={'서울 행정동 생활인프라 접근성 — ' + currentW.label + ' · ' + cG + ' 행정동'} class="mb-4">
+	<Card title={cUnit === 'gu' ? '자치구별 접근가능 점수 순위 — ' + currentW.label + ' · ' + cT + '분' : '서울 행정동 생활인프라 접근성 — ' + currentW.label + ' · ' + cG + ' 행정동'} class="mb-4">
 		<div class="tbl-outer" style="position:relative">
-			<div class="tbl-wrap">
-				<table>
-					<thead>
-						<tr>
-							{#each [{ k: 'gu', label: '자치구' },{ k: 'dong', label: '행정동' },{ k: 'mkt', label: '전통시장' },{ k: 'sup', label: '슈퍼' },{ k: 'bank', label: '은행' },{ k: 'center', label: '주민센터' },{ k: 'tot', label: '합계' },{ k: 'elder', label: '65세+' },{ k: 'score', label: '도달 가능 점수' }] as col}
-								<th class="th-sort" class:active={sortKey === col.k} onclick={() => setSort(col.k)}>
-									{col.label}
-									{#if sortKey === col.k}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
-								</th>
-							{/each}
-							<th>접근성</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each tableRows as r}
-							{@const accessCls = (r.score ?? 0) >= 70 ? 'phi' : (r.score ?? 0) >= 45 ? 'pmd' : 'plo'}
-							{@const accessLabel = (r.score ?? 0) >= 70 ? '양호' : (r.score ?? 0) >= 45 ? '보통' : '미흡'}
-							<tr class:hl={r.key === cD} onclick={() => panToRow(r)}>
-								<td>{r.gu}</td>
-								<td>{r.dong}</td>
-								<td>{r.mkt}</td>
-								<td>{r.sup}</td>
-								<td>{r.bank}</td>
-								<td>{r.center}</td>
-								<td>{r.tot}</td>
-								<td>{r.elder.toLocaleString()}</td>
-								<td>
-									<b class="score-val" style:color={scoreTextColor(r.score)}>{r.score != null ? r.score.toFixed(1) + '점' : 'N/A'}</b>
-									<span class="score-bar" style={scoreBarStyle(r.score)}></span>
-								</td>
-								<td><span class="pill {accessCls}">{accessLabel}</span></td>
+			{#if cUnit === 'gu'}
+				<div class="tbl-wrap">
+					<table>
+						<thead>
+							<tr>
+								<th class="rank-th">순위</th>
+								<th>자치구</th>
+								<th>행정동 수</th>
+								<th>65세+</th>
+								<th>구 접근가능 점수 (행정동 평균)</th>
+								<th>접근성</th>
 							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
+						</thead>
+						<tbody>
+							{#each guRankRows as r, i}
+								{@const accessCls = (r.score ?? 0) >= 70 ? 'phi' : (r.score ?? 0) >= 45 ? 'pmd' : 'plo'}
+								{@const accessLabel = (r.score ?? 0) >= 70 ? '양호' : (r.score ?? 0) >= 45 ? '보통' : '미흡'}
+								<tr class:hl={r.gu === cG} onclick={() => (cG = r.gu)}>
+									<td class="rank-num" style:color={i === 0 ? 'var(--color-teal)' : i < 3 ? 'var(--color-text2)' : undefined}>{i + 1}</td>
+									<td style="font-weight:500">{r.gu}</td>
+									<td>{r.dongCount}</td>
+									<td>{r.elder.toLocaleString()}</td>
+									<td>
+										<b class="score-val" style:color={scoreTextColor(r.score)}>{r.score != null ? r.score.toFixed(1) + '점' : 'N/A'}</b>
+										<span class="score-bar" style={scoreBarStyle(r.score)}></span>
+									</td>
+									<td><span class="pill {accessCls}">{accessLabel}</span></td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{:else}
+				<div class="tbl-wrap">
+					<table>
+						<thead>
+							<tr>
+								{#each [{ k: 'gu', label: '자치구' },{ k: 'dong', label: '행정동' },{ k: 'mkt', label: '전통시장' },{ k: 'sup', label: '슈퍼' },{ k: 'bank', label: '은행' },{ k: 'center', label: '주민센터' },{ k: 'tot', label: '합계' },{ k: 'elder', label: '65세+' },{ k: 'score', label: '도달 가능 점수' }] as col}
+									<th class="th-sort" class:active={sortKey === col.k} onclick={() => setSort(col.k)}>
+										{col.label}
+										{#if sortKey === col.k}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+									</th>
+								{/each}
+								<th>접근성</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each tableRows as r}
+								{@const accessCls = (r.score ?? 0) >= 70 ? 'phi' : (r.score ?? 0) >= 45 ? 'pmd' : 'plo'}
+								{@const accessLabel = (r.score ?? 0) >= 70 ? '양호' : (r.score ?? 0) >= 45 ? '보통' : '미흡'}
+								<tr class:hl={r.key === cD} onclick={() => panToRow(r)}>
+									<td>{r.gu}</td>
+									<td>{r.dong}</td>
+									<td>{r.mkt}</td>
+									<td>{r.sup}</td>
+									<td>{r.bank}</td>
+									<td>{r.center}</td>
+									<td>{r.tot}</td>
+									<td>{r.elder.toLocaleString()}</td>
+									<td>
+										<b class="score-val" style:color={scoreTextColor(r.score)}>{r.score != null ? r.score.toFixed(1) + '점' : 'N/A'}</b>
+										<span class="score-bar" style={scoreBarStyle(r.score)}></span>
+									</td>
+									<td><span class="pill {accessCls}">{accessLabel}</span></td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
 			{#if cW === 0}
 				<div class="tbl-overlay">
 					<div style="font-size:28px">📋</div>
@@ -1060,6 +1181,9 @@
 		border-radius: 8px;
 		padding: 8px 14px;
 	}
+
+	.rank-th { width: 36px; text-align: center; }
+	.rank-num { text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--color-text3); font-weight: 600; }
 
 	.score-val { display: inline-block; min-width: 46px; font-family: var(--font-mono); font-size: 11px; }
 	.score-bar { display: inline-block; height: 8px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
