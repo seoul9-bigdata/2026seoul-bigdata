@@ -24,7 +24,7 @@ export const DOMAIN_THEME = {
 		key: 'climate',
 		label: '기후',
 		emoji: '🌡️',
-		author: '김',
+		author: '김성령',
 		color: '#f5b740',
 		accent: 'var(--color-amber)',
 		light: 'rgba(245,183,64,0.10)',
@@ -34,7 +34,7 @@ export const DOMAIN_THEME = {
 		key: 'infra',
 		label: '인프라',
 		emoji: '🏪',
-		author: '심',
+		author: '심재현',
 		color: '#3ecfa0',
 		accent: 'var(--color-teal)',
 		light: 'rgba(62,207,160,0.10)',
@@ -42,9 +42,9 @@ export const DOMAIN_THEME = {
 	},
 	bokji: {
 		key: 'bokji',
-		label: '복지',
-		emoji: '🏛️',
-		author: '양',
+		label: '복지/녹지',
+		emoji: '🌳',
+		author: '양석준',
 		color: '#b48ef4',
 		accent: 'var(--color-purple)',
 		light: 'rgba(180,142,244,0.10)',
@@ -54,7 +54,7 @@ export const DOMAIN_THEME = {
 		key: 'medical',
 		label: '의료',
 		emoji: '🏥',
-		author: '이',
+		author: '이정태',
 		color: '#f472b6',
 		accent: 'var(--color-pink)',
 		light: 'rgba(244,114,182,0.10)',
@@ -130,7 +130,7 @@ export const COMPARE_COLORS = {
 
 /** Chart.js 공통 theme */
 export const CHART_THEME = {
-	fontFamily: "'Noto Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif",
+	fontFamily: "'Gothic A1', 'Apple SD Gothic Neo', system-ui, sans-serif",
 	textColor: '#2c2c2a',
 	textColorMuted: '#888780',
 	borderColor: 'rgba(0,0,0,0.06)',

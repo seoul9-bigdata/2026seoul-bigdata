@@ -32,10 +32,10 @@ export const ROUTES = [
 		desc: '왜 노인 도보 생활권인가 — 2040 인구 변화 + 문제 정의'
 	},
 	domainRoute('transit', 'transit', '환승·정류장·OD 흐름 — 노인 카드 trip 505K 분석'),
-	domainRoute('climate', 'climate', '폭염·한파·결빙 — 도보 30분 내 쉼터 도달성'),
+	domainRoute('climate', 'climate', '폭염·한파·결빙위험구역 — 도보 30분 내 쉼터 도달성'),
 	domainRoute('infra', 'infra', '시장·마트·은행·주민센터 도달가능 점수'),
 	domainRoute('bokji', 'bokji', '경로당·노인복지관·공원 분포와 보행 도달성'),
-	domainRoute('medical', 'medical', '1차 진료·약국·응급 30분 도달 반경'),
+	domainRoute('medical', 'medical', '병의원·약국 접근성 — 1차 진료 도달 반경'),
 	{
 		slug: 'conclusion',
 		label: '결론',
