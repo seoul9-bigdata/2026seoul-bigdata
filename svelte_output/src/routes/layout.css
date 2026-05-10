@@ -2,9 +2,10 @@
 
 @theme {
 	/* ── 폰트 (KIM dashboard 톤) ── */
-	--font-sans: 'Noto Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+	--font-sans: 'Gothic A1', 'Apple SD Gothic Neo', system-ui, sans-serif;
 	--font-serif: 'Noto Serif KR', serif;
 	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+	--font-display: 'Black Han Sans', sans-serif;
 
 	/* ── 라이트 베이스 (KIM) ── */
 	--color-bg: #f5f4f0;

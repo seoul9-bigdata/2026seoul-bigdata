@@ -692,17 +692,29 @@
 	);
 </script>
 
-<section class="wrap mx-auto px-[18px] pt-[18px] pb-[52px]" style:max-width="1320px">
-	<!-- 페이지 타이틀 -->
-	<div class="mb-4">
-		<p class="kicker mb-1.5">{meta.kicker}</p>
-		<h1 class="serif-h text-[26px] font-medium" style:color={meta.accent}>{meta.title}</h1>
-		<p class="text-[12px]" style:color="var(--color-text3)">
-			OSM 보행 네트워크 기반 · 노인여가복지시설 {WELFARE.length}개소 + 공원 {PARK.length}개소 · 30분 기준 ·
-			Tobler 경사 보정
-		</p>
-	</div>
+<svelte:head>
+	<title>④ 복지/녹지 — 노인 복지·녹지 접근성 분석</title>
+</svelte:head>
 
+<section class="bokji-hero">
+	<div class="hero-glow"></div>
+	<div class="bokji-hero-inner">
+		<div class="hero-text">
+			<p class="hero-kicker">④ 복지/녹지 · 양석준</p>
+			<h1 class="hero-title">
+				노인 복지·<em>녹지</em> 접근성
+			</h1>
+			<div class="hero-chips">
+				<span class="chip purple">🏛 복지시설 {WELFARE.length}개소</span>
+				<span class="chip purple">🌳 공원 {PARK.length}개소</span>
+				<span class="chip-sep">·</span>
+				<span class="chip muted">428개 행정동 · OSM 보행 네트워크 · Tobler 경사보정 · 서울시 2025</span>
+			</div>
+		</div>
+	</div>
+</section>
+
+<section class="wrap mx-auto px-[18px] pt-[18px] pb-[52px]" style:max-width="1320px">
 	<!-- ── 컨트롤 패널 ── -->
 	<div class="ctrl">
 		<div class="crow">
@@ -1186,8 +1198,74 @@
 		background: #ebebeb;
 		color: #666;
 	}
-	.serif-h {
-		font-family: var(--font-serif);
+	.bokji-hero {
+		position: relative;
+		background: var(--color-dark);
+		color: var(--color-dark-text);
+		padding: 22px 28px;
+		overflow: hidden;
+	}
+	.hero-glow {
+		pointer-events: none;
+		position: absolute;
+		top: -60px;
+		right: -80px;
+		width: 340px;
+		height: 340px;
+		border-radius: 50%;
+		background: radial-gradient(circle, rgba(180,142,244,0.18), transparent 65%);
+	}
+	.bokji-hero-inner {
+		position: relative;
+		max-width: 1320px;
+		margin: 0 auto;
+	}
+	.hero-kicker {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-purple);
+		opacity: 0.85;
+		margin-bottom: 8px;
+	}
+	.hero-title {
+		font-family: var(--font-display);
+		font-size: 26px;
+		line-height: 1.2;
+		margin-bottom: 12px;
+		color: var(--color-dark-text);
+	}
+	.hero-title em {
+		font-style: normal;
+		color: var(--color-purple);
+	}
+	.hero-chips {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+	}
+	.chip {
+		font-size: 11px;
+		padding: 3px 9px;
+		border-radius: 12px;
+		background: rgba(255,255,255,0.07);
+		color: rgba(241,239,232,0.65);
+		white-space: nowrap;
+	}
+	.chip.purple {
+		background: rgba(180,142,244,0.15);
+		color: #b48ef4;
+		border: 0.5px solid rgba(180,142,244,0.3);
+	}
+	.chip.muted {
+		background: transparent;
+		color: rgba(241,239,232,0.35);
+	}
+	.chip-sep {
+		color: rgba(241,239,232,0.25);
+		font-size: 11px;
 	}
 	@media (max-width: 900px) {
 		.r2,

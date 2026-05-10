@@ -7,7 +7,7 @@
 
 	let { active = false } = $props();
 
-	let curBuf = $state(100);
+	let curBuf = $state(200);
 	let iceOn = $state({ icing: true, cov: true, boxes: true });
 
 	let mapEl = $state();
@@ -43,8 +43,8 @@
 
 	const cards = $derived.by(() => {
 		const km2 = curBuf === 100 ? ICING_S.icing_100_km2 : ICING_S.icing_200_km2;
-		const pct = curBuf === 100 ? ICING_S.icing_100_pct : ICING_S.icing_200_pct;
-		const cov = +(ICING_S.clean_km2 - km2).toFixed(1);
+		const pct = +(km2 / ICING_S.base_km2 * 100).toFixed(1);
+		const cov = +(ICING_S.base_km2 - km2).toFixed(1);
 		const cpct = (100 - pct).toFixed(1);
 		return { km2, pct, cov, cpct };
 	});
@@ -305,12 +305,12 @@
 				.addTo(boxesLayer);
 		});
 
-		buildLayers(100);
+		buildLayers(200);
 
 		icingChoroLayer = L.geoJSON(GU_GEO, {
 			style: (f) => {
 				const d = ICING_GU[f.properties.cd];
-				const pct = d ? d.vuln100 : null;
+				const pct = d ? d.vuln200 : null;
 				return {
 					fillColor: vulnColor(pct),
 					fillOpacity: 0.38,
@@ -369,6 +369,21 @@
 	function togIce(key) {
 		iceOn = { ...iceOn, [key]: !iceOn[key] };
 	}
+
+	function vulnPillClass(pct) {
+		if (pct == null || pct < 30) return 'phi';
+		if (pct < 50) return 'pmd';
+		return 'plo';
+	}
+	function vulnPillText(pct) {
+		if (pct == null || pct < 30) return '양호';
+		if (pct < 50) return '보통';
+		return '취약';
+	}
+	function vulnBarStyle(pct) {
+		if (pct == null) return 'display:none';
+		return `background:${vulnColor(pct)};width:${Math.round((pct * 40) / 100)}px`;
+	}
 </script>
 
 <div class="ctrl">
@@ -386,14 +401,12 @@
 		<button class="btn bw" class:on={iceOn.boxes} onclick={() => togIce('boxes')}>
 			제설함 {iceOn.boxes ? 'ON' : 'OFF'}
 		</button>
-		<span style="flex:1"></span>
-		<span style="font-size:11px;color:#888780">도심 기반(행정동 − 수역·산림) = 431.9 km²</span>
 	</div>
 	<div class="sgrid">
 		<div class="sc">
-			<div class="sl">도심 기반 면적</div>
-			<div class="sv">{ICING_S.clean_km2}<span class="sv-unit"> km²</span></div>
-			<div class="ss">행정동 − 한강·산지 제외</div>
+			<div class="sl">서울 행정동 면적</div>
+			<div class="sv">{ICING_S.base_km2}<span class="sv-unit"> km²</span></div>
+			<div class="ss">서울시 행정동 전체</div>
 		</div>
 		<div class="sc">
 			<div class="sl">제설함 커버 구역</div>
@@ -432,25 +445,6 @@
 			</div>
 			<div class="chart-wrap-tall"><canvas bind:this={canvasRank}></canvas></div>
 		</div>
-		<div class="card">
-			<div class="ct">결빙 위험 서사</div>
-			<div class="ice-narr">
-				<div class="ice-hero">
-					<div class="ice-hero-num">{cards.pct}%</div>
-					<div class="ice-hero-sub">결빙 취약 비율 ({curBuf}m 제설함 반경 기준)</div>
-					<div class="ice-hero-body">도심 {cards.km2} km²가 제설함 사각지대 — 초동 제설 불가 구역</div>
-				</div>
-				<div class="ice-narr-body">
-					겨울 결빙 구역에서 낙상은 보행 속도가 느린 노인에게 치명적입니다.<br />
-					보행보조 노인은 낙상 시 골절 위험이 특히 높고 회복 기간도 더 깁니다.<br />
-					한파·폭염쉼터와 달리 결빙 위험은 <b>이동 경로 자체</b>의 문제입니다.
-				</div>
-			</div>
-			<div class="note">
-				<b>낙상 경로:</b> 제설함 없음 → 초동 제설 불가 → 결빙 지속 → 노인 낙상<br />
-				서울 연간 낙상 사고 37%가 12–2월 집중.
-			</div>
-		</div>
 	</div>
 </div>
 
@@ -463,21 +457,26 @@
 		<table class="ktbl">
 			<thead>
 				<tr>
-					<th>순위</th>
-					<th>자치구</th>
-					<th>취약 비율</th>
+					<th class="left">자치구</th>
 					<th>제설함</th>
 					<th>도로 노드</th>
+					<th>취약 비율</th>
+					<th class="center">취약도</th>
 				</tr>
 			</thead>
 			<tbody>
-				{#each rankRows as r, i (r.cd)}
+				{#each rankRows as r (r.cd)}
 					<tr>
-						<td style="color:#888780">{i + 1}</td>
-						<td style="text-align:left">{r.nm}</td>
-						<td><b style:color={vulnColor(r.pct)}>{r.pct.toFixed(1)}%</b></td>
+						<td class="left">{r.nm}</td>
 						<td>{r.jiseol}</td>
 						<td>{r.nodes.toLocaleString()}</td>
+						<td>
+							<b style:color={vulnColor(r.pct)}>{r.pct.toFixed(1)}%</b>
+							<span class="score-bar" style={vulnBarStyle(r.pct)}></span>
+						</td>
+						<td class="center">
+							<span class="pill {vulnPillClass(r.pct)}">{vulnPillText(r.pct)}</span>
+						</td>
 					</tr>
 				{/each}
 			</tbody>
@@ -641,46 +640,6 @@
 		height: 380px;
 		width: 100%;
 	}
-	.ice-narr {
-		line-height: 1.9;
-		font-size: 13px;
-		padding: 4px 0;
-	}
-	.ice-hero {
-		margin-bottom: 16px;
-		padding: 14px;
-		background: var(--color-card-soft);
-		border-radius: 8px;
-	}
-	.ice-hero-num {
-		font-size: 32px;
-		font-weight: 500;
-		color: #c0392b;
-	}
-	.ice-hero-sub {
-		font-size: 12px;
-		color: var(--color-text3);
-	}
-	.ice-hero-body {
-		font-size: 12px;
-		color: var(--color-text);
-		margin-top: 4px;
-	}
-	.ice-narr-body {
-		font-size: 12px;
-		color: var(--color-text2);
-		line-height: 2;
-	}
-	.note {
-		background: var(--color-note-warm-bg);
-		border: 0.5px solid var(--color-note-warm-border);
-		border-radius: 8px;
-		padding: 10px 14px;
-		font-size: 11px;
-		color: var(--color-note-warm-text);
-		line-height: 1.7;
-		margin-top: 10px;
-	}
 	.tbl-wrap {
 		overflow-x: auto;
 	}
@@ -691,31 +650,47 @@
 	}
 	.ktbl th {
 		background: var(--color-card-soft);
-		padding: 8px 10px;
+		padding: 8px 12px;
 		text-align: right;
 		font-weight: 500;
 		color: var(--color-text2);
 		border-bottom: 1px solid var(--color-border);
 		white-space: nowrap;
 	}
-	.ktbl th:nth-child(2) {
-		text-align: left;
-	}
+	.ktbl th.left { text-align: left; }
+	.ktbl th.center { text-align: center; }
 	.ktbl td {
-		padding: 7px 10px;
+		padding: 7px 12px;
 		border-bottom: 0.5px solid var(--color-border-soft);
 		color: var(--color-text);
 		text-align: right;
 		white-space: nowrap;
 	}
-	.ktbl td:nth-child(2) {
-		text-align: left;
-	}
+	.ktbl td.left { text-align: left; }
+	.ktbl td.center { text-align: center; }
 	.ktbl tr:last-child td {
 		border-bottom: none;
 	}
 	.ktbl tr:hover td {
 		background: #fafaf8;
+	}
+	.pill {
+		display: inline-block;
+		padding: 2px 8px;
+		border-radius: 10px;
+		font-size: 11px;
+		font-weight: 500;
+		margin-left: 4px;
+	}
+	.phi { background: #d4edda; color: #155724; }
+	.pmd { background: #fff3cd; color: #856404; }
+	.plo { background: #f8d7da; color: #721c24; }
+	.score-bar {
+		display: inline-block;
+		height: 5px;
+		border-radius: 3px;
+		vertical-align: middle;
+		margin-left: 4px;
 	}
 	@media (max-width: 900px) {
 		.r2,

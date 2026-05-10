@@ -10,8 +10,8 @@
 
 <header>
 	<a class="title-block" href="{base}/">
-		<h1>분(分)의 격차</h1>
-		<p>Seoul Elder Mobility · 노인 도보 생활권 진단</p>
+		<h1>절반의 서울</h1>
+		<p>Seoul Elder Walkability · 노인 보행일상권 진단</p>
 	</a>
 
 	<nav>
@@ -58,10 +58,9 @@
 	.title-block h1 {
 		margin: 0;
 		font-size: 18px;
-		font-weight: 600;
-		letter-spacing: 0.01em;
+		letter-spacing: 0.03em;
 		color: var(--color-dark-text);
-		font-family: var(--font-serif);
+		font-family: var(--font-display);
 	}
 	.title-block p {
 		margin: 0;

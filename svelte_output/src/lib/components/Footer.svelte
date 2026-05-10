@@ -44,14 +44,14 @@
 			<span class="dot-sep">·</span>
 			<span>2026 Seoul Big-Data · 시각화 부문</span>
 			<span class="dot-sep">·</span>
-			<span>분(分)의 격차</span>
+			<span>절반의 서울</span>
 		</div>
 	</div>
 </footer>
 
 <style>
 	footer {
-		margin-top: 60px;
+		margin-top: 12px;
 		padding: 40px 28px 48px;
 		border-top: 0.5px solid var(--color-border);
 		background: var(--color-card-soft);
@@ -181,7 +181,7 @@
 	.label {
 		font-size: 15px;
 		font-weight: 500;
-		font-family: var(--font-serif);
+		font-family: var(--font-sans);
 		color: var(--color-text);
 		overflow: hidden;
 		text-overflow: ellipsis;
