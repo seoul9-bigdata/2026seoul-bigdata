@@ -1,5 +1,6 @@
 <script>
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
+	import { loadGraph, computeIsochrone } from '$lib/util/isochrone.js';
 	import bokji from '$lib/data/bokji.json';
 	import Card from '$lib/components/Card.svelte';
 	import ChartCard from '$lib/components/ChartCard.svelte';
@@ -23,6 +24,13 @@
 	let cG = $state('종로구');        // 자치구
 	let cSlope = $state(false);
 	let cDong = $state(false);
+	let sortCol = $state('combined');
+	let sortDir = $state('desc');
+
+	function setSort(col) {
+		if (sortCol === col) sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+		else { sortCol = col; sortDir = 'desc'; }
+	}
 
 	const gus = [...new Set(DONG.map((d) => d.gu))].sort();
 
@@ -67,26 +75,18 @@
 	const stats = $derived.by(() => {
 		const gd = DONG.filter((d) => d.gu === cG);
 		const n = gd.length || 1;
-		const isNormal = cW === 0;
 		const avgW = (gd.reduce((s, d) => s + getW(d), 0) / n).toFixed(1);
 		const avgP = (gd.reduce((s, d) => s + getP(d), 0) / n).toFixed(1);
-		let avgWS = null,
-			avgPS = null;
-		if (!isNormal) {
-			const validW = gd.filter((d) => d.w[0] > 0);
-			const validP = gd.filter((d) => d.p[0] > 0);
-			avgWS = validW.length
-				? parseFloat((validW.reduce((s, d) => s + wScore(d), 0) / validW.length).toFixed(1))
-				: null;
-			avgPS = validP.length
-				? parseFloat((validP.reduce((s, d) => s + pScore(d), 0) / validP.length).toFixed(1))
-				: null;
-		}
-		return { gd, isNormal, avgW, avgP, avgWS, avgPS };
+		const validW = gd.filter((d) => d.w[0] > 0);
+		const validP = gd.filter((d) => d.p[0] > 0);
+		const avgWS = validW.length
+			? parseFloat((validW.reduce((s, d) => s + wScore(d), 0) / validW.length).toFixed(1))
+			: null;
+		const avgPS = validP.length
+			? parseFloat((validP.reduce((s, d) => s + pScore(d), 0) / validP.length).toFixed(1))
+			: null;
+		return { gd, avgW, avgP, avgWS, avgPS };
 	});
-
-	// ── 취약 동 (취약도 ≥ 0.5) ─────────────────────────────────────
-	const vulnCount = $derived(DONG.filter((d) => d.vuln >= 0.5).length);
 
 	// ── 자치구별 테이블 집계 ──────────────────────────────────────
 	const guTableRows = $derived.by(() => {
@@ -100,9 +100,6 @@
 				const wCnt = WELFARE.filter((w) => w.gu === gu).length;
 				const pCnt = PARK.filter((p) => p.gu === gu).length;
 				const pop65Dongs = dongs.filter((d) => d.pop65 > 0);
-				const avgVuln = pop65Dongs.length
-					? pop65Dongs.reduce((s, d) => s + d.vuln, 0) / pop65Dongs.length
-					: 0;
 				const validW = pop65Dongs.filter((d) => wScore(d) !== null);
 				const validP = pop65Dongs.filter((d) => pScore(d) !== null);
 				const ws = validW.length
@@ -113,11 +110,14 @@
 					: null;
 				const combined =
 					ws !== null && ps !== null ? parseFloat(((ws + ps) / 2).toFixed(1)) : ws ?? ps;
-				return { gu, wCnt, pCnt, ws, ps, combined, avgVuln };
+				return { gu, wCnt, pCnt, ws, ps, combined };
 			})
-			.sort((a, b) =>
-				cW === 0 ? b.avgVuln - a.avgVuln : (b.combined ?? -1) - (a.combined ?? -1)
-			);
+			.sort((a, b) => {
+				const av = a[sortCol] ?? -1;
+				const bv = b[sortCol] ?? -1;
+				if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+				return sortDir === 'asc' ? av - bv : bv - av;
+			});
 	});
 
 	// ── Leaflet ────────────────────────────────────────────────────
@@ -129,6 +129,14 @@
 	let parkGroup;
 	let radiusCircle = null;
 	let dongCircleGroup = null;
+	let clickMark = null;
+	/** @type {{lat:number,lng:number}|null} */
+	let clickPoint = $state(null);
+	let isoLayer = null;
+	let graph = null;
+	let graphLoading = $state(false);
+	let graphError = $state('');
+	let isoMeta = $state(/** @type {{count:number,ms:number}|null} */ (null));
 
 	onMount(async () => {
 		await import('leaflet/dist/leaflet.css');
@@ -166,6 +174,22 @@
 			})
 				.bindTooltip(`<b>${p.name}</b><br>${p.area > 0 ? (p.area / 10000).toFixed(1) + 'ha' : ''}`)
 				.addTo(parkGroup);
+		});
+
+		map.on('click', (e) => {
+			const { lat, lng } = e.latlng;
+			clickPoint = { lat, lng };
+			if (clickMark) { map.removeLayer(clickMark); clickMark = null; }
+			clickMark = L.circleMarker([lat, lng], {
+				radius: 9, fillColor: '#b48ef4', color: '#fff',
+				weight: 2.5, fillOpacity: 1, pane: 'markerPane'
+			})
+				.bindTooltip(`클릭 지점<br>${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+				.addTo(map);
+			const gd = DONG.filter((d) => d.gu === cG);
+			const tobler = cSlope && cW > 0 ? gd.reduce((s, d) => s + d.tobler, 0) / Math.max(1, gd.length) : 1.0;
+			const maxDistM = Math.round(SPEEDS[cW].mps * tobler * 30 * 60);
+			drawIsochrone(lat, lng, maxDistM, SPEEDS[cW].color || '#b48ef4');
 		});
 
 		mapReady = true;
@@ -271,7 +295,54 @@
 		});
 	});
 
-	onDestroy(() => map?.remove());
+	onDestroy(() => { isoLayer = null; map?.remove(); });
+
+	async function drawIsochrone(lat, lng, maxDistM, color) {
+		if (!map || !L) return;
+		if (isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
+		isoMeta = null;
+		try {
+			if (!graph) {
+				graphLoading = true;
+				graphError = '';
+				graph = await loadGraph();
+				graphLoading = false;
+			}
+			const { ring, count, ms } = computeIsochrone(graph, lat, lng, maxDistM);
+			if (!ring) { graphError = '도달 노드 부족 — 다른 지점 선택'; return; }
+			isoLayer = L.polygon(ring, {
+				color, weight: 2.5, opacity: 0.9,
+				fillColor: color, fillOpacity: 0.18, smoothFactor: 1.2
+			})
+				.bindTooltip(`OSM 보행망 ${count.toLocaleString()} 노드 도달 · ${ms}ms`)
+				.addTo(map);
+			isoMeta = { count, ms };
+			graphError = '';
+		} catch (e) {
+			console.error('[bokji] isochrone failed', e);
+			graphError = '그래프 로드 실패 — 직선 반경만 표시';
+			graphLoading = false;
+		}
+	}
+
+	function resetToCenter() {
+		if (clickMark && map) { map.removeLayer(clickMark); clickMark = null; }
+		if (isoLayer && map) { map.removeLayer(isoLayer); isoLayer = null; }
+		clickPoint = null;
+		isoMeta = null;
+	}
+
+	// 보행자·경사 변경 시 기존 클릭 지점 이소크론 재계산
+	$effect(() => {
+		void cW; void cSlope;
+		if (!untrack(() => mapReady)) return;
+		const cp = untrack(() => clickPoint);
+		if (!cp) return;
+		const gd = DONG.filter((d) => d.gu === untrack(() => cG));
+		const tobler = cSlope && cW > 0 ? gd.reduce((s, d) => s + d.tobler, 0) / Math.max(1, gd.length) : 1.0;
+		const maxDistM = Math.round(SPEEDS[cW].mps * tobler * 30 * 60);
+		drawIsochrone(cp.lat, cp.lng, maxDistM, SPEEDS[cW].color || '#b48ef4');
+	});
 
 	// ── Chart.js ──────────────────────────────────────────────────
 	let Chart;
@@ -558,10 +629,7 @@
 					legend: { display: false },
 					tooltip: {
 						callbacks: {
-							label: (c) => {
-								const v = parseFloat(c.raw);
-								return cW === 0 ? ` 취약도: ${v.toFixed(3)}` : ` 도달가능점수: ${v.toFixed(1)}점`;
-							}
+							label: (c) => ` 도달가능점수: ${parseFloat(c.raw).toFixed(1)}점`
 						}
 					}
 				},
@@ -609,39 +677,22 @@
 	function updateDongChart() {
 		if (!dongChart) return;
 		const gd = DONG.filter((d) => d.gu === cG && d.pop65 > 0);
-		if (cW === 0) {
-			dongChart.options.scales.x.max = 1.05;
-			dongChart.options.scales.x.min = 0;
-			dongChart.options.scales.x.title.text = '취약도 지수';
-			const sorted = [...gd].sort((a, b) => b.vuln - a.vuln);
-			const colors = sorted.map((d) => {
-				const v = d.vuln;
-				return v >= 0.7
-					? 'rgba(198,40,40,0.82)'
-					: v >= 0.4
-						? 'rgba(245,127,23,0.82)'
-						: 'rgba(46,125,50,0.82)';
-			});
-			dongChart.data.labels = sorted.map((d) => d.dong);
-			dongChart.data.datasets = [{ data: sorted.map((d) => d.vuln), backgroundColor: colors, borderRadius: 3, minBarLength: 4 }];
-		} else {
-			dongChart.options.scales.x.max = 100;
-			dongChart.options.scales.x.min = 0;
-			dongChart.options.scales.x.title.text = '도달가능점수 (점)';
-			const withScores = gd
-				.map((d) => ({ d, s: curScore(d) }))
-				.filter(({ s }) => s !== null)
-				.sort((a, b) => (a.s ?? 0) - (b.s ?? 0));
-			const colors = withScores.map(({ s }) => {
-				if (s >= 80) return 'rgba(15,110,86,0.8)';
-				if (s >= 50) return 'rgba(133,79,11,0.8)';
-				return 'rgba(163,45,45,0.85)';
-			});
-			dongChart.data.labels = withScores.map(({ d }) => d.dong);
-			dongChart.data.datasets = [
-				{ data: withScores.map(({ s }) => parseFloat((s ?? 0).toFixed(1))), backgroundColor: colors, borderRadius: 3, minBarLength: 4 }
-			];
-		}
+		dongChart.options.scales.x.max = 100;
+		dongChart.options.scales.x.min = 0;
+		dongChart.options.scales.x.title.text = '도달가능점수 (점)';
+		const withScores = gd
+			.map((d) => ({ d, s: curScore(d) }))
+			.filter(({ s }) => s !== null)
+			.sort((a, b) => (a.s ?? 0) - (b.s ?? 0));
+		const colors = withScores.map(({ s }) => {
+			if (s >= 80) return 'rgba(15,110,86,0.8)';
+			if (s >= 50) return 'rgba(133,79,11,0.8)';
+			return 'rgba(163,45,45,0.85)';
+		});
+		dongChart.data.labels = withScores.map(({ d }) => d.dong);
+		dongChart.data.datasets = [
+			{ data: withScores.map(({ s }) => parseFloat((s ?? 0).toFixed(1))), backgroundColor: colors, borderRadius: 3, minBarLength: 4 }
+		];
 		dongChart.update('none');
 	}
 
@@ -665,28 +716,14 @@
 	function gradeText(sc) {
 		return sc == null ? '-' : sc >= 80 ? '양호' : sc >= 50 ? '보통' : '미흡';
 	}
-	function vulnPillClass(v) {
-		return v >= 0.7 ? 'plo' : v >= 0.4 ? 'pmd' : 'phi';
-	}
-	function vulnGradeText(v) {
-		return v >= 0.7 ? '미흡' : v >= 0.4 ? '보통' : '양호';
-	}
 	function scoreBarStyle(sc) {
 		if (sc == null) return 'display:none';
 		const col = scoreColor(sc);
 		const w = Math.round((sc * 40) / 100);
 		return `background:${col};width:${w}px`;
 	}
-	function vulnBarStyle(v) {
-		const col = v >= 0.7 ? '#C62828' : v >= 0.4 ? '#F57F17' : '#2E7D32';
-		const w = Math.round(v * 40);
-		return `background:${col};width:${w}px`;
-	}
-
 	const dongChartTitle = $derived(
-		cW === 0
-			? `${cG} 행정동별 취약도`
-			: `${cG} 행정동별 도달가능점수${cSlope ? ' (경사보정)' : ''}`
+		`${cG} 행정동별 도달가능점수${cSlope ? ' (경사보정)' : ''}`
 	);
 	const dongChartHeight = $derived(
 		Math.max(280, DONG.filter((d) => d.gu === cG && d.pop65 > 0).length * 26 + 50) + 'px'
@@ -786,82 +823,66 @@
 						<CountUp value={+stats.avgP} decimals={1} suffix="개소" />
 					{/snippet}
 				</StatCard>
-				{#if stats.isNormal}
-					<StatCard label="복지 도달가능점수" value="—" sub="노인 보행자 선택 시 표시" />
-					<StatCard label="공원 도달가능점수" value="—" sub="노인 보행자 선택 시 표시" />
-				{:else}
-					<StatCard
-						label={`복지 도달가능점수${cSlope ? ' (경사보정)' : ''}`}
-						sub={`${cG} · ${SPEEDS[cW].key} · 일반인 대비`}
-						tone="blue"
-					>
-						{#snippet children()}
-							{#if stats.avgWS !== null}
-								<CountUp value={stats.avgWS} decimals={1} suffix="점" />
-							{:else}
-								N/A
-							{/if}
-						{/snippet}
-					</StatCard>
-					<StatCard
-						label={`공원 도달가능점수${cSlope ? ' (경사보정)' : ''}`}
-						sub={`${cG} · ${SPEEDS[cW].key} · 일반인 대비`}
-						tone="green"
-					>
-						{#snippet children()}
-							{#if stats.avgPS !== null}
-								<CountUp value={stats.avgPS} decimals={1} suffix="점" />
-							{:else}
-								N/A
-							{/if}
-						{/snippet}
-					</StatCard>
-				{/if}
+				<StatCard
+					label={`복지 도달가능점수${cSlope && cW > 0 ? ' (경사보정)' : ''}`}
+					sub={cW === 0 ? '노인 보행자 선택 시 표시' : `${cG} · ${SPEEDS[cW].key} · 일반인 대비`}
+					tone="blue"
+				>
+					{#snippet children()}
+						{#if cW === 0 || stats.avgWS === null}—{:else}
+							<CountUp value={stats.avgWS} decimals={1} suffix="점" />
+						{/if}
+					{/snippet}
+				</StatCard>
+				<StatCard
+					label={`공원 도달가능점수${cSlope && cW > 0 ? ' (경사보정)' : ''}`}
+					sub={cW === 0 ? '노인 보행자 선택 시 표시' : `${cG} · ${SPEEDS[cW].key} · 일반인 대비`}
+					tone="green"
+				>
+					{#snippet children()}
+						{#if cW === 0 || stats.avgPS === null}—{:else}
+							<CountUp value={stats.avgPS} decimals={1} suffix="점" />
+						{/if}
+					{/snippet}
+				</StatCard>
 			</StatGrid>
 			{/key}
-			<div class="mt-2 text-[11px]" style:color="var(--color-text3)">
-				서울 전체 취약 동 ({vulnCount}개) · 취약도 ≥ 0.5 기준
-			</div>
 		</div>
 	</div>
-
-	<!-- ── 취약도 설명 카드 (일반인 선택 시) ── -->
-	{#if cW === 0}
-		<div class="vuln-info">
-			<div class="vuln-info-title">📊 취약도 지수란?</div>
-			<div class="vuln-info-body">
-				취약도 = <b>복지 도달 박탈도 50% + 공원 도달 박탈도 50%</b>, Min-Max 정규화 (0 = 접근성 최상,
-				1 = 최취약)<br />
-				복지 박탈도 = (서울 전체 최대 도달 수 − 해당 동 도달 수) / (최대 − 최소) 방식으로 산정. 공원 박탈도도 동일 방식
-				적용.<br />
-				현재 서울 전체 <b>{vulnCount}개 행정동</b>이 취약도 ≥ 0.5 기준으로 복지·녹지 도달 취약 구역으로 분류됨.
-				노인 보행자 유형을 선택하면 도달가능점수 기준으로 전환됩니다.
-			</div>
-		</div>
-	{/if}
 
 	<!-- ── 지도 (단독 full-width) ── -->
 	<div class="mt-3.5">
 		<Card title="서울시 복지·녹지 시설 분포 지도">
-			<div class="map-tabs mb-2.5">
-				<button
-					type="button"
-					class="btn"
-					class:on={cFilter === 'both'}
-					onclick={() => (cFilter = 'both')}>복지시설 + 공원</button
-				>
-				<button
-					type="button"
-					class="btn"
-					class:on={cFilter === 'welfare'}
-					onclick={() => (cFilter = 'welfare')}>복지시설만</button
-				>
-				<button
-					type="button"
-					class="btn"
-					class:on={cFilter === 'park'}
-					onclick={() => (cFilter = 'park')}>공원만</button
-				>
+			<div class="map-top-row mb-2.5">
+				<div class="map-tabs">
+					<button
+						type="button"
+						class="btn"
+						class:on={cFilter === 'both'}
+						onclick={() => (cFilter = 'both')}>복지시설 + 공원</button
+					>
+					<button
+						type="button"
+						class="btn"
+						class:on={cFilter === 'welfare'}
+						onclick={() => (cFilter = 'welfare')}>복지시설만</button
+					>
+					<button
+						type="button"
+						class="btn"
+						class:on={cFilter === 'park'}
+						onclick={() => (cFilter = 'park')}>공원만</button
+					>
+				</div>
+				<div class="iso-meta">
+					{#if graphLoading}
+						<span class="iso-loading">⚙ OSM 보행망 로드 중…</span>
+					{:else if graphError}
+						<span class="iso-err">⚠ {graphError}</span>
+					{:else if isoMeta}
+						<span class="iso-ok">OSM 보행망 <b>{isoMeta.count.toLocaleString()}</b> 노드 도달 · {isoMeta.ms}ms</span>
+					{/if}
+				</div>
 			</div>
 			<MapShell
 				height="420px"
@@ -870,11 +891,15 @@
 					{ color: '#E8A838', label: '노인교실', shape: 'circle' },
 					{ color: '#8AAFD4', label: '소규모복지관', shape: 'circle' },
 					{ color: '#4CAF50', label: '공원', shape: 'circle' },
-					{ color: '#FF6F00', label: '30분 보행반경 (점선)' }
+					{ color: '#FF6F00', label: '30분 보행반경 (점선)' },
+					{ color: '#b48ef4', label: 'OSM 보행망 도달범위 (클릭)' }
 				]}
-				source="출처: 서울시 사회복지시설(노인여가복지시설) 목록 · 서울시 주요 공원현황(2026 상반기) · 반경은 자치구 중심점 기준 직선거리"
+				source="출처: 서울시 사회복지시설(노인여가복지시설) 목록 · 서울시 주요 공원현황(2026 상반기) · 반경 = 자치구 중심점 기준 직선거리 · 채워진 폴리곤 = OSM 보행망 Dijkstra+Convex Hull (지도 클릭 시 계산)"
 			>
 				<div bind:this={mapEl} class="absolute inset-0 h-full w-full"></div>
+				{#if clickPoint}
+					<button type="button" class="map-reset-btn" onclick={resetToCenter}>중심점</button>
+				{/if}
 			</MapShell>
 		</Card>
 	</div>
@@ -905,99 +930,87 @@
 			height="300px"
 			onmount={setupGuChart}
 		/>
-		<ChartCard title={dongChartTitle} height={dongChartHeight} onmount={setupDongChart} />
+		<div style="position:relative">
+			<ChartCard title={dongChartTitle} height={dongChartHeight} onmount={setupDongChart} />
+			{#if cW === 0}
+				<div class="tbl-overlay">
+					<div style="font-size:28px">📊</div>
+					<div style="font-size:13px;font-weight:500;color:#5f5e5a">노인 보행자를 선택하세요</div>
+					<div class="tbl-overlay-sub">일반인은 비교 기준값(분모)이므로<br />모든 동이 <b>100점</b> — 비교 의미 없음</div>
+				</div>
+			{/if}
+		</div>
 	</div>
 
 	<!-- ── 자치구별 집계 테이블 ── -->
 	<div class="card-shell mt-3.5">
 		<div class="ct-label mb-2">자치구별 복지·녹지 접근성 상세표</div>
 		<p class="mb-1.5 text-[11px]" style:color="var(--color-text3)">
-			{#if cW === 0}
-				취약도 내림차순 · 취약도 = (복지박탈 50% + 공원박탈 50%) Min-Max 정규화 · 행정동 평균
-			{:else}
-				합산점수 내림차순 · {SPEEDS[cW].key} 기준 · 일반인 도달 수 = 0 시 N/A{cSlope
-					? ' · 경사로 보정 적용'
-					: ''}
-			{/if}
+			열 헤더 클릭으로 정렬 · {SPEEDS[cW].key} 기준 · 일반인 도달 수 = 0 시 N/A{cSlope ? ' · 경사로 보정 적용' : ''}
 		</p>
-		<div class="tbl-wrap">
-			<table class="ktbl">
-				<thead>
-					<tr>
-						<th>자치구</th>
-						<th>복지시설 수</th>
-						<th>공원시설 수</th>
-						{#if cW === 0}
-							<th>취약도 (평균)</th>
-							<th>접근성</th>
-						{:else}
-							<th>복지 점수{cSlope ? ' (경사)' : ''}</th>
-							<th>녹지 점수{cSlope ? ' (경사)' : ''}</th>
-							<th>합산 점수</th>
-							<th>접근성</th>
-						{/if}
-					</tr>
-				</thead>
-				<tbody>
-					{#each guTableRows as r (r.gu)}
+		<div style="position:relative">
+			<div class="tbl-wrap">
+				<table class="ktbl">
+					<thead>
 						<tr>
-							<td style="text-align:left">{r.gu}</td>
-							<td>{r.wCnt}</td>
-							<td>{r.pCnt}</td>
-							{#if cW === 0}
+							<th class="th-sort" class:active={sortCol==='gu'} onclick={() => setSort('gu')}>
+								자치구{#if sortCol==='gu'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							</th>
+							<th class="th-sort" class:active={sortCol==='wCnt'} onclick={() => setSort('wCnt')}>
+								복지시설 수{#if sortCol==='wCnt'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							</th>
+							<th class="th-sort" class:active={sortCol==='pCnt'} onclick={() => setSort('pCnt')}>
+								공원시설 수{#if sortCol==='pCnt'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							</th>
+							<th class="th-sort" class:active={sortCol==='ws'} onclick={() => setSort('ws')}>
+								복지 점수{cSlope ? ' (경사)' : ''}{#if sortCol==='ws'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							</th>
+							<th class="th-sort" class:active={sortCol==='ps'} onclick={() => setSort('ps')}>
+								녹지 점수{cSlope ? ' (경사)' : ''}{#if sortCol==='ps'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							</th>
+							<th class="th-sort" class:active={sortCol==='combined'} onclick={() => setSort('combined')}>
+								합산 점수{#if sortCol==='combined'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							</th>
+							<th>접근성</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each guTableRows as r (r.gu)}
+							<tr>
+								<td style="text-align:left">{r.gu}</td>
+								<td>{r.wCnt}</td>
+								<td>{r.pCnt}</td>
 								<td>
-									<b
-										style="color:{r.avgVuln >= 0.7
-											? '#C62828'
-											: r.avgVuln >= 0.4
-												? '#F57F17'
-												: '#2E7D32'}">{r.avgVuln.toFixed(3)}</b
-									>
-									<span class="score-bar" style={vulnBarStyle(r.avgVuln)}></span>
-								</td>
-								<td
-									><span class="pill {vulnPillClass(r.avgVuln)}"
-										>{vulnGradeText(r.avgVuln)}</span
-									></td
-								>
-							{:else}
-								<td>
-									<b style="color:{scoreColor(r.ws)}"
-										>{r.ws !== null ? r.ws.toFixed(1) + '점' : 'N/A'}</b
-									>
+									<b style="color:{scoreColor(r.ws)}">{r.ws !== null ? r.ws.toFixed(1) + '점' : 'N/A'}</b>
 									<span class="score-bar" style={scoreBarStyle(r.ws)}></span>
 								</td>
 								<td>
-									<b style="color:{scoreColor(r.ps)}"
-										>{r.ps !== null ? r.ps.toFixed(1) + '점' : 'N/A'}</b
-									>
+									<b style="color:{scoreColor(r.ps)}">{r.ps !== null ? r.ps.toFixed(1) + '점' : 'N/A'}</b>
 									<span class="score-bar" style={scoreBarStyle(r.ps)}></span>
 								</td>
 								<td>
-									<b style="color:{scoreColor(r.combined)}"
-										>{r.combined !== null ? r.combined.toFixed(1) + '점' : 'N/A'}</b
-									>
+									<b style="color:{scoreColor(r.combined)}">{r.combined !== null ? r.combined.toFixed(1) + '점' : 'N/A'}</b>
 									<span class="score-bar" style={scoreBarStyle(r.combined)}></span>
 								</td>
-								<td
-									><span class="pill {gradePillClass(r.combined)}"
-										>{gradeText(r.combined)}</span
-									></td
-								>
-							{/if}
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+								<td><span class="pill {gradePillClass(r.combined)}">{gradeText(r.combined)}</span></td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+			{#if cW === 0}
+				<div class="tbl-overlay">
+					<div style="font-size:28px">📋</div>
+					<div style="font-size:13px;font-weight:500;color:#5f5e5a">노인 보행자를 선택하세요</div>
+					<div class="tbl-overlay-sub">일반인은 비교 기준값(분모)이므로<br />모든 구가 <b>100점</b> — 비교 의미 없음</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 
 	<Note tone="warm" class="mt-3">
-		※ 도달가능점수 = (선택 속도 도달 시설 수 / 일반인 속도 도달 시설 수) × 100<br />
-		※ 일반인 선택 시 점수는 항상 100이므로 취약도 기준으로 표시 · 분모(일반인 도달 수) = 0이면 N/A 표시<br
-		/>
-		※ 경사로 보정: Tobler 보행속도 모델 적용 · 동별 OSM 경사도 기반 · 일반인 속도는 보정 대상 제외<br
-		/>
+		※ 도달가능점수 = (선택 속도 도달 시설 수 / 일반인 속도 도달 시설 수) × 100 · 분모(일반인 도달 수) = 0이면 N/A<br />
+		※ 경사로 보정: Tobler 보행속도 모델 적용 · 동별 OSM 경사도 기반 · 일반인 속도는 보정 대상 제외<br />
 		※ 분석 기준: OSM 보행 네트워크 · 30분 보행 · 행정동 중심점 출발 · 서울시 2026
 	</Note>
 </section>
@@ -1105,24 +1118,28 @@
 		border-radius: 50%;
 		flex-shrink: 0;
 	}
-	/* ── 취약도 설명 카드 ── */
-	.vuln-info {
-		background: #f3eeff;
-		border: 0.5px solid #c4a3f5;
-		border-radius: 10px;
-		padding: 14px 18px;
-		margin-bottom: 12px;
+	/* ── 오버레이 (일반인 잠금) ── */
+	.tbl-overlay {
+		position: absolute;
+		inset: 0;
+		border-radius: 8px;
+		background: rgba(245,244,240,0.92);
+		backdrop-filter: blur(3px);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		padding: 20px;
 	}
-	.vuln-info-title {
-		font-size: 12px;
-		font-weight: 600;
-		color: #5b21b6;
-		margin-bottom: 6px;
-	}
-	.vuln-info-body {
-		font-size: 12px;
-		color: #4b3476;
-		line-height: 1.8;
+	.tbl-overlay-sub {
+		font-size: 11px;
+		color: #aaa9a5;
+		text-align: center;
+		line-height: 1.7;
+		background: #fff;
+		border-radius: 8px;
+		padding: 8px 14px;
 	}
 	/* ── 그리드 ── */
 	.r2 {
@@ -1141,11 +1158,46 @@
 		grid-template-columns: 1fr 1fr 1fr;
 		gap: 14px;
 	}
+	.map-top-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
 	.map-tabs {
 		display: flex;
 		gap: 4px;
 		flex-wrap: wrap;
 	}
+	.iso-meta {
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		color: var(--color-text3);
+		letter-spacing: 0.04em;
+		min-height: 16px;
+	}
+	.iso-loading { color: var(--color-text3); opacity: 0.85; }
+	.iso-err { color: #c0392b; }
+	.iso-ok b { color: var(--color-text); font-weight: 600; }
+	.map-reset-btn {
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		z-index: 1000;
+		padding: 5px 12px;
+		border-radius: 6px;
+		border: 0.5px solid var(--color-border);
+		background: rgba(255,255,255,0.92);
+		backdrop-filter: blur(4px);
+		font-size: 12px;
+		font-family: inherit;
+		color: var(--color-text);
+		cursor: pointer;
+		box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+		transition: background 0.14s;
+	}
+	.map-reset-btn:hover { background: #fff; }
 	/* ── 테이블 (ShelterTab ktbl 통일) ── */
 	.tbl-wrap {
 		overflow-x: auto;
@@ -1193,7 +1245,7 @@
 	}
 	.score-bar {
 		display: inline-block;
-		height: 5px;
+		height: 8px;
 		border-radius: 3px;
 		vertical-align: middle;
 		margin-left: 4px;
@@ -1206,20 +1258,35 @@
 		font-weight: 500;
 	}
 	.phi {
-		background: #d4edda;
-		color: #155724;
+		background: #2e7d3218;
+		color: #2e7d32;
 	}
 	.pmd {
-		background: #fff3cd;
-		color: #856404;
+		background: #f57f1718;
+		color: #e65100;
 	}
 	.plo {
-		background: #f8d7da;
-		color: #721c24;
+		background: #c6282818;
+		color: #c62828;
 	}
 	.pna {
-		background: #ebebeb;
+		background: #9e9e9e14;
 		color: #666;
+	}
+	.th-sort {
+		cursor: pointer;
+		user-select: none;
+	}
+	.th-sort:hover {
+		color: var(--color-text);
+	}
+	.th-sort.active {
+		color: var(--color-purple, #8b5cf6);
+	}
+	.sort-arr {
+		margin-left: 3px;
+		font-size: 9px;
+		color: var(--color-purple, #8b5cf6);
 	}
 	.bokji-hero {
 		position: relative;
