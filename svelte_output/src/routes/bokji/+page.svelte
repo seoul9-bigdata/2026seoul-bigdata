@@ -179,6 +179,7 @@
 		map.on('click', (e) => {
 			const { lat, lng } = e.latlng;
 			clickPoint = { lat, lng };
+			map.setView([lat, lng], map.getZoom(), { animate: true, duration: 0.3 });
 			if (clickMark) { map.removeLayer(clickMark); clickMark = null; }
 			clickMark = L.circleMarker([lat, lng], {
 				radius: 9, fillColor: '#b48ef4', color: '#fff',
