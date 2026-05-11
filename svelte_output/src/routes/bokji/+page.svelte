@@ -7,6 +7,7 @@
 	import Note from '$lib/components/Note.svelte';
 	import StatGrid from '$lib/components/StatGrid.svelte';
 	import StatCard from '$lib/components/StatCard.svelte';
+	import CountUp from '$lib/components/CountUp.svelte';
 
 	const meta = {
 		title: '복지·녹지 인프라',
@@ -767,35 +768,57 @@
 
 		<!-- ── 통계 4열 ── -->
 		<div class="mt-3">
+			{#key cG + '|' + cW + '|' + cSlope}
 			<StatGrid cols={4}>
 				<StatCard
 					label="평균 도달 복지시설 수"
-					value={`${stats.avgW}개소`}
 					sub={`${cG} · ${SPEEDS[cW].key} · 30분${cSlope && cW > 0 ? ' · 경사보정' : ''}`}
-				/>
+				>
+					{#snippet children()}
+						<CountUp value={+stats.avgW} decimals={1} suffix="개소" />
+					{/snippet}
+				</StatCard>
 				<StatCard
 					label="평균 도달 공원 수"
-					value={`${stats.avgP}개소`}
 					sub={`${cG} · ${SPEEDS[cW].key} · 30분${cSlope && cW > 0 ? ' · 경사보정' : ''}`}
-				/>
+				>
+					{#snippet children()}
+						<CountUp value={+stats.avgP} decimals={1} suffix="개소" />
+					{/snippet}
+				</StatCard>
 				{#if stats.isNormal}
 					<StatCard label="복지 도달가능점수" value="—" sub="노인 보행자 선택 시 표시" />
 					<StatCard label="공원 도달가능점수" value="—" sub="노인 보행자 선택 시 표시" />
 				{:else}
 					<StatCard
 						label={`복지 도달가능점수${cSlope ? ' (경사보정)' : ''}`}
-						value={stats.avgWS !== null ? `${stats.avgWS.toFixed(1)}점` : 'N/A'}
 						sub={`${cG} · ${SPEEDS[cW].key} · 일반인 대비`}
 						tone="blue"
-					/>
+					>
+						{#snippet children()}
+							{#if stats.avgWS !== null}
+								<CountUp value={stats.avgWS} decimals={1} suffix="점" />
+							{:else}
+								N/A
+							{/if}
+						{/snippet}
+					</StatCard>
 					<StatCard
 						label={`공원 도달가능점수${cSlope ? ' (경사보정)' : ''}`}
-						value={stats.avgPS !== null ? `${stats.avgPS.toFixed(1)}점` : 'N/A'}
 						sub={`${cG} · ${SPEEDS[cW].key} · 일반인 대비`}
 						tone="green"
-					/>
+					>
+						{#snippet children()}
+							{#if stats.avgPS !== null}
+								<CountUp value={stats.avgPS} decimals={1} suffix="점" />
+							{:else}
+								N/A
+							{/if}
+						{/snippet}
+					</StatCard>
 				{/if}
 			</StatGrid>
+			{/key}
 			<div class="mt-2 text-[11px]" style:color="var(--color-text3)">
 				서울 전체 취약 동 ({vulnCount}개) · 취약도 ≥ 0.5 기준
 			</div>

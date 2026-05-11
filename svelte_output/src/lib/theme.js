@@ -138,7 +138,9 @@ export const CHART_THEME = {
 	tooltipBg: 'rgba(255,255,255,0.96)',
 	tooltipBorder: 'rgba(0,0,0,0.08)',
 
-	/** 차트 인스턴스에 펼쳐 쓸 기본 옵션 */
+	/** 차트 인스턴스에 펼쳐 쓸 기본 옵션 — animation 은 applyChartTheme 후
+	    Chart.defaults.animation 에 반영되므로 여기서 중복 정의 불필요. 남겨두면 인스턴스
+	    옵션이 글로벌 디폴트를 덮어쓰므로 동일 값을 보존. */
 	baseOptions: {
 		responsive: true,
 		maintainAspectRatio: false,
@@ -162,6 +164,8 @@ export async function applyChartTheme() {
 	Chart.defaults.font.size = 11;
 	Chart.defaults.color = CHART_THEME.textColor;
 	Chart.defaults.borderColor = CHART_THEME.borderColor;
+	Chart.defaults.animation.duration = ANIM.chart.duration;
+	Chart.defaults.animation.easing = ANIM.chart.easing;
 	return Chart;
 }
 
@@ -169,3 +173,42 @@ export async function applyChartTheme() {
 export function domainColors(keys) {
 	return keys.map((k) => DOMAIN_THEME[k]?.color ?? '#888');
 }
+
+/* ────────────────────────────────────────────────────────────
+ *  ANIM — 전 페이지 공통 애니메이션 토큰 (단일 진실 원천)
+ *  · 막대 reveal / CountUp / 탭·카드 fade / Chart.js animation 모두
+ *    이 값들로 통일. 페이지에서 inline 값 박지 말 것.
+ * ──────────────────────────────────────────────────────────── */
+export const ANIM = {
+	/** 막대 reveal — scaleX 0→1 */
+	bar: {
+		duration: 850, // ms
+		easing: 'cubic-bezier(0.16, 0.84, 0.36, 1)',
+		stagger: 60 // ms — 인덱스 i 당 추가 지연
+	},
+	/** CountUp 숫자 카운트업 */
+	countUp: {
+		duration: 900,
+		stagger: 70
+	},
+	/** in:fade — 탭/카드 전환 */
+	fade: {
+		duration: 220,
+		stagger: 60
+	},
+	/** Chart.js animation */
+	chart: {
+		duration: 700,
+		easing: 'easeOutCubic'
+	},
+	/** Hero 통계 카드 reveal (translateY+opacity) */
+	statReveal: {
+		duration: 700,
+		stagger: 90
+	}
+};
+
+/** 인덱스 기반 stagger 지연 계산 — `style:--ad="{barStagger(i)}ms"` */
+export const barStagger = (i = 0) => i * ANIM.bar.stagger;
+export const countStagger = (i = 0) => ANIM.countUp.duration + i * ANIM.countUp.stagger;
+export const fadeStagger = (i = 0) => i * ANIM.fade.stagger;

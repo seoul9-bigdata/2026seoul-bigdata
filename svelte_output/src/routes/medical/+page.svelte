@@ -6,6 +6,7 @@
 	import Card from '$lib/components/Card.svelte';
 	import MapShell from '$lib/components/MapShell.svelte';
 	import Note from '$lib/components/Note.svelte';
+	import CountUp from '$lib/components/CountUp.svelte';
 
 	/** @type {{ COUNTS: Record<string, Record<string, number>>, DONG_META: Record<string, {fn:string,gu:string,el:number}>, GEOJSON: any, SPEEDS: {id:string,label:string,speed:number,color:string}[] }} */
 	const { COUNTS, DONG_META, GEOJSON, SPEEDS } = medical;
@@ -893,38 +894,40 @@
 
 		<!-- 통계 카드 (일반인 선택 시 2열, 비교 속도 선택 시 4열) -->
 		<div class="sgrid" class:sgrid-2={cB === 0}>
+			{#key cG + '|' + cB + '|' + cT}
 			<div class="sc">
 				<div class="sl" style:color="#db2777">🏥 {cG} 병의원 도달개수</div>
 				{#if cB === 0}
-					<div class="sv pink">{guStat.hospYoung.toFixed(1)}<span class="sv-unit"> 개</span></div>
+					<div class="sv pink"><CountUp value={guStat.hospYoung} decimals={1} /><span class="sv-unit"> 개</span></div>
 					<div class="ss">일반인 {cT}분 기준</div>
 				{:else}
-					<div class="sv pink">{guStat.hospCB.toFixed(1)}<span class="sv-unit"> 개</span></div>
+					<div class="sv pink"><CountUp value={guStat.hospCB} decimals={1} /><span class="sv-unit"> 개</span></div>
 					<div class="ss">일반인 기준 {guStat.hospYoung.toFixed(1)}개 · {SPEEDS[cB].label} {cT}분</div>
 				{/if}
 			</div>
 			<div class="sc">
 				<div class="sl" style:color="#059669">💊 {cG} 약국 도달개수</div>
 				{#if cB === 0}
-					<div class="sv green">{guStat.pharmYoung.toFixed(1)}<span class="sv-unit"> 개</span></div>
+					<div class="sv green"><CountUp value={guStat.pharmYoung} decimals={1} /><span class="sv-unit"> 개</span></div>
 					<div class="ss">일반인 {cT}분 기준</div>
 				{:else}
-					<div class="sv green">{guStat.pharmCB.toFixed(1)}<span class="sv-unit"> 개</span></div>
+					<div class="sv green"><CountUp value={guStat.pharmCB} decimals={1} /><span class="sv-unit"> 개</span></div>
 					<div class="ss">일반인 기준 {guStat.pharmYoung.toFixed(1)}개 · {SPEEDS[cB].label} {cT}분</div>
 				{/if}
 			</div>
 			{#if cB !== 0}
 			<div class="sc">
 				<div class="sl">병의원 도달점수</div>
-				<div class="sv {statScoreClass(guStat.hospScore)}">{guStat.hospScore.toFixed(1)}<span class="sv-unit"> 점</span></div>
+				<div class="sv {statScoreClass(guStat.hospScore)}"><CountUp value={guStat.hospScore} decimals={1} /><span class="sv-unit"> 점</span></div>
 				<div class="ss">{SPEEDS[cB].label} · {cG} 평균</div>
 			</div>
 			<div class="sc">
 				<div class="sl">약국 도달점수</div>
-				<div class="sv {statScoreClass(guStat.pharmScore)}">{guStat.pharmScore.toFixed(1)}<span class="sv-unit"> 점</span></div>
+				<div class="sv {statScoreClass(guStat.pharmScore)}"><CountUp value={guStat.pharmScore} decimals={1} /><span class="sv-unit"> 점</span></div>
 				<div class="ss">{SPEEDS[cB].label} · {cG} 평균</div>
 			</div>
 			{/if}
+			{/key}
 		</div>
 	</div>
 

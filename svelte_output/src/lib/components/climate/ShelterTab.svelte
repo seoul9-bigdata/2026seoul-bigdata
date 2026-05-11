@@ -1,6 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
 	import data from '$lib/data/climate.json';
+	import CountUp from '$lib/components/CountUp.svelte';
 	import 'leaflet/dist/leaflet.css';
 
 	const {
@@ -974,6 +975,7 @@
 
 	<!-- 통계 4열 카드 -->
 	<div class="sgrid">
+		{#key cUnit + '|' + cSel + '|' + cW + '|' + cT + '|' + cSlope}
 		{#if cUnit === 'gu'}
 			{@const gu = GU_META.find((g) => g.cd === cSel)}
 			{@const hTotal = gu?.heat ?? 0}
@@ -981,12 +983,12 @@
 			{#if stats.isBase}
 				<div class="sc">
 					<div class="sl" style:color="#d46800">☀️ 더위쉼터</div>
-					<div class="sv orange">{hTotal}<span class="sv-unit"> 개소</span></div>
+					<div class="sv orange"><CountUp value={hTotal} /><span class="sv-unit"> 개소</span></div>
 					<div class="ss">{stats.meta?.nm || ''} 구 내 등록 시설</div>
 				</div>
 				<div class="sc">
 					<div class="sl" style:color="#1a5fa0">❄️ 한파쉼터</div>
-					<div class="sv blue">{cTotal}<span class="sv-unit"> 개소</span></div>
+					<div class="sv blue"><CountUp value={cTotal} /><span class="sv-unit"> 개소</span></div>
 					<div class="ss">{stats.meta?.nm || ''} 구 내 등록 시설</div>
 				</div>
 				<div class="sc">
@@ -1005,17 +1007,23 @@
 			{:else}
 				<div class="sc">
 					<div class="sl" style:color="#d46800">☀️ 더위쉼터 접근성</div>
-					<div class="sv {scoreColorCls(stats.hScore)}">{fmtScore(stats.hScore)}<span class="sv-unit"> 점</span></div>
+					<div class="sv {scoreColorCls(stats.hScore)}">
+						{#if stats.hScore == null}-{:else}<CountUp value={+stats.hScore} decimals={1} />{/if}<span class="sv-unit"> 점</span>
+					</div>
 					<div class="ss">{SPEEDS[cW].label} · 구 내 동 평균</div>
 				</div>
 				<div class="sc">
 					<div class="sl" style:color="#1a5fa0">❄️ 한파쉼터 접근성</div>
-					<div class="sv {scoreColorCls(stats.cScore)}">{fmtScore(stats.cScore)}<span class="sv-unit"> 점</span></div>
+					<div class="sv {scoreColorCls(stats.cScore)}">
+						{#if stats.cScore == null}-{:else}<CountUp value={+stats.cScore} decimals={1} />{/if}<span class="sv-unit"> 점</span>
+					</div>
 					<div class="ss">{SPEEDS[cW].label} · 구 내 동 평균</div>
 				</div>
 				<div class="sc">
 					<div class="sl">합산 접근성 점수</div>
-					<div class="sv {scoreColorCls(stats.avg)}" style:font-size="28px">{fmtScore(stats.avg)}<span class="sv-unit"> 점</span></div>
+					<div class="sv {scoreColorCls(stats.avg)}" style:font-size="28px">
+						{#if stats.avg == null}-{:else}<CountUp value={+stats.avg} decimals={1} />{/if}<span class="sv-unit"> 점</span>
+					</div>
 					<div class="ss">(더위 + 한파) / 2 · {stats.meta?.nm || ''}</div>
 				</div>
 				<div class="sc">
@@ -1035,16 +1043,18 @@
 			<div class="sc">
 				<div class="sl" style:color="#d46800">☀️ 더위쉼터 도달가능</div>
 				{#if stats.isBase}
-					<div class="sv orange" style:font-size="18px">{hCnt}<span class="sv-unit"> 개 도달 가능</span></div>
+					<div class="sv orange" style:font-size="18px"><CountUp value={hCnt} /><span class="sv-unit"> 개 도달 가능</span></div>
 					<div class="ss">일반인 {cT}분 기준 도달 가능 개소</div>
 				{:else}
 					<div class="cnt-line">
-						<b>{hCnt}</b><span class="sv-unit"> 개</span>
+						<b><CountUp value={hCnt} /></b><span class="sv-unit"> 개</span>
 						<span class="sv-unit-sm">/ 일반인 {h0}개</span>
 					</div>
 					<div class="ss">{SPEEDS[cW].label} · {cT}분 도달 가능</div>
 					<div class="score-line">
-						<span class="sv-score {scoreColorCls(stats.hScore)}">{fmtScore(stats.hScore)}</span>
+						<span class="sv-score {scoreColorCls(stats.hScore)}">
+							{#if stats.hScore == null}-{:else}<CountUp value={+stats.hScore} decimals={1} />{/if}
+						</span>
 						<span class="sv-unit"> 점</span>
 					</div>
 				{/if}
@@ -1052,16 +1062,18 @@
 			<div class="sc">
 				<div class="sl" style:color="#1a5fa0">❄️ 한파쉼터 도달가능</div>
 				{#if stats.isBase}
-					<div class="sv blue" style:font-size="18px">{cCnt}<span class="sv-unit"> 개 도달 가능</span></div>
+					<div class="sv blue" style:font-size="18px"><CountUp value={cCnt} /><span class="sv-unit"> 개 도달 가능</span></div>
 					<div class="ss">일반인 {cT}분 기준 도달 가능 개소</div>
 				{:else}
 					<div class="cnt-line">
-						<b>{cCnt}</b><span class="sv-unit"> 개</span>
+						<b><CountUp value={cCnt} /></b><span class="sv-unit"> 개</span>
 						<span class="sv-unit-sm">/ 일반인 {c0}개</span>
 					</div>
 					<div class="ss">{SPEEDS[cW].label} · {cT}분 도달 가능</div>
 					<div class="score-line">
-						<span class="sv-score {scoreColorCls(stats.cScore)}">{fmtScore(stats.cScore)}</span>
+						<span class="sv-score {scoreColorCls(stats.cScore)}">
+							{#if stats.cScore == null}-{:else}<CountUp value={+stats.cScore} decimals={1} />{/if}
+						</span>
 						<span class="sv-unit"> 점</span>
 					</div>
 				{/if}
@@ -1075,7 +1087,9 @@
 			{:else}
 				<div class="sc">
 					<div class="sl">합산 접근성 점수</div>
-					<div class="sv {scoreColorCls(stats.avg)}">{fmtScore(stats.avg)}<span class="sv-unit"> 점</span></div>
+					<div class="sv {scoreColorCls(stats.avg)}">
+						{#if stats.avg == null}-{:else}<CountUp value={+stats.avg} decimals={1} />{/if}<span class="sv-unit"> 점</span>
+					</div>
 					<div class="ss">(더위 + 한파) / 2 · {stats.meta?.nm || ''}</div>
 				</div>
 			{/if}
@@ -1088,6 +1102,7 @@
 				</div>
 			</div>
 		{/if}
+		{/key}
 	</div>
 </div>
 

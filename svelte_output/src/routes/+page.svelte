@@ -133,11 +133,7 @@
 									class="font-mono text-[20px] font-semibold leading-none tabular-nums sm:text-[22px]"
 									style:color={d.color}
 								>
-									<CountUp
-										value={d.num}
-										decimals={d.decimals}
-										duration={1100 + i * 80 + j * 70}
-									/>
+									<CountUp value={d.num} decimals={d.decimals} />
 									<span
 										class="ml-[2px] text-[0.38em] font-normal"
 										style:color={d.color}
@@ -161,7 +157,7 @@
 							class="font-mono text-[26px] font-medium leading-none tabular-nums sm:text-[30px]"
 							style:color="var(--color-text)"
 						>
-							<CountUp value={s.num} decimals={s.decimals} duration={1100 + i * 80} />
+							<CountUp value={s.num} decimals={s.decimals} />
 							<span class="ml-[3px] text-[0.42em] font-normal" style:color="var(--color-accent)">
 								{s.unit}
 							</span>

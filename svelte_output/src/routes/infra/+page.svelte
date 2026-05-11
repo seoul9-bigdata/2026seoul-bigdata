@@ -7,6 +7,7 @@
 	import StatGrid from '$lib/components/StatGrid.svelte';
 	import PillTabs from '$lib/components/PillTabs.svelte';
 	import Note from '$lib/components/Note.svelte';
+	import CountUp from '$lib/components/CountUp.svelte';
 	import { loadGraph, computeIsochrone } from '$lib/util/isochrone.js';
 
 	const {
@@ -775,55 +776,90 @@
 		</div>
 
 		<div class="mt-3">
+			{#key cUnit + '|' + cG + '|' + cW + '|' + cSlope + '|' + (clickReach?.tot ?? '_')}
 			<StatGrid cols={4}>
 				{#if cUnit === 'gu'}
 					<StatCard
 						label="도달 가능 지점 (클릭 지점)"
-						value={clickReach ? clickReach.tot + '개소' + (cW !== 0 && clickReach.score != null ? ' (' + clickReach.score + '점)' : '') : '—'}
 						sub={clickReach ? '시장 ' + clickReach.mkt + ' · 슈퍼 ' + clickReach.sup + ' · 은행 ' + clickReach.bank + ' · 센터 ' + clickReach.center : '지도 클릭 시 표시'}
-					/>
+					>
+						{#snippet children()}
+							{#if clickReach}
+								<CountUp value={+clickReach.tot} suffix="개소" />{#if cW !== 0 && clickReach.score != null}
+									<span class="text-[14px] opacity-70"> (<CountUp value={+clickReach.score} decimals={1} suffix="점" />)</span>
+								{/if}
+							{:else}—{/if}
+						{/snippet}
+					</StatCard>
 					<StatCard
 						label={'도달 가능 지점 (' + cG + ' 중심점)'}
-						value={guReach ? guReach.tot + '개소' : '—'}
 						sub={guReach ? '시장 ' + guReach.mkt + ' · 슈퍼 ' + guReach.sup + ' · 은행 ' + guReach.bank + ' · 센터 ' + guReach.center : '—'}
-					/>
+					>
+						{#snippet children()}
+							{#if guReach}<CountUp value={+guReach.tot} suffix="개소" />{:else}—{/if}
+						{/snippet}
+					</StatCard>
 					<StatCard
 						label="도달 가능 점수"
-						value={cW === 0 ? '—' : (guReach?.score != null ? guReach.score + '점' : '—')}
 						sub={cW === 0 ? '노인 보행자 선택 시 표시' : '일반인 대비 도달가능 비율 (구 중심점)'}
 						tone="green"
-					/>
+					>
+						{#snippet children()}
+							{#if cW === 0 || guReach?.score == null}—{:else}<CountUp value={+guReach.score} decimals={1} suffix="점" />{/if}
+						{/snippet}
+					</StatCard>
 					<StatCard
 						label="65세+ 인구"
-						value={(guRankRows.find((r) => r.gu === cG)?.elder.toLocaleString() ?? '-') + '명'}
 						sub={cG + ' 주민센터 ' + (CENTER_BY_GU[cG] || 0) + '개소'}
 						tone="blue"
-					/>
+					>
+						{#snippet children()}
+							{@const el = guRankRows.find((r) => r.gu === cG)?.elder}
+							{#if el != null}<CountUp value={+el} suffix="명" />{:else}—{/if}
+						{/snippet}
+					</StatCard>
 				{:else}
 					<StatCard
 						label="도달 가능 지점 (클릭 지점)"
-						value={clickReach ? clickReach.tot + '개소' + (cW !== 0 && clickReach.score != null ? ' (' + clickReach.score + '점)' : '') : '—'}
 						sub={clickReach ? '시장 ' + clickReach.mkt + ' · 슈퍼 ' + clickReach.sup + ' · 은행 ' + clickReach.bank + ' · 센터 ' + clickReach.center : '지도 클릭 시 표시'}
-					/>
+					>
+						{#snippet children()}
+							{#if clickReach}
+								<CountUp value={+clickReach.tot} suffix="개소" />{#if cW !== 0 && clickReach.score != null}
+									<span class="text-[14px] opacity-70"> (<CountUp value={+clickReach.score} decimals={1} suffix="점" />)</span>
+								{/if}
+							{:else}—{/if}
+						{/snippet}
+					</StatCard>
 					<StatCard
 						label="도달 가능 지점 (동 중심점)"
-						value={wReach ? (wReach.tot ?? 0) + '개소' : '—'}
 						sub={'시장 ' + (wReach?.mkt ?? 0) + ' · 슈퍼 ' + (wReach?.sup ?? 0) + ' · 은행 ' + (wReach?.bank ?? 0) + ' · 센터 ' + (wReach?.center ?? 0)}
-					/>
+					>
+						{#snippet children()}
+							{#if wReach}<CountUp value={+(wReach.tot ?? 0)} suffix="개소" />{:else}—{/if}
+						{/snippet}
+					</StatCard>
 					<StatCard
 						label="도달 가능 점수"
-						value={cW === 0 ? '—' : (score != null ? score + '점' : '—')}
 						sub={cW === 0 ? '노인 보행자 선택 시 표시' : (cSlope ? '경사 보정 반영' : '일반인 대비 도달가능 비율')}
 						tone="green"
-					/>
+					>
+						{#snippet children()}
+							{#if cW === 0 || score == null}—{:else}<CountUp value={+score} decimals={1} suffix="점" />{/if}
+						{/snippet}
+					</StatCard>
 					<StatCard
 						label="65세+ 인구"
-						value={(currentDong ? currentDong.elder.toLocaleString() : '-') + '명'}
 						sub={cG + ' 주민센터 ' + (CENTER_BY_GU[cG] || 0) + '개소'}
 						tone="blue"
-					/>
+					>
+						{#snippet children()}
+							{#if currentDong}<CountUp value={+currentDong.elder} suffix="명" />{:else}—{/if}
+						{/snippet}
+					</StatCard>
 				{/if}
 			</StatGrid>
+			{/key}
 		</div>
 	</div>
 

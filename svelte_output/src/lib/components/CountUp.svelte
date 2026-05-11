@@ -1,10 +1,11 @@
 <script>
+	import { ANIM } from '$lib/theme.js';
 	/**
 	 * IntersectionObserver 기반 숫자 카운트업.
 	 * @typedef {Object} Props
 	 * @property {number} value - 목표값
 	 * @property {number} [from] - 시작값 (기본 0)
-	 * @property {number} [duration] - 애니메이션 시간 ms (기본 1100)
+	 * @property {number} [duration] - 애니메이션 시간 ms (기본 ANIM.countUp.duration)
 	 * @property {number} [decimals] - 소수점 자리수 (기본 자동 추정: value가 정수면 0, 소수면 1)
 	 * @property {string} [prefix] - 앞 (예: '−')
 	 * @property {string} [suffix] - 뒤 (예: '%', '만 명')
@@ -17,7 +18,7 @@
 	let {
 		value,
 		from = 0,
-		duration = 1100,
+		duration = ANIM.countUp.duration,
 		decimals,
 		prefix = '',
 		suffix = '',
@@ -31,23 +32,32 @@
 	let display = $state(from);
 	/** @type {HTMLSpanElement | undefined} */
 	let el = $state();
+	/** @type {number | null} */
+	let rafId = null;
 
-	function animate() {
+	function animate(fromVal) {
 		if (typeof window === 'undefined' || !window.requestAnimationFrame) {
 			display = value;
 			return;
 		}
+		if (rafId != null) cancelAnimationFrame(rafId);
 		const start = performance.now();
-		const delta = value - from;
+		const startVal = fromVal;
+		const delta = value - startVal;
 		const tick = (t) => {
-			const e = Math.min(1, (t - start) / duration);
+			// clamp e ∈ [0, 1] — t < start 가능 (clock skew/첫 프레임) → 음수 progress 차단
+			const e = Math.max(0, Math.min(1, (t - start) / duration));
 			// ease-out cubic
-			const v = from + delta * (1 - Math.pow(1 - e, 3));
+			const v = startVal + delta * (1 - Math.pow(1 - e, 3));
 			display = v;
-			if (e < 1) requestAnimationFrame(tick);
-			else display = value;
+			if (e < 1) {
+				rafId = requestAnimationFrame(tick);
+			} else {
+				display = value;
+				rafId = null;
+			}
 		};
-		requestAnimationFrame(tick);
+		rafId = requestAnimationFrame(tick);
 	}
 
 	$effect(() => {
@@ -59,7 +69,7 @@
 			(entries) => {
 				for (const entry of entries) {
 					if (entry.isIntersecting) {
-						animate();
+						animate(from);
 						io.disconnect();
 						break;
 					}
@@ -68,7 +78,10 @@
 			{ threshold }
 		);
 		io.observe(el);
-		return () => io.disconnect();
+		return () => {
+			io.disconnect();
+			if (rafId != null) cancelAnimationFrame(rafId);
+		};
 	});
 
 	const formatted = $derived(

@@ -389,7 +389,7 @@
 						</span>
 					</div>
 					<div class="text-right font-mono text-[13px] font-medium tabular-nums" style:color={s.color}>
-						<CountUp value={+s.score} decimals={Number.isInteger(s.score) ? 0 : 1} duration={1000 + i * 80} />점
+						<CountUp value={+s.score} decimals={Number.isInteger(s.score) ? 0 : 1} />점
 					</div>
 				</div>
 			{/each}
@@ -412,7 +412,7 @@
 							class="mt-1 font-mono text-[26px] font-medium leading-none tabular-nums"
 							style:color={d.color}
 						>
-							<CountUp value={d.avg} decimals={1} duration={900 + i * 80} />
+							<CountUp value={d.avg} decimals={1} />
 						</div>
 						<div class="mt-0.5 text-[10.5px]" style:color="var(--color-text3)">점 (0~100)</div>
 					</div>
@@ -453,24 +453,24 @@
 			</label>
 			<div class="ml-auto flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-[11px]">
 				{#key scoreKey}
-					<span style:color="var(--color-text3)" in:fade={{ duration: 280 }}>
+					<span style:color="var(--color-text3)" in:fade={{ duration: 220 }}>
 						서울 평균
 						<b class="ml-0.5 text-[13px] tabular-nums" style:color="var(--color-text)">
-							<CountUp value={seoulAvg} decimals={1} duration={750} />
+							<CountUp value={seoulAvg} decimals={1} />
 						</b>점
 					</span>
 					<span class="opacity-50">·</span>
-					<span style:color="var(--color-text3)" in:fade={{ duration: 280, delay: 60 }}>
+					<span style:color="var(--color-text3)" in:fade={{ duration: 220, delay: 60 }}>
 						🟢 최고 <b style:color="#3ecfa0">{best?.name}</b>
 						<b class="ml-0.5 tabular-nums" style:color="#3ecfa0">
-							<CountUp value={best?.composite ?? 0} decimals={1} duration={750} />
+							<CountUp value={best?.composite ?? 0} decimals={1} />
 						</b>
 					</span>
 					<span class="opacity-50">·</span>
-					<span style:color="var(--color-text3)" in:fade={{ duration: 280, delay: 120 }}>
+					<span style:color="var(--color-text3)" in:fade={{ duration: 220, delay: 120 }}>
 						🔴 최저 <b style:color="#C62828">{worst?.name}</b>
 						<b class="ml-0.5 tabular-nums" style:color="#C62828">
-							<CountUp value={worst?.composite ?? 0} decimals={1} duration={750} />
+							<CountUp value={worst?.composite ?? 0} decimals={1} />
 						</b>
 					</span>
 				{/key}
@@ -511,7 +511,7 @@
 									class="font-mono text-[28px] font-medium tabular-nums"
 									style:color={scoreColor(selectedGu.composite)}
 								>
-									<CountUp value={selectedGu.composite} decimals={1} duration={900} />
+									<CountUp value={selectedGu.composite} decimals={1} />
 								</span>
 								<span class="text-[12px]" style:color="var(--color-text3)">
 									점 · <b style:color="var(--color-text)">{selectedGu.rank}위</b>
@@ -535,7 +535,7 @@
 										></div>
 									</div>
 									<div class="text-right font-mono text-[11.5px] tabular-nums" style:color={d.color}>
-										<CountUp value={v} decimals={1} duration={900 + i * 60} />
+										<CountUp value={v} decimals={1} />
 									</div>
 								</div>
 							{/each}
@@ -661,10 +661,10 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each sortedTable as d (d.name)}
+					{#each sortedTable as d, i (d.name)}
 						<tr style:border-bottom="0.5px solid var(--color-border-soft)">
 							<td class="px-3 py-2 font-mono tabular-nums" style:color="var(--color-text3)">
-								{d.rank}
+								{i + 1}
 							</td>
 							<td class="px-3 py-2 font-medium" style:color="var(--color-text)">{d.name}</td>
 							{#each ['climate', 'infra', 'bokji', 'medical'] as k}
@@ -877,15 +877,12 @@
 
 	.bar-fill,
 	.domain-bar {
-		animation: bar-reveal 1s cubic-bezier(0.16, 0.84, 0.36, 1) both;
+		animation: bar-reveal 0.85s cubic-bezier(0.16, 0.84, 0.36, 1) both;
 		animation-delay: var(--ad, 0ms);
 		transform-origin: left center;
 		will-change: transform;
 		backface-visibility: hidden;
 		transform: translateZ(0);
-	}
-	.domain-bar {
-		animation-duration: 0.7s;
 	}
 	.radar-fade {
 		animation: radar-in 0.55s ease-out 0.4s both;

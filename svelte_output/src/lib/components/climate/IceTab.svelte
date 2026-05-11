@@ -1,6 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
 	import data from '$lib/data/climate.json';
+	import CountUp from '$lib/components/CountUp.svelte';
 	import 'leaflet/dist/leaflet.css';
 
 	const { ICING_GU, ICING_S, JISEOL, GU_GEO, SEOUL_OUTLINE } = data;
@@ -403,26 +404,28 @@
 		</button>
 	</div>
 	<div class="sgrid">
+		{#key curBuf}
 		<div class="sc">
 			<div class="sl">서울 행정동 면적</div>
-			<div class="sv">{ICING_S.base_km2}<span class="sv-unit"> km²</span></div>
+			<div class="sv"><CountUp value={+ICING_S.base_km2} decimals={1} /><span class="sv-unit"> km²</span></div>
 			<div class="ss">서울시 행정동 전체</div>
 		</div>
 		<div class="sc">
 			<div class="sl">제설함 커버 구역</div>
-			<div class="sv green">{cards.cov}<span class="sv-unit"> km²</span></div>
+			<div class="sv green"><CountUp value={+cards.cov} decimals={1} /><span class="sv-unit"> km²</span></div>
 			<div class="ss">{cards.cpct}% · {curBuf}m 반경</div>
 		</div>
 		<div class="sc">
 			<div class="sl">결빙 취약 구역</div>
-			<div class="sv red">{cards.km2}<span class="sv-unit"> km²</span></div>
+			<div class="sv red"><CountUp value={+cards.km2} decimals={1} /><span class="sv-unit"> km²</span></div>
 			<div class="ss">{cards.pct}% · {curBuf}m 반경</div>
 		</div>
 		<div class="sc">
 			<div class="sl">제설함 수</div>
-			<div class="sv">{JISEOL.length.toLocaleString()}</div>
+			<div class="sv"><CountUp value={JISEOL.length} /></div>
 			<div class="ss">서울시 등록 개소</div>
 		</div>
+		{/key}
 	</div>
 </div>
 

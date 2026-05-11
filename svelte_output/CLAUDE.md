@@ -217,16 +217,28 @@ function setupChart(canvas) {
 
 ## 애니메이션 패턴
 
+**전 페이지 공통 토큰**: `theme.js` 의 `ANIM` 객체 (`bar`, `countUp`, `fade`, `chart`, `statReveal`).
+페이지마다 inline duration 박지 말 것 — 토큰만 참조.
+
+```js
+import { ANIM, barStagger } from '$lib/theme.js';
+// ANIM.bar.duration = 850, easing = cubic-bezier(0.16,0.84,0.36,1), stagger = 60
+// ANIM.countUp.duration = 900
+// ANIM.fade.duration = 220
+// ANIM.chart.duration = 700
+```
+
 ### CountUp (`$lib/components/CountUp.svelte`)
 IntersectionObserver + rAF + ease-out cubic. 화면에 보이면 자동 0 → value 카운트업.
+**디폴트 duration = `ANIM.countUp.duration`** — 호출부에서 prop 안 줘도 통일됨.
 ```svelte
-<CountUp value={76.7} decimals={1} suffix="점" duration={900} />
+<CountUp value={76.7} decimals={1} suffix="점" />
 ```
 
 ### 막대 reveal (CSS)
-GPU 합성 `transform: scaleX` 사용. `width` 변경 X.
+GPU 합성 `transform: scaleX` 사용. `width` 변경 X. **duration 0.85s + cubic-bezier(0.16,0.84,0.36,1)** 고정.
 ```svelte
-<div class="bar-fill" style:width="{w}%" style:--ad="{i*22}ms"></div>
+<div class="bar-fill" style:width="{w}%" style:--ad="{i*60}ms"></div>
 <style>
 .bar-fill {
   animation: bar-reveal 0.85s cubic-bezier(0.16,0.84,0.36,1) both;

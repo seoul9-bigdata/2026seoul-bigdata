@@ -232,7 +232,7 @@
 			</StatCard>
 			<StatCard label="보행보조 노인 시설 손실률" sub="일반인 대비 도달가능 점수" tone="red">
 				{#snippet children()}
-					<CountUp value={53} prefix="−" suffix="%" />
+					<CountUp value={53} suffix="%" />
 				{/snippet}
 			</StatCard>
 		</StatGrid>
@@ -287,7 +287,7 @@
 			<!-- 25구 막대 그래프 (year 토글 시 전체 재애니메이션) -->
 			<div class="rounded-[8px] p-3" style:background="var(--color-card-soft)">
 			{#key year}
-				<div class="flex flex-col gap-[5px]" in:fade={{ duration: 200 }}>
+				<div class="flex flex-col gap-[5px]" in:fade={{ duration: 220 }}>
 					{#each sortedByYear as d, i (d.name)}
 						{@const w = (d.value / combinedMax) * 100}
 						{@const bg = colorOf(d.value)}
