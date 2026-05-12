@@ -8,11 +8,36 @@
 	import transitData from '$lib/data/transit.json';
 
 	const tabs = [
-		{ key: 'constellation', label: '환승 별자리', emoji: '🌌' },
-		{ key: 'heat', label: '폭염 정류장', emoji: '🌡️' },
-		{ key: 'anchor', label: '거점 시설', emoji: '🛒' },
-		{ key: 'crosswalk', label: '횡단보도 안전', emoji: '🚦' },
-		{ key: 'od', label: '환승 OD', emoji: '🔀' }
+		{
+			key: 'constellation',
+			label: '환승 별자리',
+			emoji: '🌌',
+			desc: '노인 환승시간이 긴 정류장을 분포·자치구별 차이로 진단 (상위 10 강조)'
+		},
+		{
+			key: 'heat',
+			label: '폭염 정류장',
+			emoji: '🌡️',
+			desc: '100m 내 더위쉼터가 없는 폭염 사각지대 정류장 — 연계율 점검'
+		},
+		{
+			key: 'anchor',
+			label: '거점 시설',
+			emoji: '🛒',
+			desc: '노인 거점(시장·공원·병원·복지관 등) 분포와 최근접 정류장 접근성'
+		},
+		{
+			key: 'crosswalk',
+			label: '횡단보도 안전',
+			emoji: '🚦',
+			desc: '노인 보행사고 vs 횡단보도 위치 — 자치구별 안전 격차 비교'
+		},
+		{
+			key: 'od',
+			label: '환승 OD',
+			emoji: '🔀',
+			desc: '자주 가는 출발 → 도착 정류장 쌍 — 노인 환승 핫라인 동선'
+		}
 	];
 
 	const ALL_GUS_SET = new Set();
@@ -23,6 +48,8 @@
 
 	let activeTab = $state('constellation');
 	let cG = $state('전체'); // '전체' = 필터 없음
+
+	const activeTabMeta = $derived(tabs.find((t) => t.key === activeTab) ?? tabs[0]);
 </script>
 
 <svelte:head>
@@ -37,6 +64,10 @@
 			<h1 class="hero-title">
 				노인 대중교통 <em>동선</em> 분석
 			</h1>
+			<p class="hero-desc">
+				환승 부담·폭염 노출·거점 접근성·횡단보도 안전·자주 가는 OD —
+				노인 대중교통 이용 패턴의 5가지 관점을 동선 기반으로 진단합니다.
+			</p>
 			<div class="hero-chips">
 				<span class="chip blue">🚇 정류장 3,290개</span>
 				<span class="chip blue">🛒 거점시설 347개</span>
@@ -57,12 +88,20 @@
 				<option value={gu}>{gu}</option>
 			{/each}
 		</select>
+		{#if cG !== '전체'}
+			<span class="gu-active">📍 {cG} 필터 적용 중</span>
+			<button type="button" class="gu-reset" onclick={() => (cG = '전체')}>전체 보기 ✕</button>
+		{/if}
 	</div>
 </div>
 
 <div class="wrap">
 	<div class="main-tabs">
 		<PillTabs {tabs} value={activeTab} onChange={(k) => (activeTab = k)} />
+		<p class="tab-desc">
+			<span class="tab-desc-icon">{activeTabMeta.emoji}</span>
+			{activeTabMeta.desc}
+		</p>
 	</div>
 
 	<div style:display={activeTab === 'constellation' ? 'block' : 'none'}>
@@ -125,6 +164,13 @@
 		font-style: normal;
 		color: var(--color-blue);
 	}
+	.hero-desc {
+		font-size: 12.5px;
+		line-height: 1.6;
+		color: rgba(241, 239, 232, 0.72);
+		margin-bottom: 10px;
+		max-width: 720px;
+	}
 	.hero-chips {
 		display: flex;
 		flex-wrap: wrap;
@@ -160,6 +206,19 @@
 	.main-tabs {
 		margin-bottom: 14px;
 	}
+	.tab-desc {
+		margin-top: 10px;
+		font-size: 12px;
+		line-height: 1.6;
+		color: var(--color-text2);
+		display: flex;
+		align-items: flex-start;
+		gap: 6px;
+	}
+	.tab-desc-icon {
+		font-size: 13px;
+		flex-shrink: 0;
+	}
 	.gu-filter-wrap {
 		max-width: 1340px;
 		margin: 0 auto;
@@ -192,5 +251,28 @@
 	.gu-select:focus {
 		outline: 1px solid var(--color-blue);
 		outline-offset: 1px;
+	}
+	.gu-active {
+		font-size: 11px;
+		padding: 4px 10px;
+		border-radius: 12px;
+		background: rgba(90, 173, 255, 0.15);
+		color: var(--color-blue);
+		border: 0.5px solid rgba(90, 173, 255, 0.4);
+		font-weight: 500;
+	}
+	.gu-reset {
+		font-size: 11px;
+		padding: 4px 10px;
+		border-radius: 12px;
+		background: transparent;
+		color: var(--color-text2);
+		border: 0.5px solid var(--color-border);
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.gu-reset:hover {
+		background: var(--color-bg2);
+		color: var(--color-text);
 	}
 </style>

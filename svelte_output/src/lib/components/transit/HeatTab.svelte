@@ -26,11 +26,11 @@
 	const deadStations = $derived(climateF.filter((c) => c.heat_within_100m === 0));
 	const okStations = $derived(climateF.filter((c) => c.heat_within_100m > 0));
 
-	// TOP30 사각지대 (heat_nearest_m 큰 순)
-	const top30Dead = $derived(
+	// TOP10 사각지대 (heat_nearest_m 큰 순) — 전체 list/순위 통일
+	const top10Dead = $derived(
 		[...deadStations]
 			.sort((a, b) => (b.heat_nearest_m || 0) - (a.heat_nearest_m || 0))
-			.slice(0, 30)
+			.slice(0, 10)
 	);
 
 	function buildLayers() {
@@ -192,9 +192,9 @@
 	</div>
 
 	<div class="card side-card">
-		<div class="ct">TOP 30 — 폭염 사각지대 (최근접 더위쉼터 거리 큰 순)</div>
+		<div class="ct">TOP 10 — 폭염 사각지대 (최근접 더위쉼터 거리 큰 순)</div>
 		<ul class="rank">
-			{#each top30Dead as c, i}
+			{#each top10Dead as c, i}
 				<li>
 					<button type="button" class="rank-btn" onclick={() => panTo(c)}>
 						<span class="rk">{i + 1}</span>

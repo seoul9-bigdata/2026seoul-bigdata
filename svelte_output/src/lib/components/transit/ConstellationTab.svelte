@@ -25,12 +25,14 @@
 	let mixChart, guChart;
 
 	// 색상: avg_xfer_sec 따라
+	// 임계값 = 전체 정류장 분포 사분위 기반 (q1=501, q2=609, q3=756)
+	// 예전 임계값 (<600/<900/<1200/≥1200) 은 q3(756) 보다 한참 위라 50% 이상이 초록색 → 위험 신호 약화. 사분위 기반으로 조정.
 	function colorForSec(sec) {
 		if (sec == null) return '#cccccc';
-		if (sec < 600) return '#3ecfa0';
-		if (sec < 900) return '#5aadff';
-		if (sec < 1200) return '#f5b740';
-		return '#ff5f5f';
+		if (sec < 500) return '#3ecfa0'; // 짧음 (하위 25%)
+		if (sec < 610) return '#5aadff'; // 평균 이하
+		if (sec < 760) return '#f5b740'; // 평균 이상 (상위 25%)
+		return '#ff5f5f'; // 긴 환승 (상위 25%, q3 = 756초)
 	}
 	function radiusForRides(r) {
 		if (!r) return 4;
@@ -57,6 +59,8 @@
 			.sort((a, b) => b.avg_xfer_sec - a.avg_xfer_sec)
 			.slice(0, 10)
 	);
+	// 강조용 sttn_id 집합 (마커 테두리)
+	const topSlowIds = $derived(new Set(topSlow.map((s) => s.sttn_id)));
 
 	// TOP 이용객 많은 정류장 — 필터된 데이터 기준
 	const topBusy = $derived(
@@ -137,14 +141,33 @@
 		if (!L || !map) return;
 		if (stationLayer) map.removeLayer(stationLayer);
 		stationLayer = L.layerGroup();
+		// 일반 마커 먼저 → top10 은 마지막에 그려 위로 올림
+		const topIds = topSlowIds;
+		const regular = [];
+		const highlighted = [];
 		stationsF.forEach((s) => {
 			if (!s.lat || !s.lon) return;
+			(topIds.has(s.sttn_id) ? highlighted : regular).push(s);
+		});
+		regular.forEach((s) => {
 			L.circleMarker([s.lat, s.lon], {
 				radius: radiusForRides(s.elder_rides),
 				fillColor: colorForSec(s.avg_xfer_sec),
 				color: '#fff',
 				weight: 0.8,
 				fillOpacity: 0.82
+			})
+				.bindPopup(popupHtml(s))
+				.addTo(stationLayer);
+		});
+		// TOP10 환승시간 긴 정류장: 굵은 다크 테두리 + 반경 +2 강조 (색은 그라데이션 유지)
+		highlighted.forEach((s) => {
+			L.circleMarker([s.lat, s.lon], {
+				radius: radiusForRides(s.elder_rides) + 2,
+				fillColor: colorForSec(s.avg_xfer_sec),
+				color: '#2c2c2a',
+				weight: 2.2,
+				fillOpacity: 0.95
 			})
 				.bindPopup(popupHtml(s))
 				.addTo(stationLayer);
@@ -171,8 +194,10 @@
 
 	function panToStn(s) {
 		if (!map || !s.lat) return;
-		map.setView([s.lat, s.lon], 14, { animate: true });
-		// 마커 popup 띄우려면 새로 생성
+		// 매 클릭마다 화면 중앙으로: flyTo 가 현재 뷰 상태와 무관하게 항상 이동/줌 애니메이션 보장.
+		// 기존 setView 는 동일 좌표 재클릭 시 no-op 처럼 보이는 케이스가 있어 flyTo 로 교체.
+		map.closePopup();
+		map.flyTo([s.lat, s.lon], 15, { animate: true, duration: 0.7 });
 		L.popup({ offset: [0, -6] }).setLatLng([s.lat, s.lon]).setContent(popupHtml(s)).openOn(map);
 	}
 
@@ -295,10 +320,11 @@
 			<div bind:this={mapEl} class="lmap"></div>
 		</div>
 		<div class="leg">
-			<div class="li"><span class="dot" style:background="#3ecfa0"></span>&lt; 600초</div>
-			<div class="li"><span class="dot" style:background="#5aadff"></span>600–900초</div>
-			<div class="li"><span class="dot" style:background="#f5b740"></span>900–1200초</div>
-			<div class="li"><span class="dot" style:background="#ff5f5f"></span>≥ 1200초 (취약)</div>
+			<div class="li"><span class="dot" style:background="#3ecfa0"></span>&lt; 500초</div>
+			<div class="li"><span class="dot" style:background="#5aadff"></span>500–610초</div>
+			<div class="li"><span class="dot" style:background="#f5b740"></span>610–760초</div>
+			<div class="li"><span class="dot" style:background="#ff5f5f"></span>≥ 760초 (취약)</div>
+			<div class="li"><span class="dot ring" style:background="#f5b740"></span>TOP 10 (테두리)</div>
 			<div class="li" style:color="#888780;margin-left:6px">크기 = 노인 이용객 수 (log scale)</div>
 		</div>
 		<div class="src">
@@ -418,6 +444,11 @@
 		height: 10px;
 		border-radius: 50%;
 		display: inline-block;
+	}
+	.dot.ring {
+		border: 2px solid #2c2c2a;
+		width: 12px;
+		height: 12px;
 	}
 	.src {
 		font-size: 11px;

@@ -50,15 +50,18 @@
 	}
 
 	const sortedOD = $derived([...OD].sort((a, b) => b.n - a.n));
+	// 지도 베지어 곡선은 시각적 다양성 위해 TOP 20, 우측 list 는 TOP 10 으로 통일
+	const mapOD = $derived(sortedOD.slice(0, 20));
+	const listOD = $derived(sortedOD.slice(0, 10));
 
 	function popupHtml(o) {
 		return `
 			<div style="font-family:inherit;min-width:200px">
 				<b style="font-size:12px;color:#888780">환승 OD pair</b>
-				<div style="font-size:13px;color:#2c2c2a;margin-top:4px">
-					🟢 ${o.ride_nm}<br>
-					⬇<br>
-					🔴 ${o.goff_nm}
+				<div style="font-size:12px;color:#2c2c2a;margin-top:4px;line-height:1.5">
+					<div><span style="color:#1d8e6a;font-weight:600">🟢 출발</span> ${o.ride_nm}</div>
+					<div style="color:#888780;font-size:10px;margin:2px 0">↓</div>
+					<div><span style="color:#b04282;font-weight:600">🟣 도착</span> ${o.goff_nm}</div>
 				</div>
 				<div style="font-size:11px;color:#185fa5;margin-top:6px">
 					환승 노인 <b>${o.n}</b>회
@@ -75,9 +78,10 @@
 		odLayer = L.layerGroup();
 
 		// 베지어 곡선 — 비관련 먼저, 관련은 마지막에 그려 위에 올림
-		const dimOD = sortedOD.filter((o) => !isRelated(o));
-		const hotOD = sortedOD.filter((o) => isRelated(o));
-		const drawOrder = hasFilter ? [...dimOD, ...hotOD] : sortedOD;
+		// TOP 20 (mapOD) 만 그려 시각적 명확성 확보
+		const dimOD = mapOD.filter((o) => !isRelated(o));
+		const hotOD = mapOD.filter((o) => isRelated(o));
+		const drawOrder = hasFilter ? [...dimOD, ...hotOD] : mapOD;
 
 		drawOrder.forEach((o) => {
 			if (!o.ride_lat || !o.goff_lat) return;
@@ -96,8 +100,9 @@
 		});
 
 		// 출발 점 (초록): 정류장 단위 집계 + 해당 정류장이 cG 관련 OD 에 포함되는지 표시
+		// 곡선과 동일한 TOP 20 (mapOD) 기준으로 점 표시
 		const rideMap = new Map();
-		sortedOD.forEach((o) => {
+		mapOD.forEach((o) => {
 			const k = `${o.ride_lat},${o.ride_lon}`;
 			if (!rideMap.has(k))
 				rideMap.set(k, { ...o, sumN: 0, count: 0, related: false });
@@ -121,14 +126,14 @@
 				opacity: dim ? 0.4 : 1
 			})
 				.bindPopup(
-					`<div style="font-family:inherit"><b>🟢 ${r.ride_nm}</b><br><span style="font-size:11px;color:#888780">출발 ${r.count}건 · 합계 ${r.sumN}회</span></div>`
+					`<div style="font-family:inherit"><b style="color:#1d8e6a">🟢 출발 · ${r.ride_nm}</b><br><span style="font-size:11px;color:#888780">${r.count}건 · 합계 ${r.sumN}회</span></div>`
 				)
 				.addTo(odLayer);
 		});
 
-		// 도착 점 (분홍)
+		// 도착 점 (분홍) — mapOD (TOP 20) 기준
 		const goffMap = new Map();
-		sortedOD.forEach((o) => {
+		mapOD.forEach((o) => {
 			const k = `${o.goff_lat},${o.goff_lon}`;
 			if (!goffMap.has(k))
 				goffMap.set(k, { ...o, sumN: 0, count: 0, related: false });
@@ -152,7 +157,7 @@
 				opacity: dim ? 0.4 : 1
 			})
 				.bindPopup(
-					`<div style="font-family:inherit"><b>🔴 ${g.goff_nm}</b><br><span style="font-size:11px;color:#888780">도착 ${g.count}건 · 합계 ${g.sumN}회</span></div>`
+					`<div style="font-family:inherit"><b style="color:#b04282">🟣 도착 · ${g.goff_nm}</b><br><span style="font-size:11px;color:#888780">${g.count}건 · 합계 ${g.sumN}회</span></div>`
 				)
 				.addTo(odLayer);
 		});
@@ -175,7 +180,7 @@
 			return;
 		}
 		const pts = [];
-		sortedOD.forEach((o) => {
+		mapOD.forEach((o) => {
 			if (!isRelated(o)) return;
 			if (o.ride_lat && o.ride_lon) pts.push([o.ride_lat, o.ride_lon]);
 			if (o.goff_lat && o.goff_lon) pts.push([o.goff_lat, o.goff_lon]);
@@ -211,12 +216,18 @@
 	// cG 변경 시: 베지어 곡선 재구성 + 지도 줌
 	$effect(() => {
 		void cG;
-		void sortedOD;
+		void mapOD;
 		if (!map) return;
 		buildLayer();
 		zoomToFiltered();
 	});
 </script>
+
+<div class="od-note">
+	<b>🔀 노인 환승 OD —</b> 자주 가는 <span class="hl-from">출발(🟢)</span> →
+	<span class="hl-to">도착(🟣)</span> 정류장 쌍의 환승 흐름.
+	곡선 두께·색상이 환승 횟수에 비례하며, 원 크기는 해당 정류장의 출발 또는 도착 합산 환승수입니다. 지도는 TOP 20 쌍, 우측 list 는 TOP 10 쌍을 표시합니다.
+</div>
 
 <div class="r2">
 	<div class="card">
@@ -226,27 +237,42 @@
 		</div>
 		<div class="leg">
 			<div class="li"><span class="dot" style:background="#3ecfa0"></span>🟢 출발 정류장</div>
-			<div class="li"><span class="dot" style:background="#f472b6"></span>🔴 도착 정류장</div>
+			<div class="li"><span class="dot" style:background="#f472b6"></span>🟣 도착 정류장</div>
 			<div class="li"><span class="bar" style:background="#ff5f5f"></span>≥20회</div>
 			<div class="li"><span class="bar" style:background="#f5b740"></span>13–19</div>
 			<div class="li"><span class="bar" style:background="#5aadff"></span>8–12</div>
 			<div class="li"><span class="bar" style:background="#b48ef4"></span>&lt;8</div>
 		</div>
 		<div class="src">
-			TOP 40 노인 환승 OD pair — 곡선 두께 = √(환승수) × 1.4 · 곡률 0.18
+			TOP 20 노인 환승 OD pair — 곡선 두께 = √(환승수) × 1.4 · 곡률 0.18
 		</div>
 	</div>
 
 	<div class="card side-card">
-		<div class="ct">TOP OD pair — 환승 노인수 정렬</div>
+		<div class="ct">TOP 10 OD pair — 환승 노인수 정렬</div>
+		<div class="rank-head">
+			<span class="rh-from"><span class="dot-mini" style:background="#3ecfa0"></span>출발</span>
+			<span class="rh-arrow">→</span>
+			<span class="rh-to"><span class="dot-mini" style:background="#f472b6"></span>도착</span>
+			<span class="rh-cnt">환승</span>
+		</div>
 		<ul class="rank">
-			{#each sortedOD as o, i}
+			{#each listOD as o, i}
 				<li class:related={isRelated(o)} class:dim={hasFilter && !isRelated(o)}>
 					<button type="button" class="rank-btn" onclick={() => panToOD(o)}>
 						<span class="rk">{i + 1}</span>
 						<span class="nm">
-							<span class="nm-from">🟢 {o.ride_nm}</span>
-							<span class="nm-to">🔴 {o.goff_nm}</span>
+							<span class="nm-from">
+								<span class="dot-mini" style:background="#3ecfa0"></span>
+								<span class="lbl-tag from-tag">출발</span>
+								<span class="stn">{o.ride_nm}</span>
+							</span>
+							<span class="arrow">↦</span>
+							<span class="nm-to">
+								<span class="dot-mini" style:background="#f472b6"></span>
+								<span class="lbl-tag to-tag">도착</span>
+								<span class="stn">{o.goff_nm}</span>
+							</span>
 						</span>
 						<span class="vr" style:color={colorN(o.n)}>{o.n}회</span>
 					</button>
@@ -378,18 +404,111 @@
 		display: flex;
 		flex-direction: column;
 		min-width: 0;
-		gap: 1px;
+		gap: 2px;
 	}
 	.nm-from,
 	.nm-to {
-		font-size: 11px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		min-width: 0;
+		font-size: 11.5px;
 		color: var(--color-text);
 	}
 	.nm-to {
 		color: var(--color-text2);
+	}
+	.nm-from .stn,
+	.nm-to .stn {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		min-width: 0;
+		flex: 1 1 auto;
+		font-weight: 500;
+	}
+	.dot-mini {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		flex-shrink: 0;
+		display: inline-block;
+	}
+	.lbl-tag {
+		font-family: var(--font-mono);
+		font-size: 9px;
+		padding: 1px 5px;
+		border-radius: 8px;
+		letter-spacing: 0.04em;
+		flex-shrink: 0;
+	}
+	.from-tag {
+		background: rgba(62, 207, 160, 0.14);
+		color: #1d8e6a;
+	}
+	.to-tag {
+		background: rgba(244, 114, 182, 0.14);
+		color: #b04282;
+	}
+	.arrow {
+		font-size: 10px;
+		color: var(--color-text3);
+		padding-left: 12px;
+		line-height: 1;
+	}
+	.od-note {
+		font-size: 12px;
+		line-height: 1.7;
+		color: var(--color-text2);
+		background: rgba(90, 173, 255, 0.08);
+		border: 0.5px solid rgba(90, 173, 255, 0.28);
+		border-radius: 8px;
+		padding: 10px 14px;
+		margin-bottom: 12px;
+	}
+	.od-note b {
+		color: var(--color-text);
+	}
+	.od-note .hl-from {
+		color: #1d8e6a;
+		font-weight: 500;
+	}
+	.od-note .hl-to {
+		color: #b04282;
+		font-weight: 500;
+	}
+	.rank-head {
+		display: grid;
+		grid-template-columns: 24px 1fr 14px 1fr auto;
+		gap: 8px;
+		align-items: center;
+		padding: 4px 4px 6px;
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		color: var(--color-text3);
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		border-bottom: 0.5px solid var(--color-border);
+		margin-bottom: 2px;
+	}
+	.rank-head .rh-from,
+	.rank-head .rh-to {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.rank-head .rh-from {
+		grid-column: 2;
+	}
+	.rank-head .rh-arrow {
+		grid-column: 3;
+		text-align: center;
+	}
+	.rank-head .rh-to {
+		grid-column: 4;
+	}
+	.rank-head .rh-cnt {
+		grid-column: 5;
 	}
 	.vr {
 		font-size: 13px;

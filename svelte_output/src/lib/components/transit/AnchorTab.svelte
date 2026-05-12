@@ -32,12 +32,12 @@
 		cG === '전체' ? ANCHORS : ANCHORS.filter((a) => a.gu === cG)
 	);
 
-	// TOP 20 by elder_alights_300m — 필터된 데이터 기준
-	const top20 = $derived(
+	// TOP 10 by elder_alights_300m — 필터된 데이터 기준 (전체 list/순위 통일)
+	const top10 = $derived(
 		[...anchorsF]
 			.filter((a) => a.elder_alights_300m != null)
 			.sort((a, b) => (b.elder_alights_300m || 0) - (a.elder_alights_300m || 0))
-			.slice(0, 20)
+			.slice(0, 10)
 	);
 
 	function makeIcon(meta) {
@@ -159,9 +159,9 @@
 	</div>
 
 	<div class="card side-card">
-		<div class="ct">TOP 20 — 300m 노인 하차 많은 거점 (수요 거점)</div>
+		<div class="ct">TOP 10 — 300m 노인 하차 많은 거점 (수요 거점)</div>
 		<ul class="rank">
-			{#each top20 as a, i}
+			{#each top10 as a, i}
 				{@const meta = TYPE_META[a.anchor_type] || { color: '#888', emoji: '•' }}
 				<li>
 					<button type="button" class="rank-btn" onclick={() => panTo(a)}>
