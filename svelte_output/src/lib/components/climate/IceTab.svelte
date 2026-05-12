@@ -454,7 +454,7 @@
 			<div class="li"><div class="ld" style="background:#1565C0;opacity:.13;border:1px solid rgba(30,136,229,.5)"></div>제설함 커버리지 원</div>
 			<div class="li"><div class="ld" style="background:#00E5FF;border-radius:50%"></div>제설함 위치</div>
 		</div>
-		<div class="src">제설함 10,437개 · 100m/200m 버퍼 합집합 · 서울 행정동 − OSM 자연지물</div>
+		<div class="src">제설함 10,437개 · 100m/200m 버퍼 합집합 · 서울 행정동 − OSM 자연지물<br>제설함 커버리지 원: 각 제설함 위치를 중심으로 선택 반경(100m/200m) 내 도달 가능 범위 · 원 밖 도로 노드 = 결빙 취약 구역</div>
 	</div>
 	<div class="ice-side">
 		<div class="card">

@@ -97,7 +97,7 @@
 			style:font-family="var(--font-display)"
 			style:color="var(--color-text)"
 		>
-			노인의 발이 그리는<br />
+			어르신의 발걸음으로 그리는<br />
 			<span style:color="var(--color-accent)">서울의 경계</span>
 		</h1>
 
@@ -135,7 +135,7 @@
 								>
 									<CountUp value={d.num} decimals={d.decimals} />
 									<span
-										class="ml-[2px] text-[0.38em] font-normal"
+										class="ml-[2px] text-[0.58em] font-normal"
 										style:color={d.color}
 										style:opacity="0.75"
 									>
@@ -158,7 +158,7 @@
 							style:color="var(--color-text)"
 						>
 							<CountUp value={s.num} decimals={s.decimals} />
-							<span class="ml-[3px] text-[0.42em] font-normal" style:color="var(--color-accent)">
+							<span class="ml-[3px] text-[0.58em] font-normal" style:color="var(--color-accent)">
 								{s.unit}
 							</span>
 						</div>

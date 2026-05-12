@@ -362,6 +362,10 @@
 	});
 
 	let radarCanvas = $state();
+	let radarZoom = $state(1);
+	let panOffset = $state({ x: 0, y: 0 });
+	/** @type {{ active: boolean, startX: number, startY: number, origX: number, origY: number }} */
+	const _drag = { active: false, startX: 0, startY: 0, origX: 0, origY: 0 };
 	let canvasNearby = $state({ markets: [], supers: [], banks: [], centers: [] });
 	let canvasSrcLabel = $state('');
 
@@ -395,12 +399,14 @@
 		const ctx = cv.getContext('2d');
 		const W = cv.width, H = cv.height, cx = W/2, cy = H/2 + 10;
 		ctx.clearRect(0, 0, W, H);
+		ctx.save();
+		ctx.translate(panOffset.x, panOffset.y);
 		const w = WS[cW];
 		const r_avg = w.speed * (cSlope ? getToblerRatio(cD) : 1.0) * cT * 60;
 		const nb = canvasNearby;
 		const allDists = [...nb.markets, ...nb.supers, ...nb.banks, ...nb.centers].map((x) => x.dist);
 		const displayMax = Math.max(r_avg * 1.5, allDists.length > 2 ? [...allDists].sort((a, b) => a - b)[Math.min(10, allDists.length - 1)] * 1.2 : r_avg * 1.8);
-		const sc = (Math.min(W, H) * 0.43) / displayMax;
+		const sc = (Math.min(W, H) * 0.43) / displayMax * radarZoom;
 
 		const gs = displayMax > 2000 ? 500 : displayMax > 1000 ? 300 : 150;
 		for (let r = gs; r <= displayMax * 1.05; r += gs) {
@@ -520,6 +526,7 @@
 		ctx.fillStyle = '#2c2c2a';
 		ctx.textAlign = 'center';
 		ctx.fillText(srcLabel, cx, cy - 13);
+		ctx.restore();
 	}
 
 	$effect(() => {
@@ -528,8 +535,54 @@
 		if (d && d.lat) buildCanvasNearby(d.lat, d.lng, label);
 	});
 	$effect(() => {
-		canvasNearby; cW; cT; cSlope;
+		canvasNearby; cW; cT; cSlope; radarZoom; panOffset;
 		if (radarCanvas) drawRadar();
+	});
+
+	$effect(() => {
+		const cv = radarCanvas;
+		if (!cv) return;
+		const onWheel = (e) => {
+			e.preventDefault();
+			const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+			radarZoom = Math.max(0.2, Math.min(8, radarZoom * factor));
+		};
+		cv.addEventListener('wheel', onWheel, { passive: false });
+		return () => cv.removeEventListener('wheel', onWheel);
+	});
+
+	$effect(() => {
+		const cv = radarCanvas;
+		if (!cv) return;
+		cv.style.cursor = 'grab';
+		const onDown = (e) => {
+			_drag.active = true;
+			_drag.startX = e.clientX;
+			_drag.startY = e.clientY;
+			_drag.origX = panOffset.x;
+			_drag.origY = panOffset.y;
+			cv.style.cursor = 'grabbing';
+		};
+		const onMove = (e) => {
+			if (!_drag.active) return;
+			panOffset = {
+				x: _drag.origX + (e.clientX - _drag.startX),
+				y: _drag.origY + (e.clientY - _drag.startY)
+			};
+		};
+		const onUp = () => {
+			if (!_drag.active) return;
+			_drag.active = false;
+			cv.style.cursor = 'grab';
+		};
+		cv.addEventListener('mousedown', onDown);
+		window.addEventListener('mousemove', onMove);
+		window.addEventListener('mouseup', onUp);
+		return () => {
+			cv.removeEventListener('mousedown', onDown);
+			window.removeEventListener('mousemove', onMove);
+			window.removeEventListener('mouseup', onUp);
+		};
 	});
 
 	let Chart;
@@ -708,7 +761,7 @@
 		<div class="hero-text">
 			<p class="hero-kicker">③ 인프라 · 심재현</p>
 			<h1 class="hero-title">
-				노인 생활<em>인프라</em> 접근성
+				노인 <em>생활인프라</em> 접근성
 			</h1>
 			<div class="hero-chips">
 				<span class="chip teal">🛒 전통시장 195개소</span>
@@ -886,7 +939,7 @@
 					{ color: '#7B5EA7', label: '은행', shape: 'circle' },
 					{ color: '#2563a8', label: '주민센터', shape: 'circle' }
 				]}
-				source="출처: 소상공인시장진흥공단 · 금융감독원 · 행정안전부 · OpenStreetMap (266,780 노드) / 점선 = 직선 반경 · 채워진 폴리곤 = OSM 보행망 Dijkstra + Convex Hull 도달 범위"
+				source={"출처: 소상공인시장진흥공단 · 금융감독원 · 행정안전부 · OpenStreetMap (266,780 노드)\n점선 = 직선 반경 · 채워진 폴리곤 = OSM 보행망 Dijkstra + Convex Hull 도달 범위"}
 			>
 				<div bind:this={mapEl} class="absolute inset-0"></div>
 				{#if clickPoint}
@@ -903,6 +956,14 @@
 				{currentW.label} · {Math.round(currentW.speed * ratio * cT * 60).toLocaleString()} m
 			</div>
 			<canvas bind:this={radarCanvas} width="340" height="340" class="radar-canvas"></canvas>
+			<div class="radar-zoom-row">
+				{#if radarZoom !== 1 || panOffset.x !== 0 || panOffset.y !== 0}
+					{#if radarZoom !== 1}<span class="radar-zoom-pct">{Math.round(radarZoom * 100)}%</span>{/if}
+					<button type="button" class="radar-zoom-reset" onclick={() => { radarZoom = 1; panOffset = { x: 0, y: 0 }; }}>초기화</button>
+				{:else}
+					<span class="radar-zoom-hint">휠 줌 · 드래그 이동</span>
+				{/if}
+			</div>
 			<div class="radar-leg">
 				<div class="leg-row">
 					{#each WS as ws, i}
@@ -1169,7 +1230,12 @@
 	@media (max-width: 1100px) { .r-map { grid-template-columns: 1fr; } }
 	.radar-sub { font-size: 12px; color: var(--color-text2); margin-bottom: 4px; }
 	.radar-radius { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--color-text); text-align: center; margin-bottom: 8px; }
-	.radar-canvas { display: block; width: 100%; max-width: 340px; margin: 0 auto; }
+	.radar-canvas { display: block; width: 100%; max-width: 340px; margin: 0 auto; cursor: grab; }
+	.radar-zoom-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 4px 0 2px; min-height: 20px; }
+	.radar-zoom-hint { font-size: 10px; color: var(--color-text4); letter-spacing: 0.04em; }
+	.radar-zoom-pct { font-family: var(--font-mono); font-size: 11px; color: var(--color-teal); font-weight: 600; }
+	.radar-zoom-reset { font-size: 10px; padding: 2px 8px; border-radius: 8px; border: 0.5px solid var(--color-text4); background: transparent; color: var(--color-text3); cursor: pointer; font-family: inherit; transition: all 0.12s; }
+	.radar-zoom-reset:hover { border-color: var(--color-text2); color: var(--color-text); }
 	.radar-leg { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; align-items: center; }
 	.leg-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; font-size: 11px; color: var(--color-text2); }
 	.leg-it { display: inline-flex; align-items: center; gap: 4px; }

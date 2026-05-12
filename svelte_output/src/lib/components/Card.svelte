@@ -7,12 +7,12 @@
 	 */
 
 	/** @type {Props} */
-	let { title, class: className = '', children } = $props();
+	let { title, class: className = '', titleColor = '', children } = $props();
 </script>
 
 <section class="card-shell {className}">
 	{#if title}
-		<div class="ct-label mb-2.5">{title}</div>
+		<div class="ct-label mb-2.5" style:color={titleColor || null}>{title}</div>
 	{/if}
 	{@render children?.()}
 </section>

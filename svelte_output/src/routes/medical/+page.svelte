@@ -31,7 +31,7 @@
 	const AVG_TOBLER = 0.8006;
 
 	// ─── 상태 (Svelte 5 runes) ───
-	let cB = $state(2); // 비교 속도 인덱스 (1/2/3)
+	let cB = $state(1); // 비교 속도 인덱스 (1/2/3)
 	let cT = $state(30); // 시간(분) 15/30/45
 	let cF = $state('all'); // 시설 유형 all/hosp/pharm
 	let cSlope = $state(false);
@@ -287,6 +287,14 @@
 	let isoMeta = $state(/** @type {{count:number, ms:number}|null} */ (null));
 
 	const PINK = '#f472b6';
+	let fromMapClick = false;
+
+	function hav(lat1, lng1, lat2, lng2) {
+		const R = 6371000, toR = Math.PI / 180;
+		const dlat = (lat2 - lat1) * toR, dlng = (lng2 - lng1) * toR;
+		const a = Math.sin(dlat/2)**2 + Math.cos(lat1*toR)*Math.cos(lat2*toR)*Math.sin(dlng/2)**2;
+		return R * 2 * Math.asin(Math.sqrt(Math.min(a, 1)));
+	}
 
 	/** cG / cSlope / cB / cT → maxDistM (m) */
 	function currentMaxDistM() {
@@ -401,7 +409,7 @@
 				.addTo(grpPharm);
 		});
 
-		// 지도 클릭 → 클릭 지점 기준 이소크론 재계산
+		// 지도 클릭 → 클릭 지점 기준 이소크론 재계산 + 가장 가까운 자치구로 차트 동기화
 		map.on('click', (/** @type {any} */ e) => {
 			const { lat, lng } = e.latlng;
 			if (clickMark) {
@@ -422,6 +430,16 @@
 			// fitBounds 로 새 폴리곤 영역 보이게
 			const r = untrack(() => currentMaxDistM());
 			map.fitBounds(L.latLng(lat, lng).toBounds(r * 2), { padding: [30, 30], animate: true });
+			// 가장 가까운 자치구로 cG 갱신 → 차트 자동 연동
+			let minDist = Infinity, nearestGu = null;
+			for (const [gu, center] of Object.entries(GU_CENTER)) {
+				const d = hav(lat, lng, /** @type {number[]} */ (center)[0], /** @type {number[]} */ (center)[1]);
+				if (d < minDist) { minDist = d; nearestGu = gu; }
+			}
+			if (nearestGu && nearestGu !== cG) {
+				fromMapClick = true;
+				cG = nearestGu;
+			}
 		});
 
 		mapReady = true;
@@ -496,9 +514,10 @@
 		drawIsochrone(origin[0], origin[1], radiusM);
 	});
 
-	// 자치구 변경 시 클릭 지점 해제 (다른 구로 옮기면 클릭은 의미 없음)
+	// 자치구 변경 시 클릭 지점 해제 (지도 클릭으로 인한 변경은 예외)
 	$effect(() => {
 		cG;
+		if (fromMapClick) { fromMapClick = false; return; }
 		if (clickMark && map) {
 			map.removeLayer(clickMark);
 			clickMark = null;
@@ -1084,6 +1103,13 @@
 		<Card title="구별 접근손실 가중 노인 수">
 			<div class="relative w-full" style:height="420px">
 				<canvas bind:this={impCanvas} class="block h-full w-full"></canvas>
+				{#if cB === 0}
+					<div class="tbl-overlay">
+						<div style="font-size:28px">📊</div>
+						<div style="font-size:13px;font-weight:500;color:#5f5e5a">비교 속도를 선택하세요</div>
+						<div class="tbl-overlay-sub">일반인은 비교 기준값(분모)이므로<br />모든 구가 <b>100점</b> — 비교 의미 없음</div>
+					</div>
+				{/if}
 			</div>
 			<p class="text-[11px] mt-2" style:color="var(--color-text3)">
 				접근손실 가중 노인 수 = 접근격차비율(1−점수/100) × 65세이상 인구 합산 — 접근성 손실을 인구 단위로 환산
@@ -1092,6 +1118,13 @@
 		<Card title="{cG} 점수 × 노인인구 버블">
 			<div class="relative w-full" style:height="420px">
 				<canvas bind:this={bblCanvas} class="block h-full w-full"></canvas>
+				{#if cB === 0}
+					<div class="tbl-overlay">
+						<div style="font-size:28px">🫧</div>
+						<div style="font-size:13px;font-weight:500;color:#5f5e5a">비교 속도를 선택하세요</div>
+						<div class="tbl-overlay-sub">일반인은 비교 기준값(분모)이므로<br />모든 구가 <b>100점</b> — 비교 의미 없음</div>
+					</div>
+				{/if}
 			</div>
 			<p class="text-[11px] mt-2" style:color="var(--color-text3)">
 				버블 크기 = 접근손실 가중 노인 수 · 오른쪽 하단(노인 많고 점수 낮음)이 가장 취약
@@ -1170,6 +1203,13 @@
 			<div class="tbl-src">
 				합산 점수 = (병의원 도달가능점수 + 약국 도달가능점수) / 2 · 구 내 동 평균 · 합산 점수 내림차순
 			</div>
+			{#if cB === 0}
+				<div class="tbl-overlay">
+					<div style="font-size:28px">📋</div>
+					<div style="font-size:13px;font-weight:500;color:#5f5e5a">비교 속도를 선택하세요</div>
+					<div class="tbl-overlay-sub">일반인은 비교 기준값(분모)이므로<br />모든 구가 <b>100점</b> — 비교 의미 없음</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 
@@ -1419,6 +1459,30 @@
 		transition: background 0.14s;
 	}
 	.map-reset-btn:hover { background: #fff; }
+
+	.tbl-overlay {
+		position: absolute;
+		inset: 0;
+		border-radius: 8px;
+		background: rgba(245, 244, 240, 0.92);
+		backdrop-filter: blur(3px);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		padding: 20px;
+		z-index: 10;
+	}
+	.tbl-overlay-sub {
+		font-size: 11px;
+		color: #aaa9a5;
+		text-align: center;
+		line-height: 1.7;
+		background: #fff;
+		border-radius: 8px;
+		padding: 8px 14px;
+	}
 
 	:global(.leaflet-container) {
 		background: #e8e4db !important;
