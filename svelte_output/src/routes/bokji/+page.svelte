@@ -68,6 +68,12 @@
 		if (s >= 50) return '#F57F17';
 		return '#C62828';
 	}
+	function hav(lat1, lng1, lat2, lng2) {
+		const R = 6371000, toR = Math.PI / 180;
+		const dlat = (lat2 - lat1) * toR, dlng = (lng2 - lng1) * toR;
+		const a = Math.sin(dlat/2)**2 + Math.cos(lat1*toR)*Math.cos(lat2*toR)*Math.sin(dlng/2)**2;
+		return R * 2 * Math.asin(Math.sqrt(Math.min(a, 1)));
+	}
 
 	// ── 통계 카드 ──────────────────────────────────────────────────
 	const stats = $derived.by(() => {
@@ -179,10 +185,14 @@
 			})
 				.bindTooltip(`클릭 지점<br>${lat.toFixed(5)}, ${lng.toFixed(5)}`)
 				.addTo(map);
-			const gd = DONG.filter((d) => d.gu === cG);
-			const tobler = cSlope && cW > 0 ? gd.reduce((s, d) => s + d.tobler, 0) / Math.max(1, gd.length) : 1.0;
-			const maxDistM = Math.round(SPEEDS[cW].mps * tobler * 30 * 60);
-			drawIsochrone(lat, lng, maxDistM);
+			// 가장 가까운 자치구로 cG 갱신 → 차트 자동 연동
+			let minDist = Infinity, nearestGu = null;
+			for (const [gu, center] of Object.entries(GU_CENTER)) {
+				const d = hav(lat, lng, center[0], center[1]);
+				if (d < minDist) { minDist = d; nearestGu = gu; }
+			}
+			if (nearestGu) cG = nearestGu;
+			// isochrone은 radiusCircle $effect가 clickPoint + cG 변경에 반응해 자동 계산
 		});
 
 		mapReady = true;

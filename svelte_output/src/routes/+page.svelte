@@ -97,7 +97,7 @@
 			style:font-family="var(--font-display)"
 			style:color="var(--color-text)"
 		>
-			노인의 발이 그리는<br />
+			어르신의 발걸음으로 그리는<br />
 			<span style:color="var(--color-accent)">서울의 경계</span>
 		</h1>
 

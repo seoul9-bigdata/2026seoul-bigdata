@@ -25,7 +25,7 @@
 	} = data;
 
 	// ── 상태 (runes) ───────────────────────────────────────────
-	let cW = $state(0); // 보행자 유형 (0–3)
+	let cW = $state(1); // 보행자 유형 (0–3)
 	let cT = $state(30); // 보행 시간
 	let cUnit = $state('gu'); // 'gu' | 'dong'
 	let cSel = $state(GU_META[0].cd);
@@ -328,8 +328,7 @@
 					smoothFactor: 0
 				}
 			}).addTo(map);
-			if (cUnit === 'gu') map.fitBounds(hullLayer.getBounds(), { padding: [30, 30], maxZoom: 13 });
-			else map.panTo(hullLayer.getBounds().getCenter(), { animate: true });
+			map.panTo(hullLayer.getBounds().getCenter(), { animate: true, duration: 0.4 });
 		}
 		if (cUnit === 'gu') return;
 
@@ -455,6 +454,19 @@
 	let canvasWc = $state();
 	let canvasNetwork = $state();
 	let gcChart, wcChart, Chart;
+	let networkZoom = 1;
+	let networkPanX = 0;
+	let networkPanY = 0;
+	let _lastNetworkKey = '';
+
+	function onNetworkWheel(e) {
+		if (cUnit === 'gu') return;
+		e.preventDefault();
+		e.stopPropagation();
+		const factor = e.deltaY < 0 ? 1.18 : 1 / 1.18;
+		networkZoom = Math.max(0.3, Math.min(8, networkZoom * factor));
+		drawNetwork();
+	}
 
 	function gcRows() {
 		const sid = SPEEDS[cW].id;
@@ -608,17 +620,31 @@
 			return;
 		}
 
+		const _nk = `${cW}|${cSel}|${cT}`;
+		if (_nk !== _lastNetworkKey) {
+			_lastNetworkKey = _nk;
+			networkZoom = 1;
+			networkPanX = 0;
+			networkPanY = 0;
+		}
+
 		ctx.fillStyle = '#06060f';
 		ctx.fillRect(0, 0, W, H);
 
 		const meta = getSelMeta();
 		if (!meta || !meta.lat) return;
 		const selDistM = SPEEDS[cW].mps * cT * 60;
-		const maxDistM = selDistM * 1.25;
+		const refDistM = SPEEDS[0].mps * cT * 60; // 스케일 기준 고정 = 일반인
+		const maxDistM = refDistM * 1.25;
 		const cx = W / 2,
 			cy = H / 2;
 		const scale = (Math.min(W, H) / 2 - 18) / maxDistM;
-		const gridStep = selDistM > 2000 ? 1000 : 500;
+		const gridStep = refDistM > 2000 ? 1000 : 500;
+
+		ctx.save();
+		ctx.translate(cx + networkPanX, cy + networkPanY);
+		ctx.scale(networkZoom, networkZoom);
+		ctx.translate(-cx, -cy);
 
 		for (let d = gridStep; d <= maxDistM; d += gridStep) {
 			ctx.beginPath();
@@ -722,6 +748,8 @@
 		ctx.shadowBlur = 22;
 		ctx.fill();
 		ctx.shadowBlur = 0;
+
+		ctx.restore();
 
 		ctx.font = '10px system-ui';
 		ctx.textAlign = 'left';
@@ -1141,7 +1169,7 @@
 	</div>
 	<div class="card">
 		<div class="ct">{cUnit === 'gu' ? '구 내 동별 취약도 분포 — 65세 인구 × 도달가능 점수' : '단절망 — 보행 도달 가능 연결 시각화'}</div>
-		<canvas bind:this={canvasNetwork} class="dark-canvas" width="500" height="370" style:background={cUnit === 'gu' ? '#fafaf8' : '#080a10'}></canvas>
+		<canvas bind:this={canvasNetwork} class="dark-canvas" width="500" height="370" style:background={cUnit === 'gu' ? '#fafaf8' : '#080a10'} onwheel={onNetworkWheel}></canvas>
 		<div class="src" style="margin-top:5px">
 			{#if cUnit === 'gu'}
 				각 점 = 동 · 색: 도달가능 등급 · 좌하단 = 고령 많고 접근 낮음 (최취약)

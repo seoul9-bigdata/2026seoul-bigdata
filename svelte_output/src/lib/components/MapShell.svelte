@@ -47,7 +47,7 @@
 	{/if}
 
 	{#if source}
-		<div class="text-[11px] leading-relaxed" style:color="var(--color-text3)" style:margin-top="8px">
+		<div class="text-[11px] leading-relaxed" style:color="var(--color-text3)" style:margin-top="8px" style:white-space="pre-line">
 			{source}
 		</div>
 	{/if}

@@ -178,6 +178,8 @@
 	/** @type {any} */
 	let L = null;
 	let selectedGuName = $state(/** @type {string|null} */ (null));
+	/** @type {any} */
+	let selectedLayer = null;
 
 	const rankedByName = $derived(Object.fromEntries(ranked.map((r) => [r.name, r])));
 	/** 클릭한 구의 최신 데이터 — scoreKey 변경 시 자동 재계산 */
@@ -195,14 +197,29 @@
 		return props.SIG_KOR_NM || props.name || props.NAME || props.sig_kor_nm || '';
 	}
 
+	/** 절대값 기준 9단계 색상 — RdYlGn 팔레트, 7점 간격
+	 *  실제 범위: 일반 노인 ~70–85 / 보행보조 ~45–65 / 하위15% ~30–52 */
+	function mapCompositeColor(v) {
+		if (v >= 80) return '#1a9850';
+		if (v >= 73) return '#66bd63';
+		if (v >= 66) return '#a6d96a';
+		if (v >= 59) return '#d9ef8b';
+		if (v >= 52) return '#fee08b';
+		if (v >= 45) return '#fdae61';
+		if (v >= 38) return '#f46d43';
+		if (v >= 31) return '#d73027';
+		return '#a50026';
+	}
+
 	function drawGeoLayer() {
 		if (!lmap || !L || !geoData) return;
 		if (geoLayer) lmap.removeLayer(geoLayer);
+		selectedLayer = null;
 		geoLayer = L.geoJSON(geoData, {
 			style: (feat) => {
 				const nm = getGuName(feat.properties);
 				const r = rankedByName[nm];
-				const c = r ? scoreColor(r.composite) : '#ccc';
+				const c = r ? mapCompositeColor(r.composite) : '#ccc';
 				return { fillColor: c, weight: 1.2, color: '#fff', fillOpacity: 0.78 };
 			},
 			onEachFeature: (feat, layer) => {
@@ -217,14 +234,24 @@
 				layer.on({
 					mouseover: (e) => e.target.setStyle({ fillOpacity: 0.95, weight: 2 }),
 					mouseout: (e) => {
-						if (selectedGuName !== nm) {
+						if (selectedLayer !== e.target) {
 							e.target.setStyle({ fillOpacity: 0.78, weight: 1.2 });
 						}
 					},
-					click: () => {
+					click: (e) => {
+						if (selectedLayer && selectedLayer !== e.target) {
+							selectedLayer.setStyle({ fillOpacity: 0.78, weight: 1.2 });
+						}
+						selectedLayer = e.target;
+						e.target.setStyle({ fillOpacity: 0.95, weight: 2 });
 						selectedGuName = nm;
 					}
 				});
+				// scoreKey 변경으로 재그릴 때 선택 구 하이라이트 복원
+				if (nm === selectedGuName) {
+					selectedLayer = layer;
+					layer.setStyle({ fillOpacity: 0.95, weight: 2 });
+				}
 			}
 		}).addTo(lmap);
 	}
@@ -394,9 +421,9 @@
 		</p>
 
 		<StatGrid class="sm:grid-cols-4" cols={4}>
-			<StatCard label="분석 도메인" sub="기후·인프라·복지/녹지·의료">
+			<StatCard label="분석 도메인" sub="기후·인프라·복지/녹지·의료·교통·이동">
 				{#snippet children()}
-					<CountUp value={4} suffix="개" />
+					<CountUp value={4} suffix="+1개" />
 				{/snippet}
 			</StatCard>
 			<StatCard label="서울 평균 종합 점수" sub="점 (0~100)" tone="orange">
@@ -530,13 +557,17 @@
 	<div class="mb-3.5 grid gap-3 lg:grid-cols-[1.4fr_1fr]">
 		<Card title="서울 25개 구 종합 도달가능 점수 · 클릭하면 상세">
 			<div bind:this={mapEl} class="conclusion-map rounded-[6px]"></div>
-			<div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]" style:color="var(--color-text2)">
-				<span style:color="var(--color-text3)">도달가능 점수:</span>
-				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#9B1C1C"></span>~50 최저</div>
-				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#D85A30"></span>50~58</div>
-				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#f5b740"></span>58~65</div>
-				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#1D9E75"></span>65~73</div>
-				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#0f6e56"></span>73+ 양호</div>
+			<div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px]" style:color="var(--color-text2)">
+				<span style:color="var(--color-text3)">종합 점수:</span>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#a50026"></span>~31</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#d73027"></span>31–38</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#f46d43"></span>38–45</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#fdae61"></span>45–52</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#fee08b"></span>52–59</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#d9ef8b"></span>59–66</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#a6d96a"></span>66–73</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#66bd63"></span>73–80</div>
+				<div class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" style:background="#1a9850"></span>80+</div>
 			</div>
 		</Card>
 

@@ -510,6 +510,96 @@
 		</Note>
 	</Card>
 
+	<!-- ── 경사 보정 ── -->
+	<Card title="분석 방법론 · 경사도 보정 (Tobler + NASA SRTM)" class="mb-3.5">
+		<h2 class="mb-2 font-sans text-[22px] font-medium leading-[1.3]" style:color="var(--color-text)">
+			서울은 평지가 아닙니다
+		</h2>
+		<p class="mb-5 max-w-[660px] text-[12.5px] leading-[1.85]" style:color="var(--color-text2)">
+			노원·도봉·관악·은평 등 서울 외곽 자치구는 평균 경사도가 5–12°에 달합니다.
+			경사로는 보행속도를 낮추고 — 특히 보행보조기를 쓰는 노인에게는 더 크게 영향을 미칩니다.
+			평지 기반 반경원으로는 이 격차를 포착할 수 없어, <strong style:color="var(--color-text)">NASA SRTM 고도 데이터</strong>와
+			<strong style:color="var(--color-text)">Tobler 보행속도 함수</strong>를 결합해 보정합니다.
+		</p>
+
+		<div class="grid gap-4 md:grid-cols-[auto_1fr]">
+			<!-- 수식 박스 -->
+			<div class="sdef-box">
+				<div class="sdef-label">Tobler Hiking Function</div>
+				<div class="tobler-formula">
+					<span class="tf-v">v</span>
+					<span class="tf-eq">=</span>
+					<span class="tf-v0">v<sub>0</sub></span>
+					<span class="tf-eq">·</span>
+					<span class="tf-exp">e<sup>−3.5 · |tan θ + 0.05|</sup></span>
+				</div>
+				<ul class="sdef-notes mt-0">
+					<li><strong>v</strong> — 경사 보정 보행속도 (m/s)</li>
+					<li><strong>v₀</strong> — 평지 기준 보행속도</li>
+					<li><strong>θ</strong> — 도로 경사각 (OSM 노드 간 고도차)</li>
+					<li>오르막·내리막 모두 속도 감소</li>
+				</ul>
+			</div>
+
+			<!-- 데이터 파이프라인 + 영향 -->
+			<div class="flex flex-col gap-3">
+				<div class="rounded-[8px] p-4" style:background="var(--color-card-soft)">
+					<div class="kicker mb-2">데이터 파이프라인</div>
+					<div class="pipeline-steps">
+						<div class="ps-step">
+							<span class="ps-icon">🛰️</span>
+							<div>
+								<div class="ps-title">NASA SRTM 수치고도모델</div>
+								<div class="ps-desc">30m 해상도 · 서울 전역 고도 래스터</div>
+							</div>
+						</div>
+						<div class="ps-arrow">↓</div>
+						<div class="ps-step">
+							<span class="ps-icon">🗺️</span>
+							<div>
+								<div class="ps-title">OSM 보행 네트워크 노드</div>
+								<div class="ps-desc">266,780 노드 각각에 고도값 매핑</div>
+							</div>
+						</div>
+						<div class="ps-arrow">↓</div>
+						<div class="ps-step">
+							<span class="ps-icon">📐</span>
+							<div>
+								<div class="ps-title">엣지별 경사각 계산</div>
+								<div class="ps-desc">인접 노드 고도차 ÷ 수평거리 → tan θ</div>
+							</div>
+						</div>
+						<div class="ps-arrow">↓</div>
+						<div class="ps-step">
+							<span class="ps-icon">⚖️</span>
+							<div>
+								<div class="ps-title">Tobler 보정 엣지 가중치</div>
+								<div class="ps-desc">각 보행자 유형 × 경사 → 실효 이동 시간</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="rounded-[8px] p-4" style:background="var(--color-card-soft)">
+					<div class="kicker mb-2">경사 보정의 실질 효과</div>
+					<p class="text-[12px] leading-[1.75]" style:color="var(--color-text2)">
+						평지 기준 점수만 보면 <strong style:color="var(--color-text)">노원·도봉·관악</strong> 등 외곽 구가 실제보다
+						높게 평가됩니다. 경사 보정 시 이들 구의 도달가능점수는 최대 <strong style:color="var(--color-accent)">8–12점</strong>
+						추가 하락 — 지형적 취약성이 드러납니다.<br />
+						<span class="text-[11px]" style:color="var(--color-text3)">
+							* 서울시 행정동별 평균 경사도: 행정안전부 수치지형도 + SRTM 교차 검증
+						</span>
+					</p>
+				</div>
+			</div>
+		</div>
+
+		<Note tone="warm" class="mt-3">
+			경사 보정은 선택 토글로 켜고 끌 수 있습니다. 인프라·복지/녹지·의료 각 분석 페이지의
+			<strong>「경사로 보정 (Tobler · NASA SRTM)」</strong> 버튼으로 실시간 비교해 보세요.
+		</Note>
+	</Card>
+
 	<!-- ── SECTION 3: 왜 노인 도보 생활권인가 (문제 정의) ── -->
 	<Card title="문제 정의 · 왜 노인 도보 생활권인가" class="mb-3.5">
 		<div class="grid gap-3.5 md:grid-cols-3">
@@ -712,6 +802,70 @@
 		color: var(--color-text2);
 	}
 	.ex-callout strong { color: var(--color-text); }
+
+	/* ── 경사 보정 카드 ── */
+	.tobler-formula {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+		flex-wrap: wrap;
+		margin-bottom: 14px;
+		padding: 10px 12px;
+		background: rgba(0,0,0,0.03);
+		border-radius: 6px;
+	}
+	.tf-v, .tf-v0 {
+		font-family: var(--font-mono);
+		font-size: 15px;
+		font-weight: 600;
+		color: var(--color-accent);
+	}
+	.tf-eq {
+		font-size: 14px;
+		color: var(--color-text3);
+	}
+	.tf-exp {
+		font-family: var(--font-mono);
+		font-size: 13px;
+		color: var(--color-text2);
+	}
+	.tf-exp sup {
+		font-size: 10px;
+	}
+
+	.pipeline-steps {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+	}
+	.ps-step {
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+	}
+	.ps-icon {
+		font-size: 16px;
+		flex-shrink: 0;
+		line-height: 1.4;
+	}
+	.ps-title {
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--color-text);
+		line-height: 1.4;
+	}
+	.ps-desc {
+		font-size: 11px;
+		color: var(--color-text3);
+		line-height: 1.5;
+	}
+	.ps-arrow {
+		font-size: 11px;
+		color: var(--color-text4);
+		padding-left: 6px;
+		line-height: 1.2;
+		margin: 2px 0;
+	}
 
 	/* 고령화 choropleth 지도 */
 	.aging-map {
