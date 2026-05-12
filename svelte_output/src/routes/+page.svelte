@@ -17,12 +17,12 @@
 
 	/**
 	 * Hero 영역 핵심 수치
-	 * dual 타입: 두 수치를 나란히 표시 (건강 노인 vs 보행보조기 노인)
+	 * dual 타입: 두 수치를 나란히 표시 (일반 노인 vs 보행보조기 노인)
 	 */
 	const heroStats = [
 		{
 			dual: [
-				{ num: 1.12, decimals: 2, unit: 'm/s', label: '건강 노인', color: 'var(--color-text)' },
+				{ num: 1.12, decimals: 2, unit: 'm/s', label: '일반 노인', color: 'var(--color-text)' },
 				{
 					num: 0.88,
 					decimals: 2,
@@ -35,7 +35,7 @@
 		},
 		{
 			dual: [
-				{ num: 76.7, decimals: 1, unit: '개', label: '건강 노인 도달 구역', color: 'var(--color-blue)' },
+				{ num: 76.7, decimals: 1, unit: '개', label: '일반 노인 도달 구역', color: 'var(--color-blue)' },
 				{
 					num: 46.9,
 					decimals: 1,
@@ -104,7 +104,7 @@
 		<p class="mb-7 max-w-[640px] text-[13.5px] leading-[1.85]" style:color="var(--color-text2)">
 			서울시가 내건 <span class="font-medium" style:color="var(--color-text)">30분 보행일상권</span>.
 			그 기준은 <span class="font-medium" style:color="var(--color-text)">청장년(1.28&nbsp;m/s)</span>의 걸음으로 설계되어 있습니다.<br />
-			건강한 노인(<span class="font-medium" style:color="var(--color-blue)">1.12&nbsp;m/s</span>)은 같은 시간에
+			일반 노인(<span class="font-medium" style:color="var(--color-blue)">1.12&nbsp;m/s</span>)은 같은 시간에
 			청년 도달 구역의 <span class="font-semibold" style:color="var(--color-blue)">76.7%</span>를,
 			보행보조기를 사용하는 노인(<span class="font-medium" style:color="var(--color-accent)">0.88&nbsp;m/s</span>)은
 			<span class="font-semibold" style:color="var(--color-accent)">46.9%</span>를 이동할 수 있습니다.<br />
@@ -120,7 +120,7 @@
 					style:--ad="{i * 90}ms"
 				>
 					{#if s.dual}
-						<!-- 이중 수치 (건강 노인 vs 보행보조기 노인) -->
+						<!-- 이중 수치 (일반 노인 vs 보행보조기 노인) -->
 						<div
 							class="mb-1.5 text-[9.5px] font-medium uppercase tracking-widest"
 							style:color="var(--color-text4)"
@@ -169,39 +169,6 @@
 		</div>
 	</div>
 
-	<!-- ── 5 도메인 카드 ── -->
-	<div class="ct-label mb-2.5 px-1" style:color="var(--color-text2)">
-		<span style:color="var(--color-accent)">5축</span> 도메인 · 본론 대시보드
-	</div>
-	<div class="mb-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
-		{#each domains as d}
-			<a
-				href="{base}/{d.slug}"
-				class="card-shell group relative block overflow-hidden no-underline transition-shadow duration-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)]"
-				style:padding="16px 16px"
-			>
-				<!-- 호버 시 상단 액센트 라인 -->
-				<span
-					class="absolute inset-x-0 top-0 h-[3px] origin-left scale-x-0 transition-transform duration-300 group-hover:scale-x-100"
-					style:background={d.accent}
-				></span>
-				<div class="mb-2 text-[26px] leading-none">{d.emoji}</div>
-				<div
-					class="text-[15px] font-medium transition-colors duration-200"
-					style:color="var(--color-text)"
-					style:--domain-accent={d.accent}
-				>
-					{d.label}
-				</div>
-				<div class="mt-1 text-[11.5px] leading-snug" style:color="var(--color-text3)">
-					{domainBlurb[d.slug]}
-				</div>
-				{#if d.author}
-					<div class="kicker mt-2.5" style:color={d.accent} style:opacity="0.7">{d.author}</div>
-				{/if}
-			</a>
-		{/each}
-	</div>
 </section>
 
 <style>

@@ -1,6 +1,7 @@
 <script>
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import { loadGraph, computeIsochrone } from '$lib/util/isochrone.js';
+	import { applySort, compareBy } from '$lib/util/sortable.js';
 	import bokji from '$lib/data/bokji.json';
 	import Card from '$lib/components/Card.svelte';
 	import ChartCard from '$lib/components/ChartCard.svelte';
@@ -23,13 +24,10 @@
 	let cFilter = $state('both');    // 시설 유형 + 지도 레이어 통합: both / welfare / park
 	let cG = $state('종로구');        // 자치구
 	let cSlope = $state(false);
-	let cDong = $state(false);
-	let sortCol = $state('combined');
-	let sortDir = $state('desc');
-
-	function setSort(col) {
-		if (sortCol === col) sortDir = sortDir === 'desc' ? 'asc' : 'desc';
-		else { sortCol = col; sortDir = 'desc'; }
+	let sortKey = $state('combined');
+	let sortDir = $state(/** @type {'asc' | 'desc'} */ ('desc'));
+	function setSort(/** @type {string} */ k) {
+		({ sortKey, sortDir } = applySort(k, sortKey, sortDir, ['gu']));
 	}
 
 	const gus = [...new Set(DONG.map((d) => d.gu))].sort();
@@ -112,12 +110,7 @@
 					ws !== null && ps !== null ? parseFloat(((ws + ps) / 2).toFixed(1)) : ws ?? ps;
 				return { gu, wCnt, pCnt, ws, ps, combined };
 			})
-			.sort((a, b) => {
-				const av = a[sortCol] ?? -1;
-				const bv = b[sortCol] ?? -1;
-				if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-				return sortDir === 'asc' ? av - bv : bv - av;
-			});
+			.sort(compareBy(sortKey, sortDir));
 	});
 
 	// ── Leaflet ────────────────────────────────────────────────────
@@ -128,7 +121,6 @@
 	let welfareGroup;
 	let parkGroup;
 	let radiusCircle = null;
-	let dongCircleGroup = null;
 	let clickMark = null;
 	/** @type {{lat:number,lng:number}|null} */
 	let clickPoint = $state(null);
@@ -182,7 +174,7 @@
 			map.setView([lat, lng], map.getZoom(), { animate: true, duration: 0.3 });
 			if (clickMark) { map.removeLayer(clickMark); clickMark = null; }
 			clickMark = L.circleMarker([lat, lng], {
-				radius: 9, fillColor: '#b48ef4', color: '#fff',
+				radius: 9, fillColor: '#ff3b30', color: '#fff',
 				weight: 2.5, fillOpacity: 1, pane: 'markerPane'
 			})
 				.bindTooltip(`클릭 지점<br>${lat.toFixed(5)}, ${lng.toFixed(5)}`)
@@ -190,7 +182,7 @@
 			const gd = DONG.filter((d) => d.gu === cG);
 			const tobler = cSlope && cW > 0 ? gd.reduce((s, d) => s + d.tobler, 0) / Math.max(1, gd.length) : 1.0;
 			const maxDistM = Math.round(SPEEDS[cW].mps * tobler * 30 * 60);
-			drawIsochrone(lat, lng, maxDistM, SPEEDS[cW].color || '#b48ef4');
+			drawIsochrone(lat, lng, maxDistM);
 		});
 
 		mapReady = true;
@@ -211,16 +203,17 @@
 		}
 	});
 
-	// 자치구 중심 반경원 + 뷰 이동
+	// 자치구 중심(또는 클릭 지점) 반경원 + 뷰 이동
 	$effect(() => {
 		if (!mapReady) return;
-		// react to cG, cW, cSlope
-		const center = GU_CENTER[cG];
+		// react to cG, cW, cSlope, clickPoint
+		const cp = clickPoint;
+		const origin = cp ? [cp.lat, cp.lng] : GU_CENTER[cG];
 		if (radiusCircle) {
 			map.removeLayer(radiusCircle);
 			radiusCircle = null;
 		}
-		if (!center) return;
+		if (!origin) return;
 		let radiusM = Math.round(SPEEDS[cW].mps * 30 * 60);
 		let tooltipExtra = '';
 		if (cSlope && cW > 0) {
@@ -229,76 +222,29 @@
 			radiusM = Math.round(SPEEDS[cW].mps * avgTobler * 30 * 60);
 			tooltipExtra = ` (경사보정 · 구평균 tobler ${avgTobler.toFixed(3)})`;
 		}
-		radiusCircle = L.circle(center, {
+		radiusCircle = L.circle(origin, {
 			radius: radiusM,
-			color: '#FF6F00',
+			color: '#b48ef4',
 			weight: 2,
 			dashArray: '8,5',
-			fillColor: '#FF6F00',
-			fillOpacity: 0.04
+			fill: false
 		})
 			.bindTooltip(
-				`${cG} 중심 · ${SPEEDS[cW].key} 30분 반경 ~${(radiusM / 1000).toFixed(2)} km${tooltipExtra}`
+				cp
+					? `클릭 지점 · ${SPEEDS[cW].key} 30분 반경 ~${(radiusM / 1000).toFixed(2)} km${tooltipExtra}`
+					: `${cG} 중심 · ${SPEEDS[cW].key} 30분 반경 ~${(radiusM / 1000).toFixed(2)} km${tooltipExtra}`
 			)
 			.addTo(map);
-		map.setView(center, 12, { animate: true, duration: 0.4 });
-	});
-
-	// 동별 반경 원
-	$effect(() => {
-		if (!mapReady) return;
-		// react to cDong, cG, cW, cSlope, cFilter
-		if (dongCircleGroup) {
-			map.removeLayer(dongCircleGroup);
-			dongCircleGroup = null;
-		}
-		if (!cDong) return;
-		dongCircleGroup = L.layerGroup().addTo(map);
-		const gd = DONG.filter((d) => d.gu === cG && d.clat !== null && d.clng !== null);
-		gd.forEach((d) => {
-			const tobler = cSlope && cW > 0 ? d.tobler : 1.0;
-			const radiusM = Math.round(SPEEDS[cW].mps * tobler * 30 * 60);
-			const s = curScore(d);
-			const col = scoreColor(s);
-			const scoreText = s !== null ? s + '점' : 'N/A';
-			const slopeTip = cSlope && cW > 0 ? `<br>Tobler: ${d.tobler.toFixed(3)}` : '';
-
-			L.circle([d.clat, d.clng], {
-				radius: radiusM,
-				color: col,
-				weight: 1.2,
-				dashArray: '5,4',
-				fillColor: col,
-				fillOpacity: 0.06
-			})
-				.bindTooltip(
-					`<b>${d.gu} ${d.dong}</b><br>보행반경: ~${(radiusM / 1000).toFixed(2)} km<br>도달가능점수: ${scoreText}<br>복지 도달: ${getW(d)}개 · 공원 도달: ${getP(d)}개${slopeTip}`
-				)
-				.addTo(dongCircleGroup);
-
-			L.circleMarker([d.clat, d.clng], {
-				radius: 3,
-				color: col,
-				weight: 1,
-				fillColor: col,
-				fillOpacity: 0.9
-			}).addTo(dongCircleGroup);
-
-			if (s !== null && s < 50) {
-				L.marker([d.clat, d.clng], {
-					icon: L.divIcon({
-						className: '',
-						html: `<div style="font-size:9px;font-weight:600;color:${col};white-space:nowrap;text-shadow:0 0 2px #fff">${d.dong}</div>`,
-						iconAnchor: [0, 0]
-					})
-				}).addTo(dongCircleGroup);
-			}
-		});
+		// 클릭 지점은 setView 안 함 (사용자가 보고 있는 위치 보존), 자치구 중심일 때만 자동 이동
+		if (!cp) map.setView(origin, 12, { animate: true, duration: 0.4 });
+		// isochrone 폴리곤도 같이 갱신
+		untrack(() => drawIsochrone(origin[0] ?? origin.lat, origin[1] ?? origin.lng, radiusM));
 	});
 
 	onDestroy(() => { isoLayer = null; map?.remove(); });
 
-	async function drawIsochrone(lat, lng, maxDistM, color) {
+	const PURPLE = '#b48ef4';
+	async function drawIsochrone(lat, lng, maxDistM) {
 		if (!map || !L) return;
 		if (isoLayer) { map.removeLayer(isoLayer); isoLayer = null; }
 		isoMeta = null;
@@ -312,8 +258,8 @@
 			const { ring, count, ms } = computeIsochrone(graph, lat, lng, maxDistM);
 			if (!ring) { graphError = '도달 노드 부족 — 다른 지점 선택'; return; }
 			isoLayer = L.polygon(ring, {
-				color, weight: 2.5, opacity: 0.9,
-				fillColor: color, fillOpacity: 0.18, smoothFactor: 1.2
+				color: PURPLE, weight: 2.5, opacity: 0.9,
+				fillColor: PURPLE, fillOpacity: 0.18, smoothFactor: 1.2
 			})
 				.bindTooltip(`OSM 보행망 ${count.toLocaleString()} 노드 도달 · ${ms}ms`)
 				.addTo(map);
@@ -342,7 +288,7 @@
 		const gd = DONG.filter((d) => d.gu === untrack(() => cG));
 		const tobler = cSlope && cW > 0 ? gd.reduce((s, d) => s + d.tobler, 0) / Math.max(1, gd.length) : 1.0;
 		const maxDistM = Math.round(SPEEDS[cW].mps * tobler * 30 * 60);
-		drawIsochrone(cp.lat, cp.lng, maxDistM, SPEEDS[cW].color || '#b48ef4');
+		drawIsochrone(cp.lat, cp.lng, maxDistM);
 	});
 
 	// ── Chart.js ──────────────────────────────────────────────────
@@ -779,20 +725,6 @@
 			</span>
 		</div>
 		<div class="crow">
-			<span class="lbl">동 단위 반경</span>
-			<button
-				type="button"
-				class="chk-btn dong"
-				class:on={cDong}
-				onclick={() => (cDong = !cDong)}
-			>
-				<span class="chk-dot" style="background:#FF6F00"></span>동별 반경 표시
-			</button>
-			<span class="ml-1 text-[11px]" style:color="var(--color-text3)">
-				· 선택 자치구 내 각 행정동 중심점 기준 · 점수 색상 반영
-			</span>
-		</div>
-		<div class="crow">
 			<span class="lbl">기준 자치구</span>
 			<select bind:value={cG}>
 				{#each gus as g}
@@ -892,7 +824,7 @@
 					{ color: '#E8A838', label: '노인교실', shape: 'circle' },
 					{ color: '#8AAFD4', label: '소규모복지관', shape: 'circle' },
 					{ color: '#4CAF50', label: '공원', shape: 'circle' },
-					{ color: '#FF6F00', label: '30분 보행반경 (점선)' },
+					{ color: '#b48ef4', label: '30분 보행반경 (점선)' },
 					{ color: '#b48ef4', label: 'OSM 보행망 도달범위 (클릭)' }
 				]}
 				source="출처: 서울시 사회복지시설(노인여가복지시설) 목록 · 서울시 주요 공원현황(2026 상반기) · 반경 = 자치구 중심점 기준 직선거리 · 채워진 폴리곤 = OSM 보행망 Dijkstra+Convex Hull (지도 클릭 시 계산)"
@@ -954,23 +886,23 @@
 				<table class="ktbl">
 					<thead>
 						<tr>
-							<th class="th-sort" class:active={sortCol==='gu'} onclick={() => setSort('gu')}>
-								자치구{#if sortCol==='gu'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							<th class="th-sort" class:active={sortKey==='gu'} onclick={() => setSort('gu')}>
+								자치구{#if sortKey==='gu'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
 							</th>
-							<th class="th-sort" class:active={sortCol==='wCnt'} onclick={() => setSort('wCnt')}>
-								복지시설 수{#if sortCol==='wCnt'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							<th class="th-sort" class:active={sortKey==='wCnt'} onclick={() => setSort('wCnt')}>
+								복지시설 수{#if sortKey==='wCnt'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
 							</th>
-							<th class="th-sort" class:active={sortCol==='pCnt'} onclick={() => setSort('pCnt')}>
-								공원시설 수{#if sortCol==='pCnt'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							<th class="th-sort" class:active={sortKey==='pCnt'} onclick={() => setSort('pCnt')}>
+								공원시설 수{#if sortKey==='pCnt'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
 							</th>
-							<th class="th-sort" class:active={sortCol==='ws'} onclick={() => setSort('ws')}>
-								복지 점수{cSlope ? ' (경사)' : ''}{#if sortCol==='ws'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							<th class="th-sort" class:active={sortKey==='ws'} onclick={() => setSort('ws')}>
+								복지 점수{cSlope ? ' (경사)' : ''}{#if sortKey==='ws'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
 							</th>
-							<th class="th-sort" class:active={sortCol==='ps'} onclick={() => setSort('ps')}>
-								녹지 점수{cSlope ? ' (경사)' : ''}{#if sortCol==='ps'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							<th class="th-sort" class:active={sortKey==='ps'} onclick={() => setSort('ps')}>
+								녹지 점수{cSlope ? ' (경사)' : ''}{#if sortKey==='ps'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
 							</th>
-							<th class="th-sort" class:active={sortCol==='combined'} onclick={() => setSort('combined')}>
-								합산 점수{#if sortCol==='combined'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
+							<th class="th-sort" class:active={sortKey==='combined'} onclick={() => setSort('combined')}>
+								합산 점수{#if sortKey==='combined'}<span class="sort-arr">{sortDir==='desc'?'▼':'▲'}</span>{/if}
 							</th>
 							<th>접근성</th>
 						</tr>
@@ -1220,6 +1152,12 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+	/* 정렬 화살표 공간 확보 — 글자와 겹치지 않도록 */
+	.ktbl th.th-sort {
+		padding-right: 24px;
+		position: relative;
+		overflow: visible;
+	}
 	.ktbl th:first-child {
 		text-align: left;
 		width: 88px;
@@ -1274,21 +1212,8 @@
 		background: #9e9e9e14;
 		color: #666;
 	}
-	.th-sort {
-		cursor: pointer;
-		user-select: none;
-	}
-	.th-sort:hover {
-		color: var(--color-text);
-	}
-	.th-sort.active {
-		color: var(--color-purple, #8b5cf6);
-	}
-	.sort-arr {
-		margin-left: 3px;
-		font-size: 9px;
-		color: var(--color-purple, #8b5cf6);
-	}
+	/* .th-sort / .sort-arr 는 layout.css 글로벌 정의 사용 — 페이지 로컬 override 제거.
+	   글로벌이 활성 시에도 헤더 글자색 그대로 두고, 화살표만 도메인 액센트 (var(--pill-accent)) 로 표시. */
 	.bokji-hero {
 		position: relative;
 		background: var(--color-dark);

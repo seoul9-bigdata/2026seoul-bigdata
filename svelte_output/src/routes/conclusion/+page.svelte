@@ -7,6 +7,7 @@
 	import CountUp from '$lib/components/CountUp.svelte';
 	import { viewport } from '$lib/actions/viewport.js';
 	import conclusionData from '$lib/data/conclusion.json';
+	import { applySort, compareBy } from '$lib/util/sortable.js';
 	import {
 		DOMAINS_4,
 		scoreColor,
@@ -31,7 +32,7 @@
 
 	/** 보행자 유형 (CSV 컬럼 prefix) — '일반인'은 CSV 없음 (기준선=100) */
 	const SPEEDS = [
-		{ key: '노인',     label: '건강 노인',     mps: 1.12, emoji: '🧓' },
+		{ key: '노인',     label: '일반 노인',     mps: 1.12, emoji: '🧓' },
 		{ key: '보조',     label: '보행보조 노인', mps: 0.88, emoji: '🦯' },
 		{ key: '하위15',   label: '보조 하위15%',  mps: 0.7,  emoji: '🦽' }
 	];
@@ -115,19 +116,18 @@
 	/* ── 보행속도별 손실 비교 — 4 도메인 CSV 실데이터 평균 ── */
 	const speedComparison = [
 		{ label: '일반인',           score: 100,        color: '#4a9eff', emoji: '🚶', desc: '기준선' },
-		{ label: '건강 노인',        score: seniorAvg,  color: '#3ecfa0', emoji: '🧓', desc: pctVsBaseline(seniorAvg) + '%' },
+		{ label: '일반 노인',        score: seniorAvg,  color: '#3ecfa0', emoji: '🧓', desc: pctVsBaseline(seniorAvg) + '%' },
 		{ label: '보행보조 노인',    score: aidedAvg,   color: '#f5b740', emoji: '🦯', desc: pctVsBaseline(aidedAvg) + '%' },
 		{ label: '보행보조 하위 15%', score: bottom15Avg, color: '#ef5555', emoji: '🦽', desc: pctVsBaseline(bottom15Avg) + '%' }
 	];
 
-	/** 정렬 모드 */
+	/** 정렬 모드 — 헤더 클릭 정렬 */
 	let sortKey = $state('composite');
-	const sortedTable = $derived(
-		[...ranked].sort((a, b) => {
-			if (sortKey === 'name') return a.name.localeCompare(b.name);
-			return b[sortKey] - a[sortKey];
-		})
-	);
+	let sortDir = $state(/** @type {'asc' | 'desc'} */ ('desc'));
+	function setSort(/** @type {string} */ k) {
+		({ sortKey, sortDir } = applySort(k, sortKey, sortDir, ['name']));
+	}
+	const sortedTable = $derived([...ranked].sort(compareBy(sortKey, sortDir)));
 
 	/* ── Leaflet choropleth (종합 점수) + 클릭 시 detail card ── */
 	let mapEl = $state();
@@ -203,33 +203,33 @@
 		const seoulAvg = DOMAINS.map((d) => +(domainAvg.find((x) => x.key === d.key)?.avg ?? 0));
 		const data = DOMAINS.map((d) => +selectedGu[d.key].toFixed(1));
 		if (radarChart) radarChart.destroy();
+		// 다른 페이지(bokji/medical) 와 동일한 grouped bar 패턴 — 선택구 vs 서울 평균
 		radarChart = new Chart(radarChartEl, {
-			type: 'radar',
+			type: 'bar',
 			data: {
 				labels: DOMAINS.map((d) => d.label),
 				datasets: [
 					{
 						label: selectedGu.name,
 						data,
-						backgroundColor: COMPARE_COLORS.primary.fill,
+						backgroundColor: COMPARE_COLORS.primary.stroke + 'cc',
 						borderColor: COMPARE_COLORS.primary.stroke,
-						pointBackgroundColor: COMPARE_COLORS.primary.point,
-						pointBorderColor: '#fff',
-						pointHoverRadius: 6,
-						pointRadius: 4,
-						borderWidth: 2
+						borderWidth: 0,
+						borderRadius: 3,
+						borderSkipped: false,
+						barPercentage: 0.85,
+						categoryPercentage: 0.7
 					},
 					{
 						label: '서울 평균',
 						data: seoulAvg,
-						backgroundColor: COMPARE_COLORS.reference.fill,
+						backgroundColor: COMPARE_COLORS.reference.stroke + 'aa',
 						borderColor: COMPARE_COLORS.reference.stroke,
-						pointBackgroundColor: COMPARE_COLORS.reference.point,
-						pointBorderColor: '#fff',
-						pointHoverRadius: 5,
-						pointRadius: 3,
-						borderWidth: 1.6,
-						borderDash: [5, 3]
+						borderWidth: 0,
+						borderRadius: 3,
+						borderSkipped: false,
+						barPercentage: 0.85,
+						categoryPercentage: 0.7
 					}
 				]
 			},
@@ -237,13 +237,20 @@
 				responsive: true,
 				maintainAspectRatio: false,
 				scales: {
-					r: {
+					x: {
+						grid: { display: false },
+						ticks: { font: { size: 11 }, color: CHART_THEME.textColor }
+					},
+					y: {
 						min: 0,
 						max: 100,
-						ticks: { stepSize: 25, font: { size: 9 }, color: CHART_THEME.textColorMuted },
-						pointLabels: { font: { size: 11, weight: '500' }, color: CHART_THEME.textColor },
-						grid: { color: CHART_THEME.gridColor },
-						angleLines: { color: CHART_THEME.gridColor }
+						ticks: {
+							stepSize: 25,
+							font: { size: 10 },
+							color: CHART_THEME.textColorMuted,
+							callback: (/** @type {any} */ v) => v + '점'
+						},
+						grid: { color: CHART_THEME.gridColor }
 					}
 				},
 				plugins: {
@@ -256,7 +263,10 @@
 						borderWidth: 1,
 						padding: 8,
 						titleFont: { size: 12, weight: '500' },
-						bodyFont: { size: 11 }
+						bodyFont: { size: 11 },
+						callbacks: {
+							label: (/** @type {any} */ ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}점`
+						}
 					}
 				}
 			}
@@ -320,7 +330,7 @@
 		></div>
 
 		<div class="mb-4 flex flex-wrap items-center gap-2">
-			<p class="kicker" style:color="var(--color-accent)">결론 · 종합 진단 대시보드</p>
+			<p class="kicker" style:color="var(--color-accent)" style:letter-spacing="0.04em" style:text-transform="none">결론 · 종합 진단 대시보드</p>
 			{#each DOMAINS as d}
 				<span
 					class="rounded-full px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.06em]"
@@ -342,7 +352,7 @@
 
 		<p class="mb-7 max-w-[640px] text-[13.5px] leading-[1.85]" style:color="var(--color-text2)">
 			기후·인프라·복지/녹지·의료 4개 도메인 도달가능 점수를 결합한 25개 자치구 종합 진단.<br />
-			건강 노인(1.12&nbsp;m/s) 기준, 경사 미보정 점수.
+			일반 노인(1.12&nbsp;m/s) 기준, 경사 미보정 점수.
 		</p>
 
 		<StatGrid class="sm:grid-cols-4" cols={4}>
@@ -364,7 +374,7 @@
 	<!-- ── 보행 속도별 손실 비교 ── -->
 	<Card title="속도별 손실 · 일반인 대비 평균 도달가능 점수" class="mb-3.5">
 		<p class="mb-4 text-[12.5px] leading-[1.7]" style:color="var(--color-text2)">
-			보행속도가 떨어질수록 시설 도달 노드가 급감합니다. 본 페이지의 표·랭킹은 <strong>건강 노인 1.12&nbsp;m/s</strong>를 기준으로 합니다.
+			보행속도가 떨어질수록 시설 도달 노드가 급감합니다. 본 페이지의 표·랭킹은 <strong>일반 노인 1.12&nbsp;m/s</strong>를 기준으로 합니다.
 		</p>
 		<div class="space-y-2.5">
 			{#each speedComparison as s, i}
@@ -373,9 +383,9 @@
 						<span class="text-[14px]">{s.emoji}</span>
 						<span class="text-[12.5px] font-medium" style:color="var(--color-text)">{s.label}</span>
 					</div>
-					<div class="relative h-[18px] rounded-[4px]" style:background="var(--color-card-soft)">
+					<div class="relative h-[18px] rounded-[3px]" style:background="var(--color-card-soft)">
 						<div
-							class="bar-fill h-full rounded-[4px]"
+							class="bar-fill h-full rounded-[3px]"
 							style:width="{s.score}%"
 							style:background={s.color}
 							style:opacity="0.85"
@@ -526,9 +536,9 @@
 									<div class="text-[11.5px]" style:color="var(--color-text2)">
 										{d.emoji} {d.label}
 									</div>
-									<div class="relative h-[8px] rounded-full" style:background="rgba(0,0,0,0.05)">
+									<div class="relative h-[8px] rounded-[3px]" style:background="rgba(0,0,0,0.05)">
 										<div
-											class="domain-bar h-full rounded-full"
+											class="domain-bar h-full rounded-[3px]"
 											style:width="{v}%"
 											style:background="{d.color}cc"
 											style:--ad="{i * 80}ms"
@@ -621,42 +631,39 @@
 	</div>
 
 	<!-- ── 25구 상세 데이터 테이블 ── -->
-	<Card title="전체 25개 구 상세 점수 · 건강 노인 1.12 m/s · 경사 미보정" class="mb-3.5">
-		<div class="mb-3 flex flex-wrap items-center gap-2">
-			<span class="kicker">정렬</span>
-			{#each [
-				{ key: 'composite', label: '종합' },
-				{ key: 'climate',   label: '기후' },
-				{ key: 'infra',     label: '인프라' },
-				{ key: 'bokji',     label: '복지' },
-				{ key: 'medical',   label: '의료' },
-				{ key: 'name',      label: '가나다' }
-			] as t}
-				<button
-					type="button"
-					class="rounded-[6px] px-3 py-1 text-[11.5px] transition-colors"
-					style:background={sortKey === t.key ? 'var(--color-dark)' : '#fff'}
-					style:color={sortKey === t.key ? 'var(--color-dark-text)' : 'var(--color-text2)'}
-					style:border="0.5px solid {sortKey === t.key ? 'var(--color-dark)' : 'var(--color-border)'}"
-					onclick={() => (sortKey = t.key)}
-				>
-					{t.label}
-				</button>
-			{/each}
-		</div>
-
+	<Card title="전체 25개 구 상세 점수 · 일반 노인 1.12 m/s · 경사 미보정" class="mb-3.5">
 		<div class="overflow-x-auto rounded-[8px]" style:background="var(--color-card-soft)">
 			<table class="w-full text-[12px]">
 				<thead>
 					<tr style:border-bottom="0.5px solid var(--color-border)">
 						<th class="ct-label px-3 py-2 text-left">순위</th>
-						<th class="ct-label px-3 py-2 text-left">자치구</th>
+						<th
+							class="ct-label th-sort px-3 py-2 text-left"
+							class:active={sortKey === 'name'}
+							onclick={() => setSort('name')}
+						>
+							자치구
+							{#if sortKey === 'name'}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+						</th>
 						{#each DOMAINS as d}
-							<th class="ct-label px-3 py-2 text-left" style:color={d.color}>
+							<th
+								class="ct-label th-sort px-3 py-2 text-left"
+								class:active={sortKey === d.key}
+								style:color={d.color}
+								onclick={() => setSort(d.key)}
+							>
 								{d.emoji} {d.label}
+								{#if sortKey === d.key}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
 							</th>
 						{/each}
-						<th class="ct-label px-3 py-2 text-left">종합</th>
+						<th
+							class="ct-label th-sort px-3 py-2 text-left"
+							class:active={sortKey === 'composite'}
+							onclick={() => setSort('composite')}
+						>
+							종합
+							{#if sortKey === 'composite'}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+						</th>
 						<th class="ct-label px-3 py-2 text-left">최약축</th>
 					</tr>
 				</thead>
@@ -669,22 +676,17 @@
 							<td class="px-3 py-2 font-medium" style:color="var(--color-text)">{d.name}</td>
 							{#each ['climate', 'infra', 'bokji', 'medical'] as k}
 								<td class="px-3 py-2">
-									<span
-										class="inline-block rounded-[4px] px-2 py-[2px] font-mono text-[11.5px] tabular-nums"
-										style:background={scoreBg(d[k])}
-										style:color={scoreColor(d[k])}
-									>
+									<b class="font-mono text-[11.5px] tabular-nums" style:color={scoreColor(d[k])}>
 										{d[k].toFixed(1)}
-									</span>
+									</b>
+									<span class="score-bar" style="background:{scoreColor(d[k])};width:{Math.round(d[k] * 0.4)}px"></span>
 								</td>
 							{/each}
 							<td class="px-3 py-2">
-								<strong
-									class="font-mono text-[13px] tabular-nums"
-									style:color={scoreColor(d.composite)}
-								>
+								<strong class="font-mono text-[13px] tabular-nums" style:color={scoreColor(d.composite)}>
 									{d.composite}
 								</strong>
+								<span class="score-bar" style="background:{scoreColor(d.composite)};width:{Math.round(d.composite * 0.4)}px"></span>
 							</td>
 							<td class="px-3 py-2 text-[11.5px]" style:color="var(--color-text3)">
 								{d.weakest.emoji} {d.weakest.label}
@@ -696,7 +698,7 @@
 		</div>
 
 		<p class="mt-3 text-[11px] leading-[1.7]" style:color="var(--color-text3)">
-			* 도메인 점수 = (건강 노인 도달 노드 수 / 일반인 도달 노드 수) × 100. 기준 시간 30분 고정.<br />
+			* 도메인 점수 = (일반 노인 도달 노드 수 / 일반인 도달 노드 수) × 100. 기준 시간 30분 고정.<br />
 			** 종합 점수 = 4개 도메인 산술 평균. 본 페이지는 경사 미보정 기준이며, 경사 보정 적용 시 강북·도봉·관악·성북 등 가파른 구는 추가 하락합니다.<br />
 			*** 교통·이동 도메인은 결론 CSV가 별도 분석 단계에 있어 본 종합 점수에서 제외됨 (도메인 페이지에서 별도 살펴봅니다).
 		</p>
@@ -808,6 +810,15 @@
 		height: 380px;
 		width: 100%;
 		background: #e8e4db;
+	}
+
+	/* 표 셀 안의 score 막대 — bokji/medical/infra 와 통일된 패턴 */
+	.score-bar {
+		display: inline-block;
+		height: 5px;
+		border-radius: 3px;
+		vertical-align: middle;
+		margin-left: 4px;
 	}
 
 	/* iOS 스타일 토글 스위치 */

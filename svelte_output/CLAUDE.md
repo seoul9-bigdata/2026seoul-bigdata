@@ -299,6 +299,12 @@ L.polygon(ring, { color, fillOpacity: 0.18 }).addTo(map);
 2. **Dijkstra (Min-Heap)**: src → maxDistM 이내 reachable 노드 집합
 3. **Graham scan Convex Hull**: reachable의 lat/lng 점들 → 외곽 폴리곤 ring
 
+### 원본 Python 코드 (참고용)
+`scripts/build_osm_graph_isochrone.py` — `final_output/KIM/17_slope_dijkstra_ver3.py` 의 복사본.
+주요 함수: `convex_hull_coords(dx_arr, dy_arr, fallback_r, simplify_tol=30)` — `shapely.MultiPoint().convex_hull` 사용.
+`isochrone.js` 의 JS 구현은 이 Python 로직의 동등 변환 (shapely → Graham scan).
+GRAPH_GZ 생성 파이프라인도 동일 파일에 있음 (OSM 보행 네트워크 → CSR sparse matrix → base64 + raw deflate).
+
 ### Infra 페이지 통합
 - 점선 원 = 직선 반경 (참고용)
 - 채워진 폴리곤 = OSM 도로망 기반 실제 도달 범위
@@ -352,6 +358,12 @@ ENSEMBLE 5개 HTML에서 inline JSON 추출 (Python state-machine 파서로 한�
 - **dev 서버 reload 시 occasionally HMR 실패** → `pnpm dev` 재시작 필요.
 - **첫 진입 시 Leaflet GeoJSON fetch** (남한 raw GitHub URL). 오프라인이면 지도 빈 화면.
 - **Infra 페이지 첫 도달 시 OSM 그래프 ~3 MB fetch + 압축 해제 (~2~3 sec)** — Dijkstra 폴리곤 표시 지연. 이후 모듈 캐시.
+- **자치구별 점수 집계 원칙** — bokji/medical/infra 는 **동별 점수 평균 → 구로 집계** 패턴 (DONG 데이터 기반).
+  단 `ShelterTab` 만 예외 — `REACH_G` (구 단위 캐시) 데이터 자체가 구 단위로 이미 집계되어 있어 동 평균 단계가 없음.
+  즉 **데이터 출처가 구 단위인 경우에만 부득이하게 구 직접 집계 사용** (원칙: 데이터 가능하면 동 → 구).
+- **교통(transit) 페이지 자치구 필터** — `transit.json` 의 모든 데이터셋 (stations/anchors/heat/climate/emergency/od_stations) 에
+  Python 전처리(`scripts/preprocess_transit_gu.py`)로 `gu` 필드 추가 완료. od_stations 는 `ride_gu`/`goff_gu` 두 필드.
+  cG === '전체' 면 필터 없음. 매핑 실패 ~1% (서울 외 GTX/경기 경계 좌표).
 
 ## Build / Dev
 

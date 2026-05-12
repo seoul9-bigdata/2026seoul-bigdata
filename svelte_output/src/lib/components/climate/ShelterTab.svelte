@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import data from '$lib/data/climate.json';
 	import CountUp from '$lib/components/CountUp.svelte';
+	import { applySort, compareBy } from '$lib/util/sortable.js';
 	import 'leaflet/dist/leaflet.css';
 
 	const {
@@ -778,7 +779,7 @@
 		ctx.fillStyle = TXT2;
 		ctx.font = 'bold 11px system-ui';
 		ctx.textAlign = 'left';
-		ctx.fillText(`${guMeta.nm} · 동별 접근성 취약도 (${cT}분 / ${SPEEDS[cW].label})`, pad.l, 19);
+		ctx.fillText(`${guMeta.nm} · 동별 도달가능 취약도 (${cT}분 / ${SPEEDS[cW].label})`, pad.l, 19);
 
 		ctx.fillStyle = '#E74C3C0d';
 		ctx.fillRect(pad.l, pad.t + ph * 0.5, pw, ph * 0.5);
@@ -828,7 +829,7 @@
 		ctx.save();
 		ctx.translate(11, pad.t + ph / 2);
 		ctx.rotate(-Math.PI / 2);
-		ctx.fillText('접근성 점수 (0–100)', 0, 0);
+		ctx.fillText('도달가능 점수 (0–100)', 0, 0);
 		ctx.restore();
 
 		pts.forEach((p) => {
@@ -889,11 +890,18 @@
 		layerOn = { ...layerOn, choro: !layerOn.choro };
 	}
 
+	// 헤더 클릭 정렬 — 디폴트: 합산 점수 내림차순
+	let sortKey = $state('avg');
+	let sortDir = $state(/** @type {'asc' | 'desc'} */ ('desc'));
+	function setSort(/** @type {string} */ k) {
+		({ sortKey, sortDir } = applySort(k, sortKey, sortDir, ['nm']));
+	}
+
 	// 상세표 행
 	const tableRows = $derived.by(() => {
 		const sid = SPEEDS[cW].id;
 		const rKey = cSlope ? REACH_SG : REACH_G;
-		return GU_META.map((g) => {
+		const rows = GU_META.map((g) => {
 			const d = rKey[g.cd]?.[sid]?.[String(cT)];
 			const d0 = rKey[g.cd]?.g0?.[String(cT)];
 			const hs = calcScore(d?.heat, d0?.heat);
@@ -901,7 +909,9 @@
 			const avg = avgScore(hs, cs);
 			const sel = g.cd === cSel && cUnit === 'gu';
 			return { ...g, hs, cs, avg, sel };
-		}).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
+		});
+		rows.sort(compareBy(sortKey, sortDir));
+		return rows;
 	});
 
 	function gradePillClass(sc) {
@@ -922,7 +932,7 @@
 <div class="ctrl">
 	<div class="crow">
 		<span class="lbl">보행자 유형</span>
-		{#each ['🚶 일반인 1.28 m/s', '🧓 건강 노인 1.12 m/s', '🦽 보행보조 노인 0.88 m/s', '🦽 보행보조 하위 15% 0.70 m/s'] as label, i}
+		{#each ['🚶 일반인 1.28 m/s', '🧓 일반 노인 1.12 m/s', '🦽 보행보조 노인 0.88 m/s', '🦽 보행보조 하위 15% 0.70 m/s'] as label, i}
 			<button
 				type="button"
 				class="btn bw"
@@ -992,7 +1002,7 @@
 					<div class="ss">{stats.meta?.nm || ''} 구 내 등록 시설</div>
 				</div>
 				<div class="sc">
-					<div class="sl">합산 접근성 점수</div>
+					<div class="sl">합산 도달가능 점수</div>
 					<div class="sv-msg">다른 보행자 유형을<br />선택하면 표시됩니다</div>
 					<div class="ss">일반인은 비교 기준값 (분모)</div>
 				</div>
@@ -1006,22 +1016,22 @@
 				</div>
 			{:else}
 				<div class="sc">
-					<div class="sl" style:color="#d46800">☀️ 더위쉼터 접근성</div>
+					<div class="sl" style:color="#d46800">☀️ 더위쉼터 도달가능</div>
 					<div class="sv {scoreColorCls(stats.hScore)}">
 						{#if stats.hScore == null}-{:else}<CountUp value={+stats.hScore} decimals={1} />{/if}<span class="sv-unit"> 점</span>
 					</div>
 					<div class="ss">{SPEEDS[cW].label} · 구 내 동 평균</div>
 				</div>
 				<div class="sc">
-					<div class="sl" style:color="#1a5fa0">❄️ 한파쉼터 접근성</div>
+					<div class="sl" style:color="#1a5fa0">❄️ 한파쉼터 도달가능</div>
 					<div class="sv {scoreColorCls(stats.cScore)}">
 						{#if stats.cScore == null}-{:else}<CountUp value={+stats.cScore} decimals={1} />{/if}<span class="sv-unit"> 점</span>
 					</div>
 					<div class="ss">{SPEEDS[cW].label} · 구 내 동 평균</div>
 				</div>
 				<div class="sc">
-					<div class="sl">합산 접근성 점수</div>
-					<div class="sv {scoreColorCls(stats.avg)}" style:font-size="28px">
+					<div class="sl">합산 도달가능 점수</div>
+					<div class="sv {scoreColorCls(stats.avg)}">
 						{#if stats.avg == null}-{:else}<CountUp value={+stats.avg} decimals={1} />{/if}<span class="sv-unit"> 점</span>
 					</div>
 					<div class="ss">(더위 + 한파) / 2 · {stats.meta?.nm || ''}</div>
@@ -1043,7 +1053,7 @@
 			<div class="sc">
 				<div class="sl" style:color="#d46800">☀️ 더위쉼터 도달가능</div>
 				{#if stats.isBase}
-					<div class="sv orange" style:font-size="18px"><CountUp value={hCnt} /><span class="sv-unit"> 개 도달 가능</span></div>
+					<div class="sv orange"><CountUp value={hCnt} /><span class="sv-unit"> 개 도달 가능</span></div>
 					<div class="ss">일반인 {cT}분 기준 도달 가능 개소</div>
 				{:else}
 					<div class="cnt-line">
@@ -1062,7 +1072,7 @@
 			<div class="sc">
 				<div class="sl" style:color="#1a5fa0">❄️ 한파쉼터 도달가능</div>
 				{#if stats.isBase}
-					<div class="sv blue" style:font-size="18px"><CountUp value={cCnt} /><span class="sv-unit"> 개 도달 가능</span></div>
+					<div class="sv blue"><CountUp value={cCnt} /><span class="sv-unit"> 개 도달 가능</span></div>
 					<div class="ss">일반인 {cT}분 기준 도달 가능 개소</div>
 				{:else}
 					<div class="cnt-line">
@@ -1080,13 +1090,13 @@
 			</div>
 			{#if stats.isBase}
 				<div class="sc">
-					<div class="sl">합산 접근성 점수</div>
+					<div class="sl">합산 도달가능 점수</div>
 					<div class="sv-msg">다른 보행자 유형을<br />선택하면 표시됩니다</div>
 					<div class="ss">일반인은 비교 기준값 (분모)</div>
 				</div>
 			{:else}
 				<div class="sc">
-					<div class="sl">합산 접근성 점수</div>
+					<div class="sl">합산 도달가능 점수</div>
 					<div class="sv {scoreColorCls(stats.avg)}">
 						{#if stats.avg == null}-{:else}<CountUp value={+stats.avg} decimals={1} />{/if}<span class="sv-unit"> 점</span>
 					</div>
@@ -1109,7 +1119,7 @@
 <!-- 지도 + 단절망 -->
 <div class="r2">
 	<div class="card">
-		<div class="ct">서울시 기후쉼터 접근성 — 합산 도달가능 점수</div>
+		<div class="ct">서울시 기후쉼터 도달가능 — 합산 도달가능 점수</div>
 		<div class="map-wrap">
 			<div bind:this={mapEl} class="lmap"></div>
 		</div>
@@ -1130,11 +1140,11 @@
 		</div>
 	</div>
 	<div class="card">
-		<div class="ct">{cUnit === 'gu' ? '구 내 동별 취약도 분포 — 65세 인구 × 접근성 점수' : '단절망 — 보행 도달 가능 연결 시각화'}</div>
+		<div class="ct">{cUnit === 'gu' ? '구 내 동별 취약도 분포 — 65세 인구 × 도달가능 점수' : '단절망 — 보행 도달 가능 연결 시각화'}</div>
 		<canvas bind:this={canvasNetwork} class="dark-canvas" width="500" height="370" style:background={cUnit === 'gu' ? '#fafaf8' : '#080a10'}></canvas>
 		<div class="src" style="margin-top:5px">
 			{#if cUnit === 'gu'}
-				각 점 = 동 · 색: 접근성 등급 · 좌하단 = 고령 많고 접근 낮음 (최취약)
+				각 점 = 동 · 색: 도달가능 등급 · 좌하단 = 고령 많고 접근 낮음 (최취약)
 			{:else}
 				중심→쉼터 광섬유 연결 · 도달 가능=빛나는 라인 / 불가=단절된 파편 · 주황=더위쉼터 / 청=한파쉼터
 			{/if}
@@ -1166,18 +1176,25 @@
 
 <!-- 상세표 -->
 <div class="card" style="position:relative">
-	<div class="ct">자치구별 기후쉼터 접근성 상세표</div>
+	<div class="ct">자치구별 기후쉼터 도달가능 상세표</div>
 	<div class="tbl-wrap">
 		<table class="ktbl">
 			<thead>
 				<tr>
-					<th>자치구</th>
-					<th>더위쉼터</th>
-					<th>한파쉼터</th>
-					<th>더위 점수</th>
-					<th>한파 점수</th>
-					<th>합산 점수</th>
-					<th>접근성</th>
+					{#each [
+						{ k: 'nm',   label: '자치구' },
+						{ k: 'heat', label: '더위쉼터' },
+						{ k: 'cold', label: '한파쉼터' },
+						{ k: 'hs',   label: '더위 점수' },
+						{ k: 'cs',   label: '한파 점수' },
+						{ k: 'avg',  label: '합산 점수' }
+					] as col (col.k)}
+						<th class="th-sort" class:active={sortKey === col.k} onclick={() => setSort(col.k)}>
+							{col.label}
+							{#if sortKey === col.k}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+						</th>
+					{/each}
+					<th>도달가능</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -1215,7 +1232,7 @@
 
 <style>
 	.ctrl {
-		background: #fff;
+		background: var(--color-card);
 		border: 0.5px solid var(--color-border);
 		border-radius: 12px;
 		padding: 14px 20px;
@@ -1411,7 +1428,7 @@
 		margin-bottom: 14px;
 	}
 	.card {
-		background: #fff;
+		background: var(--color-card);
 		border: 0.5px solid var(--color-border);
 		border-radius: 12px;
 		padding: 16px 18px;
@@ -1494,6 +1511,9 @@
 	.tbl-wrap {
 		overflow-x: auto;
 		margin-top: 14px;
+		border: 0.5px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-card);
 	}
 	.ktbl {
 		width: 100%;
@@ -1502,26 +1522,37 @@
 	}
 	.ktbl th {
 		background: var(--color-card-soft);
-		padding: 8px 10px;
+		padding: 9px 14px;
 		text-align: right;
 		font-weight: 500;
 		color: var(--color-text2);
 		border-bottom: 1px solid var(--color-border);
+		border-right: 0.5px solid var(--color-border-soft);
 		white-space: nowrap;
+	}
+	.ktbl th:last-child { border-right: none; }
+	/* 정렬 화살표가 차지하는 공간 확보 — 글자와 겹치지 않도록 */
+	.ktbl th.th-sort {
+		padding-right: 24px;
+		position: relative;
 	}
 	.ktbl th:first-child {
 		text-align: left;
+		border-top-left-radius: 7.5px;
 	}
 	.ktbl th:last-child {
 		text-align: center;
+		border-top-right-radius: 7.5px;
 	}
 	.ktbl td {
-		padding: 7px 10px;
+		padding: 7px 14px;
 		border-bottom: 0.5px solid var(--color-border-soft);
+		border-right: 0.5px solid var(--color-border-soft);
 		color: var(--color-text);
 		text-align: right;
 		white-space: nowrap;
 	}
+	.ktbl td:last-child { border-right: none; }
 	.ktbl td:first-child {
 		text-align: left;
 	}

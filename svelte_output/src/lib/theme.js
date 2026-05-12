@@ -212,3 +212,25 @@ export const ANIM = {
 export const barStagger = (i = 0) => i * ANIM.bar.stagger;
 export const countStagger = (i = 0) => ANIM.countUp.duration + i * ANIM.countUp.stagger;
 export const fadeStagger = (i = 0) => i * ANIM.fade.stagger;
+
+/* ────────────────────────────────────────────────────────────
+ *  BAR_STYLES — 표·통계 카드의 progress bar 통일.
+ *  사용: <div class={...}>...</div>
+ *
+ *  height 위계 (작은 → 큰):
+ *    thin (5px)  : 표 안의 미니 score-bar
+ *    medium (8px): 상세 카드 도메인별 bar
+ *    thick (12px): 랭킹·정책 우선순위 list bar
+ *    fat (18px)  : 비교 차트의 메인 bar (속도별 손실 등)
+ *
+ *  모든 막대 radius = 3px (rounded-full 금지 — UI 일관성).
+ * ──────────────────────────────────────────────────────────── */
+export const BAR_STYLES = {
+	radius: 3,
+	height: {
+		thin: 5,
+		medium: 8,
+		thick: 12,
+		fat: 18
+	}
+};

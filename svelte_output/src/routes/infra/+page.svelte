@@ -9,6 +9,7 @@
 	import Note from '$lib/components/Note.svelte';
 	import CountUp from '$lib/components/CountUp.svelte';
 	import { loadGraph, computeIsochrone } from '$lib/util/isochrone.js';
+	import { applySort, compareBy } from '$lib/util/sortable.js';
 
 	const {
 		ALL_DONG_DATA, BANK_SERIES, GU_BANK, GU_BANK_YEARS, CENTERS, CENTER_BY_GU,
@@ -20,14 +21,16 @@
 	];
 
 	let cW = $state(0);
-	let cT = $state(15);
-	let cG = $state('중구');
-	let cD = $state('중구_소공동');
+	let cT = $state(30);
+	let cG = $state('종로구');
+	let cD = $state('종로구_사직동');
 	let cSlope = $state(false);
 	let cUnit = $state('dong');
 	let cLayer = $state('all');
-	let sortKey = $state('score');
-	let sortDir = $state('desc');
+	let sortKeyGu = $state('score');
+	let sortDirGu = $state(/** @type {'asc' | 'desc'} */ ('desc'));
+	let sortKeyDong = $state('score');
+	let sortDirDong = $state(/** @type {'asc' | 'desc'} */ ('desc'));
 
 	function getToblerRatio(dongKey) {
 		if (TOBLER_DONG[dongKey] != null) return TOBLER_DONG[dongKey];
@@ -620,18 +623,15 @@
 					score: calcScore(loss, k)
 				};
 			});
-		const dir = sortDir === 'desc' ? -1 : 1;
-		rows.sort((a, b) => {
-			const av = a[sortKey], bv = b[sortKey];
-			if (typeof av === 'string') return av.localeCompare(bv, 'ko') * dir;
-			return ((av || 0) - (bv || 0)) * dir;
-		});
+		rows.sort(compareBy(sortKeyDong, sortDirDong));
 		return rows;
 	});
 
-	function setSort(k) {
-		if (sortKey === k) sortDir = sortDir === 'desc' ? 'asc' : 'desc';
-		else { sortKey = k; sortDir = (k === 'dong' || k === 'gu') ? 'asc' : 'desc'; }
+	function setSortGu(/** @type {string} */ k) {
+		({ sortKey: sortKeyGu, sortDir: sortDirGu } = applySort(k, sortKeyGu, sortDirGu, ['gu']));
+	}
+	function setSortDong(/** @type {string} */ k) {
+		({ sortKey: sortKeyDong, sortDir: sortDirDong } = applySort(k, sortKeyDong, sortDirDong, ['gu', 'dong']));
 	}
 
 	const guRankRows = $derived.by(() => {
@@ -654,7 +654,7 @@
 			byGu[gu].tot += (wd.tot || 0);
 			byGu[gu].dongCount++;
 		}
-		return Object.entries(byGu)
+		const rows = Object.entries(byGu)
 			.map(([gu, d]) => ({
 				gu,
 				score: d.scores.length ? parseFloat((d.scores.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0) / d.scores.length).toFixed(1)) : null,
@@ -665,8 +665,9 @@
 				bank: Math.round(d.bank / d.dongCount * 10) / 10,
 				center: Math.round(d.center / d.dongCount * 10) / 10,
 				tot: Math.round(d.tot / d.dongCount * 10) / 10,
-			}))
-			.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+			}));
+		rows.sort(compareBy(sortKeyGu, sortDirGu));
+		return rows;
 	});
 
 	function panToRow(r) {
@@ -959,15 +960,13 @@
 						<thead>
 							<tr>
 								<th class="rank-th">순위</th>
-								<th>자치구</th>
-								<th>전통시장</th>
-								<th>슈퍼</th>
-								<th>은행</th>
-								<th>주민센터</th>
-								<th>합계</th>
-								<th>65세+</th>
-								<th>도달가능점수 (동 평균)</th>
-								<th>접근성</th>
+								{#each [{ k: 'gu', label: '자치구' },{ k: 'mkt', label: '전통시장' },{ k: 'sup', label: '슈퍼' },{ k: 'bank', label: '은행' },{ k: 'center', label: '주민센터' },{ k: 'tot', label: '합계' },{ k: 'elder', label: '65세+' },{ k: 'score', label: '도달가능점수 (동 평균)' }] as col}
+									<th class="th-sort" class:active={sortKeyGu === col.k} onclick={() => setSortGu(col.k)}>
+										{col.label}
+										{#if sortKeyGu === col.k}<span class="sort-arr">{sortDirGu === 'desc' ? '▼' : '▲'}</span>{/if}
+									</th>
+								{/each}
+								<th>도달가능</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -999,12 +998,12 @@
 						<thead>
 							<tr>
 								{#each [{ k: 'gu', label: '자치구' },{ k: 'dong', label: '행정동' },{ k: 'mkt', label: '전통시장' },{ k: 'sup', label: '슈퍼' },{ k: 'bank', label: '은행' },{ k: 'center', label: '주민센터' },{ k: 'tot', label: '합계' },{ k: 'elder', label: '65세+' },{ k: 'score', label: '도달 가능 점수' }] as col}
-									<th class="th-sort" class:active={sortKey === col.k} onclick={() => setSort(col.k)}>
+									<th class="th-sort" class:active={sortKeyDong === col.k} onclick={() => setSortDong(col.k)}>
 										{col.label}
-										{#if sortKey === col.k}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+										{#if sortKeyDong === col.k}<span class="sort-arr">{sortDirDong === 'desc' ? '▼' : '▲'}</span>{/if}
 									</th>
 								{/each}
-								<th>접근성</th>
+								<th>도달가능</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -1043,7 +1042,7 @@
 
 	<Note tone="cool" class="mb-4">
 		※ 도달가능점수 = (선택 유형 도달 시설 수 / 일반인 도달 시설 수) × 100<br />
-		※ 보행자 유형: 일반인 1.28 · 건강 노인 1.12 · 보행보조 노인 0.88 · 보행보조 하위15% 0.70 m/s<br />
+		※ 보행자 유형: 일반인 1.28 · 일반 노인 1.12 · 보행보조 노인 0.88 · 보행보조 하위15% 0.70 m/s<br />
 		※ 경사 보정: {cSlope ? 'Tobler hiking function 기반 동별 속도 보정 (tobler_ratio_LEE.csv, LEE 2026)' : '평지 기준 (보정 없음)'}<br />
 		※ 거리 측정: 행정동 centroid 기준 OSM 보행 네트워크(다익스트라) · 시설: 전통시장 · 슈퍼마켓 · 은행 · 주민센터
 	</Note>
@@ -1191,10 +1190,8 @@
 	table { width: 100%; font-size: 12px; border-collapse: collapse; }
 	thead { position: sticky; top: 0; background: #fff; z-index: 1; }
 	th { text-align: left; font-weight: 500; font-size: 11px; color: var(--color-text3); padding: 8px 10px; border-bottom: 0.5px solid var(--color-border); white-space: nowrap; }
-	.th-sort { cursor: pointer; user-select: none; }
-	.th-sort:hover { color: var(--color-text); }
-	.th-sort.active { color: var(--color-text); }
-	.sort-arr { font-size: 9px; margin-left: 2px; color: var(--color-teal); }
+	/* 정렬 화살표 공간 확보 — Svelte scoped CSS 가 layout.css .th-sort 보다 specific */
+	th.th-sort { padding-right: 24px; position: relative; }
 	td { padding: 7px 10px; border-bottom: 0.5px solid var(--color-border-soft); }
 	tbody tr { cursor: pointer; }
 	tr:hover td { background: #fafaf8; }
@@ -1245,7 +1242,7 @@
 	.rank-num { text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--color-text3); font-weight: 600; }
 
 	.score-val { display: inline-block; min-width: 46px; font-family: var(--font-mono); font-size: 11px; }
-	.score-bar { display: inline-block; height: 8px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+	.score-bar { display: inline-block; height: 5px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
 	.pill { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; font-weight: 500; }
 	.pill.phi { background: #2e7d3218; color: #2e7d32; }
 	.pill.pmd { background: #f57f1718; color: #f57f17; }

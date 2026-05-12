@@ -8,7 +8,12 @@
 	const XFER = D.xfer_breakdown;
 	const CHAIN = D.chain_breakdown;
 
-	let { active = true } = $props();
+	let { active = true, cG = '전체' } = $props();
+
+	// cG 필터링: '전체' 면 전체, 그 외 자치구 매칭만
+	const stationsF = $derived(
+		cG === '전체' ? STATIONS : STATIONS.filter((s) => s.gu === cG)
+	);
 
 	let mapEl = $state();
 	let map;
@@ -45,32 +50,46 @@
 		'11740': '강동구'
 	};
 
-	// TOP 환승시간 긴 정류장 (이용객 50 이상만)
-	const topSlow = STATIONS
-		.filter((s) => s.avg_xfer_sec && s.elder_rides >= 50)
-		.sort((a, b) => b.avg_xfer_sec - a.avg_xfer_sec)
-		.slice(0, 10);
+	// TOP 환승시간 긴 정류장 (이용객 50 이상만) — 필터된 데이터 기준
+	const topSlow = $derived(
+		stationsF
+			.filter((s) => s.avg_xfer_sec && s.elder_rides >= 50)
+			.sort((a, b) => b.avg_xfer_sec - a.avg_xfer_sec)
+			.slice(0, 10)
+	);
 
-	// TOP 이용객 많은 정류장
-	const topBusy = [...STATIONS]
-		.sort((a, b) => (b.elder_rides || 0) - (a.elder_rides || 0))
-		.slice(0, 10);
+	// TOP 이용객 많은 정류장 — 필터된 데이터 기준
+	const topBusy = $derived(
+		[...stationsF]
+			.sort((a, b) => (b.elder_rides || 0) - (a.elder_rides || 0))
+			.slice(0, 10)
+	);
 
-	// 환승 종류 4분해 (전체 합산)
-	const xferAgg = (() => {
+	// 환승 종류 4분해 (필터된 정류장의 XFER 만 합산)
+	const xferAgg = $derived.by(() => {
 		const agg = { BB: 0, BT: 0, TB: 0, TT: 0 };
-		Object.values(XFER).forEach((row) => {
-			Object.entries(row).forEach(([k, v]) => {
-				if (agg[k] != null) agg[k] += v.pax || 0;
+		if (cG === '전체') {
+			Object.values(XFER).forEach((row) => {
+				Object.entries(row).forEach(([k, v]) => {
+					if (agg[k] != null) agg[k] += v.pax || 0;
+				});
 			});
-		});
+		} else {
+			stationsF.forEach((s) => {
+				const row = XFER[s.sttn_id];
+				if (!row) return;
+				Object.entries(row).forEach(([k, v]) => {
+					if (agg[k] != null) agg[k] += v.pax || 0;
+				});
+			});
+		}
 		return agg;
-	})();
+	});
 
-	// 자치구별 평균 환승시간
-	const guAvg = (() => {
+	// 자치구별 평균 환승시간 — '전체' 면 25개 자치구 비교, 자치구 선택 시 해당 구만
+	const guAvg = $derived.by(() => {
 		const m = {};
-		STATIONS.forEach((s) => {
+		stationsF.forEach((s) => {
 			if (!s.sgg_cd || !s.avg_xfer_sec || !s.elder_rides || s.elder_rides < 30) return;
 			const nm = SGG_TO_NAME[s.sgg_cd];
 			if (!nm) return;
@@ -79,7 +98,7 @@
 		return Object.entries(m)
 			.map(([nm, arr]) => ({ nm, avg: arr.reduce((a, b) => a + b, 0) / arr.length }))
 			.sort((a, b) => b.avg - a.avg);
-	})();
+	});
 
 	function popupHtml(s) {
 		const xb = XFER[s.sttn_id];
@@ -118,7 +137,7 @@
 		if (!L || !map) return;
 		if (stationLayer) map.removeLayer(stationLayer);
 		stationLayer = L.layerGroup();
-		STATIONS.forEach((s) => {
+		stationsF.forEach((s) => {
 			if (!s.lat || !s.lon) return;
 			L.circleMarker([s.lat, s.lon], {
 				radius: radiusForRides(s.elder_rides),
@@ -131,6 +150,23 @@
 				.addTo(stationLayer);
 		});
 		stationLayer.addTo(map);
+	}
+
+	function zoomToFiltered() {
+		if (!L || !map) return;
+		if (cG === '전체') {
+			map.setView([37.5665, 126.978], 11, { animate: true });
+			return;
+		}
+		const pts = stationsF.filter((s) => s.lat && s.lon).map((s) => [s.lat, s.lon]);
+		if (pts.length === 0) return;
+		const lats = pts.map((p) => p[0]);
+		const lons = pts.map((p) => p[1]);
+		const bounds = L.latLngBounds([
+			[Math.min(...lats), Math.min(...lons)],
+			[Math.max(...lats), Math.max(...lons)]
+		]);
+		map.fitBounds(bounds.pad(0.1));
 	}
 
 	function panToStn(s) {
@@ -230,6 +266,26 @@
 			setTimeout(() => map.invalidateSize(), 0);
 		}
 	});
+
+	// cG 변경 시: 마커/차트 재구성 + 지도 줌
+	$effect(() => {
+		void cG;
+		void stationsF;
+		if (!map) return;
+		buildLayer();
+		zoomToFiltered();
+	});
+
+	$effect(() => {
+		void cG;
+		void xferAgg;
+		void guAvg;
+		if (!Chart) return;
+		mixChart?.destroy();
+		guChart?.destroy();
+		setupMixChart();
+		setupGuChart();
+	});
 </script>
 
 <div class="r2">
@@ -317,7 +373,7 @@
 		gap: 14px;
 	}
 	.card {
-		background: #fff;
+		background: var(--color-card);
 		border: 0.5px solid var(--color-border);
 		border-radius: 12px;
 		padding: 16px 18px;

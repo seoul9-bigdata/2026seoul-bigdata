@@ -7,7 +7,7 @@
 	const HEAT = D.heat;
 	const CLIMATE = D.climate;
 
-	let { active = true } = $props();
+	let { active = true, cG = '전체' } = $props();
 
 	let mapEl = $state();
 	let map;
@@ -18,14 +18,20 @@
 	let showDead = $state(true);
 	let showOk = $state(true);
 
+	// cG 필터링
+	const heatF = $derived(cG === '전체' ? HEAT : HEAT.filter((h) => h.gu === cG));
+	const climateF = $derived(cG === '전체' ? CLIMATE : CLIMATE.filter((c) => c.gu === cG));
+
 	// 사각지대 (heat_within_100m === 0)
-	const deadStations = CLIMATE.filter((c) => c.heat_within_100m === 0);
-	const okStations = CLIMATE.filter((c) => c.heat_within_100m > 0);
+	const deadStations = $derived(climateF.filter((c) => c.heat_within_100m === 0));
+	const okStations = $derived(climateF.filter((c) => c.heat_within_100m > 0));
 
 	// TOP30 사각지대 (heat_nearest_m 큰 순)
-	const top30Dead = [...deadStations]
-		.sort((a, b) => (b.heat_nearest_m || 0) - (a.heat_nearest_m || 0))
-		.slice(0, 30);
+	const top30Dead = $derived(
+		[...deadStations]
+			.sort((a, b) => (b.heat_nearest_m || 0) - (a.heat_nearest_m || 0))
+			.slice(0, 30)
+	);
 
 	function buildLayers() {
 		if (!L || !map) return;
@@ -34,7 +40,7 @@
 		if (okLayer) map.removeLayer(okLayer);
 
 		heatLayer = L.layerGroup();
-		HEAT.forEach((h) => {
+		heatF.forEach((h) => {
 			if (!h.lat || !h.lng) return;
 			L.circleMarker([h.lat, h.lng], {
 				radius: 3,
@@ -108,6 +114,26 @@
 		else if (!on && layer._map) map.removeLayer(layer);
 	}
 
+	function zoomToFiltered() {
+		if (!L || !map) return;
+		if (cG === '전체') {
+			map.setView([37.5665, 126.978], 11, { animate: true });
+			return;
+		}
+		const pts = [
+			...climateF.filter((c) => c.lat && c.lon).map((c) => [c.lat, c.lon]),
+			...heatF.filter((h) => h.lat && h.lng).map((h) => [h.lat, h.lng])
+		];
+		if (pts.length === 0) return;
+		const lats = pts.map((p) => p[0]);
+		const lons = pts.map((p) => p[1]);
+		const bounds = L.latLngBounds([
+			[Math.min(...lats), Math.min(...lons)],
+			[Math.max(...lats), Math.max(...lons)]
+		]);
+		map.fitBounds(bounds.pad(0.1));
+	}
+
 	onMount(async () => {
 		if (typeof window === 'undefined') return;
 		L = (await import('leaflet')).default;
@@ -131,6 +157,16 @@
 		tog(okLayer, showOk);
 		tog(deadLayer, showDead);
 	});
+
+	// cG 변경 시: 마커 재구성 + 지도 줌
+	$effect(() => {
+		void cG;
+		void heatF;
+		void climateF;
+		if (!map) return;
+		buildLayers();
+		zoomToFiltered();
+	});
 </script>
 
 <div class="r2">
@@ -138,7 +174,7 @@
 		<div class="ct">폭염 정류장 — 100m 내 더위쉼터 사각지대 분포</div>
 		<div class="ctrl">
 			<button type="button" class="chk-btn" class:on={showHeat} onclick={() => (showHeat = !showHeat)}>
-				<span class="chk-dot" style:background="#ff8c00"></span>더위쉼터 ({HEAT.length})
+				<span class="chk-dot" style:background="#ff8c00"></span>더위쉼터 ({heatF.length})
 			</button>
 			<button type="button" class="chk-btn" class:on={showOk} onclick={() => (showOk = !showOk)}>
 				<span class="chk-dot" style:background="#3ecfa0"></span>인접 정류장 ({okStations.length})
@@ -179,7 +215,7 @@
 		margin-bottom: 14px;
 	}
 	.card {
-		background: #fff;
+		background: var(--color-card);
 		border: 0.5px solid var(--color-border);
 		border-radius: 12px;
 		padding: 16px 18px;

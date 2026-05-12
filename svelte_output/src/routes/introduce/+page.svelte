@@ -60,6 +60,7 @@
 				if (r != null) {
 					layer.bindTooltip(`<b>${nm}</b><br>${year}년 고령화율 ${r}%`, { sticky: true });
 				}
+				// hover 효과만 (클릭 핸들러 X)
 				layer.on({
 					mouseover: (e) => e.target.setStyle({ fillOpacity: 1, weight: 2 }),
 					mouseout: (e) => e.target.setStyle({ fillOpacity: 0.85, weight: 1.2 })
@@ -136,7 +137,7 @@
 	/** 4종 보행 유형 — introduce_ver2.html 동일 (출처 한음 외 2020) */
 	const SPEEDS = [
 		{ label: '일반인',           mps: 1.28, color: '#4a9eff', emoji: '🚶', score: 100, note: '기준선' },
-		{ label: '건강 노인',        mps: 1.12, color: '#3ecfa0', emoji: '🧓', score: 77,  note: '평균' },
+		{ label: '일반 노인',        mps: 1.12, color: '#3ecfa0', emoji: '🧓', score: 77,  note: '평균' },
 		{ label: '보행보조 노인',    mps: 0.88, color: '#f5b740', emoji: '🦯', score: 47,  note: '−53%' },
 		{ label: '보행보조 하위 15%', mps: 0.70, color: '#ef5555', emoji: '🦽', score: 30, note: '−70%' }
 	];
@@ -293,7 +294,7 @@
 						{@const bg = colorOf(d.value)}
 						<div class="grid grid-cols-[80px_1fr_60px] items-center gap-2.5">
 							<div class="text-[11.5px] font-medium" style:color="var(--color-text)">{d.name}</div>
-							<div class="relative h-[14px] rounded-[3px]" style:background="rgba(0,0,0,0.04)">
+							<div class="relative h-[12px] rounded-[3px]" style:background="rgba(0,0,0,0.04)">
 								<div
 									class="bar-fill h-full rounded-[3px]"
 									style:width="{w}%"
@@ -435,12 +436,9 @@
 
 		<div class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
 			{#each FRAMES as f}
-				<a
-					href="{base}/{f.slug}"
-					class="card-shell group relative block overflow-hidden no-underline transition-all duration-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)]"
-				>
+				<div class="card-shell relative overflow-hidden">
 					<span
-						class="absolute inset-x-0 top-0 h-[2.5px] origin-left scale-x-0 transition-transform duration-300 group-hover:scale-x-100"
+						class="absolute inset-x-0 top-0 h-[2.5px]"
 						style:background={domains.find((d) => d.slug === f.slug)?.accent ?? 'var(--color-accent)'}
 					></span>
 					<div class="kicker mb-1">{f.no}</div>
@@ -451,7 +449,7 @@
 					<div class="text-[11.5px] leading-[1.55]" style:color="var(--color-text3)">
 						{f.desc}
 					</div>
-				</a>
+				</div>
 			{/each}
 		</div>
 	</Card>

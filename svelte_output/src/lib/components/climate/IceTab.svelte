@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import data from '$lib/data/climate.json';
 	import CountUp from '$lib/components/CountUp.svelte';
+	import { applySort, compareBy } from '$lib/util/sortable.js';
 	import 'leaflet/dist/leaflet.css';
 
 	const { ICING_GU, ICING_S, JISEOL, GU_GEO, SEOUL_OUTLINE } = data;
@@ -30,17 +31,24 @@
 		return '#2E7D32';
 	}
 
-	const rankRows = $derived.by(() =>
-		Object.entries(ICING_GU)
-			.map(([cd, d]) => ({
-				cd,
-				nm: d.nm,
-				pct: curBuf === 100 ? d.vuln100 : d.vuln200,
-				nodes: d.nodes,
-				jiseol: d.jiseol
-			}))
-			.sort((a, b) => b.pct - a.pct)
-	);
+	// 헤더 클릭 정렬 — 디폴트: 취약 비율 내림차순
+	let sortKey = $state('pct');
+	let sortDir = $state(/** @type {'asc' | 'desc'} */ ('desc'));
+	function setSort(/** @type {string} */ k) {
+		({ sortKey, sortDir } = applySort(k, sortKey, sortDir, ['nm']));
+	}
+
+	const rankRows = $derived.by(() => {
+		const rows = Object.entries(ICING_GU).map(([cd, d]) => ({
+			cd,
+			nm: d.nm,
+			pct: curBuf === 100 ? d.vuln100 : d.vuln200,
+			nodes: d.nodes,
+			jiseol: d.jiseol
+		}));
+		rows.sort(compareBy(sortKey, sortDir));
+		return rows;
+	});
 
 	const cards = $derived.by(() => {
 		const km2 = curBuf === 100 ? ICING_S.icing_100_km2 : ICING_S.icing_200_km2;
@@ -76,7 +84,7 @@
 				this._buf = buf;
 				if (this._map) this._reset();
 			},
-			_animateZoom: function (e) {
+			_animateZoom: function 이미 (e) {
 				const m = this._map;
 				const scale = m.getZoomScale(e.zoom);
 				const offset = m._latLngBoundsToNewLayerBounds(m.getBounds(), e.zoom, e.center).min;
@@ -358,13 +366,21 @@
 	});
 
 	$effect(() => {
-		if (!map || !boxesLayer || !icingLayer || !covLayer) return;
-		if (iceOn.icing) icingLayer.addTo(map);
-		else icingLayer.remove();
-		if (iceOn.cov) covLayer.addTo(map);
-		else covLayer.remove();
-		if (iceOn.boxes) boxesLayer.addTo(map);
-		else map.removeLayer(boxesLayer);
+		// 명시적 destructure 로 의존성 추적 보장
+		const { icing, cov, boxes } = iceOn;
+		if (!map) return;
+		// layer 별 독립 처리 + hasLayer 멱등성 체크 — 한 layer 가 null 이어도 다른 toggle 차단 안 함
+		const setLayer = (/** @type {any} */ layer, /** @type {boolean} */ on) => {
+			if (!layer) return;
+			if (on) {
+				if (!map.hasLayer(layer)) layer.addTo(map);
+			} else {
+				if (map.hasLayer(layer)) map.removeLayer(layer);
+			}
+		};
+		setLayer(icingLayer, icing);
+		setLayer(covLayer, cov);
+		setLayer(boxesLayer, boxes);
 	});
 
 	function togIce(key) {
@@ -460,10 +476,22 @@
 		<table class="ktbl">
 			<thead>
 				<tr>
-					<th class="left">자치구</th>
-					<th>제설함</th>
-					<th>도로 노드</th>
-					<th>취약 비율</th>
+					<th class="th-sort left" class:active={sortKey === 'nm'} onclick={() => setSort('nm')}>
+						자치구
+						{#if sortKey === 'nm'}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+					</th>
+					<th class="th-sort" class:active={sortKey === 'jiseol'} onclick={() => setSort('jiseol')}>
+						제설함
+						{#if sortKey === 'jiseol'}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+					</th>
+					<th class="th-sort" class:active={sortKey === 'nodes'} onclick={() => setSort('nodes')}>
+						도로 노드
+						{#if sortKey === 'nodes'}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+					</th>
+					<th class="th-sort" class:active={sortKey === 'pct'} onclick={() => setSort('pct')}>
+						취약 비율
+						{#if sortKey === 'pct'}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+					</th>
 					<th class="center">취약도</th>
 				</tr>
 			</thead>
@@ -489,7 +517,7 @@
 
 <style>
 	.ctrl {
-		background: #fff;
+		background: var(--color-card);
 		border: 0.5px solid var(--color-border);
 		border-radius: 12px;
 		padding: 14px 20px;
@@ -586,7 +614,7 @@
 		gap: 14px;
 	}
 	.card {
-		background: #fff;
+		background: var(--color-card);
 		border: 0.5px solid var(--color-border);
 		border-radius: 12px;
 		padding: 16px 18px;
@@ -645,6 +673,9 @@
 	}
 	.tbl-wrap {
 		overflow-x: auto;
+		border: 0.5px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-card);
 	}
 	.ktbl {
 		width: 100%;
@@ -653,22 +684,30 @@
 	}
 	.ktbl th {
 		background: var(--color-card-soft);
-		padding: 8px 12px;
+		padding: 9px 14px;
 		text-align: right;
 		font-weight: 500;
 		color: var(--color-text2);
 		border-bottom: 1px solid var(--color-border);
+		border-right: 0.5px solid var(--color-border-soft);
 		white-space: nowrap;
 	}
+	.ktbl th:last-child { border-right: none; }
 	.ktbl th.left { text-align: left; }
 	.ktbl th.center { text-align: center; }
+	.ktbl th:first-child { border-top-left-radius: 7.5px; }
+	.ktbl th:last-child { border-top-right-radius: 7.5px; }
+	/* 정렬 화살표 공간 확보 */
+	.ktbl th.th-sort { padding-right: 24px; position: relative; }
 	.ktbl td {
-		padding: 7px 12px;
+		padding: 7px 14px;
 		border-bottom: 0.5px solid var(--color-border-soft);
+		border-right: 0.5px solid var(--color-border-soft);
 		color: var(--color-text);
 		text-align: right;
 		white-space: nowrap;
 	}
+	.ktbl td:last-child { border-right: none; }
 	.ktbl td.left { text-align: left; }
 	.ktbl td.center { text-align: center; }
 	.ktbl tr:last-child td {

@@ -1,5 +1,5 @@
 <script>
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import medical from '$lib/data/medical.json';
 	import facilities from '$lib/data/medical_facilities.json';
 	import bokji from '$lib/data/bokji.json';
@@ -7,6 +7,8 @@
 	import MapShell from '$lib/components/MapShell.svelte';
 	import Note from '$lib/components/Note.svelte';
 	import CountUp from '$lib/components/CountUp.svelte';
+	import { applySort, compareBy } from '$lib/util/sortable.js';
+	import { loadGraph, computeIsochrone } from '$lib/util/isochrone.js';
 
 	/** @type {{ COUNTS: Record<string, Record<string, number>>, DONG_META: Record<string, {fn:string,gu:string,el:number}>, GEOJSON: any, SPEEDS: {id:string,label:string,speed:number,color:string}[] }} */
 	const { COUNTS, DONG_META, GEOJSON, SPEEDS } = medical;
@@ -183,6 +185,13 @@
 		};
 	});
 
+	// 헤더 클릭 정렬 — 디폴트: 합산 점수 내림차순
+	let sortKey = $state('avgScore');
+	let sortDir = $state(/** @type {'asc' | 'desc'} */ ('desc'));
+	function setSort(/** @type {string} */ k) {
+		({ sortKey, sortDir } = applySort(k, sortKey, sortDir, ['gu']));
+	}
+
 	// 자치구별 상세표 행
 	const guTableRows = $derived.by(() => {
 		void cB; void cT; void cSlope;
@@ -208,7 +217,7 @@
 			...r,
 			grade: r.avgScore >= 80 ? 'phi' : r.avgScore >= 50 ? 'pmd' : 'plo',
 			gradeText: r.avgScore >= 80 ? '양호' : r.avgScore >= 50 ? '보통' : '미흡'
-		})).sort((a, b) => b.avgScore - a.avgScore);
+		})).sort(compareBy(sortKey, sortDir));
 	});
 
 	const tableRows = $derived(
@@ -264,6 +273,26 @@
 	let guCircle = null;
 	/** @type {any} */
 	let dongCircleGroup = null;
+	// ── OSM 보행망 이소크론 (Convex Hull) ─────────────────────────
+	/** @type {any} */
+	let isoLayer = null;
+	/** @type {any} */
+	let clickMark = null;
+	/** @type {{lat:number, lng:number}|null} */
+	let clickPoint = $state(null);
+	/** @type {any} */
+	let graph = null;
+	let graphLoading = $state(false);
+	let graphError = $state('');
+	let isoMeta = $state(/** @type {{count:number, ms:number}|null} */ (null));
+
+	const PINK = '#f472b6';
+
+	/** cG / cSlope / cB / cT → maxDistM (m) */
+	function currentMaxDistM() {
+		const tr = cSlope ? AVG_TOBLER : 1.0;
+		return Math.round(SPEEDS[cB].speed * cT * 60 * tr);
+	}
 
 	/** @type {Record<string, string>} 병의원 분류별 색상 */
 	const HOSP_COLOR = {
@@ -335,18 +364,9 @@
 			maxZoom: 18
 		}).addTo(map);
 
-		// Layer 1: Choropleth
+		// Layer 1: Choropleth (호버·툴팁 없음 — 정적 시각화)
 		geoLayer = L.geoJSON(GEOJSON, {
-			style: styleFeature,
-			onEachFeature: (/** @type {any} */ feat, /** @type {any} */ layer) => {
-				layer.bindTooltip(tooltipContent(feat), { sticky: true });
-				layer.on('mouseover', /** @param {any} e */ (e) => {
-					e.target.setStyle({ weight: 2, color: '#FFD700', fillOpacity: 0.85 });
-				});
-				layer.on('mouseout', /** @param {any} e */ (e) => {
-					geoLayer?.resetStyle(e.target);
-				});
-			}
+			style: styleFeature
 		}).addTo(map);
 
 		// Layer 2: 병의원 5종 그룹
@@ -379,6 +399,29 @@
 					direction: 'top', offset: [0, -4]
 				})
 				.addTo(grpPharm);
+		});
+
+		// 지도 클릭 → 클릭 지점 기준 이소크론 재계산
+		map.on('click', (/** @type {any} */ e) => {
+			const { lat, lng } = e.latlng;
+			if (clickMark) {
+				map.removeLayer(clickMark);
+				clickMark = null;
+			}
+			clickMark = L.circleMarker([lat, lng], {
+				radius: 9,
+				fillColor: '#ff3b30',
+				color: '#fff',
+				weight: 2.5,
+				fillOpacity: 1,
+				pane: 'markerPane'
+			})
+				.bindTooltip(`클릭 지점<br>${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+				.addTo(map);
+			clickPoint = { lat, lng };
+			// fitBounds 로 새 폴리곤 영역 보이게
+			const r = untrack(() => currentMaxDistM());
+			map.fitBounds(L.latLng(lat, lng).toBounds(r * 2), { padding: [30, 30], animate: true });
 		});
 
 		mapReady = true;
@@ -420,26 +463,97 @@
 		(showPharm   && phOn)  ? grpPharm.addTo(map)   : grpPharm.remove();
 	});
 
-	// Effect 4: 자치구 중심 반경원 + 뷰 이동
+	// Effect 4: 자치구 중심 반경원 (직선 점선) + OSM 도로망 Convex Hull 폴리곤
 	$effect(() => {
 		if (!mapReady) return;
+		// react to cG, cB, cT, cSlope, clickPoint
+		const cp = clickPoint;
 		const center = /** @type {Record<string,number[]>} */ (GU_CENTER)[cG];
 		if (guCircle) { map.removeLayer(guCircle); guCircle = null; }
 		if (!center) return;
-		const tr = cSlope ? AVG_TOBLER : 1.0;
-		const radiusM = Math.round(SPEEDS[cB].speed * cT * 60 * tr);
-		guCircle = L.circle(center, {
+
+		// origin: 지도 클릭 시 클릭 지점, 아니면 자치구 중심
+		const origin = cp ? [cp.lat, cp.lng] : center;
+		const radiusM = currentMaxDistM();
+		const tooltipPrefix = cp
+			? `클릭 지점 · ${SPEEDS[cB].label} ${cT}분 반경`
+			: `${cG} 중심 · ${SPEEDS[cB].label} ${cT}분 반경`;
+		guCircle = L.circle(origin, {
 			radius: radiusM,
-			color: '#FF6F00',
-			weight: 2,
+			color: PINK,
+			weight: 1.5,
 			dashArray: '8,5',
-			fillColor: '#FF6F00',
-			fillOpacity: 0.15
+			fill: false,
+			fillOpacity: 0
 		})
-			.bindTooltip(`${cG} 중심 · ${SPEEDS[cB].label} ${cT}분 반경 ~${(radiusM / 1000).toFixed(2)} km`)
+			.bindTooltip(`${tooltipPrefix} ~${(radiusM / 1000).toFixed(2)} km (직선 참고)`)
 			.addTo(map);
-		map.setView(center, 12, { animate: true, duration: 0.4 });
+
+		// 클릭 지점이 아닐 때만 view 자치구로 이동
+		if (!cp) map.setView(center, 12, { animate: true, duration: 0.4 });
+
+		// OSM 보행망 기반 실제 도달 폴리곤 (비동기)
+		drawIsochrone(origin[0], origin[1], radiusM);
 	});
+
+	// 자치구 변경 시 클릭 지점 해제 (다른 구로 옮기면 클릭은 의미 없음)
+	$effect(() => {
+		cG;
+		if (clickMark && map) {
+			map.removeLayer(clickMark);
+			clickMark = null;
+		}
+		clickPoint = null;
+	});
+
+	/** OSM 그래프 → Dijkstra → Convex Hull 도달 폴리곤 */
+	async function drawIsochrone(/** @type {number} */ lat, /** @type {number} */ lng, /** @type {number} */ maxDistM) {
+		if (!map || !L) return;
+		if (isoLayer) {
+			map.removeLayer(isoLayer);
+			isoLayer = null;
+		}
+		isoMeta = null;
+		try {
+			if (!graph) {
+				graphLoading = true;
+				graphError = '';
+				graph = await loadGraph();
+				graphLoading = false;
+			}
+			const { ring, count, ms } = computeIsochrone(graph, lat, lng, maxDistM);
+			if (!ring) {
+				graphError = '도달 노드 부족 — 다른 지점 선택';
+				return;
+			}
+			isoLayer = L.polygon(ring, {
+				color: PINK,
+				weight: 2.2,
+				opacity: 0.9,
+				fillColor: PINK,
+				fillOpacity: 0.18,
+				smoothFactor: 1.2
+			})
+				.bindTooltip(
+					`OSM 보행망 ${count.toLocaleString()} 노드 도달 · 폴리곤 계산 ${ms}ms`
+				)
+				.addTo(map);
+			isoMeta = { count, ms };
+			graphError = '';
+		} catch (e) {
+			console.error('[medical] isochrone failed', e);
+			graphError = '그래프 로드 실패 — 직선 반경만 표시';
+			graphLoading = false;
+		}
+	}
+
+	function resetToCenter() {
+		if (clickMark && map) {
+			map.removeLayer(clickMark);
+			clickMark = null;
+		}
+		clickPoint = null;
+	}
 
 	// Effect 5: 동 반경 원 (선택 자치구만)
 	$effect(() => {
@@ -733,7 +847,7 @@
 	// ─── 버튼 라벨/상태 ───
 	const compareLabels = [
 		{ idx: 0, emoji: '🚶', text: '일반인', speed: '1.28 m/s' },
-		{ idx: 1, emoji: '🧓', text: '건강 노인', speed: '1.12 m/s' },
+		{ idx: 1, emoji: '🧓', text: '일반 노인', speed: '1.12 m/s' },
 		{ idx: 2, emoji: '🦽', text: '보행보조 노인', speed: '0.88 m/s' },
 		{ idx: 3, emoji: '♿', text: '보행보조 노인 하위15%', speed: '0.70 m/s' }
 	];
@@ -787,7 +901,7 @@
 		{ color: '#a50026', label: '40점 미만' }
 	];
 
-	const facilityLegend = [
+	const facilityLegend = $derived([
 		{ color: '#1D9E75', label: '80점+ (의료접근 양호)' },
 		{ color: '#f5a623', label: '50–80점 (보통)' },
 		{ color: '#E74C3C', label: '50점 미만 (취약)' },
@@ -795,8 +909,9 @@
 		{ color: '#e11d48', label: '병원' },
 		{ color: '#7c3aed', label: '보건소' },
 		{ color: '#1d4ed8', label: '종합병원' },
-		{ color: '#10b981', label: '약국' }
-	];
+		{ color: '#10b981', label: '약국' },
+		{ color: '#f472b6', label: `${SPEEDS[cB].label} ${cT}분 보행반경 (점선 직선 · 폴리곤 OSM)` }
+	]);
 </script>
 
 <svelte:head>
@@ -934,12 +1049,27 @@
 	<!-- r2: 지도 + 동별 도달가능점수 (선택 구) -->
 	<div class="r2 mt-3.5">
 		<Card title="병의원·약국 위치 및 의료 도달가능점수 (서울시)">
+			<div class="iso-meta-row mb-2.5">
+				<div class="iso-meta-spacer"></div>
+				<div class="iso-meta">
+					{#if graphLoading}
+						<span class="iso-loading">⚙ OSM 보행망 로드 중…</span>
+					{:else if graphError}
+						<span class="iso-err">⚠ {graphError}</span>
+					{:else if isoMeta}
+						<span class="iso-ok">OSM 보행망 <b>{isoMeta.count.toLocaleString()}</b> 노드 도달 · {isoMeta.ms}ms</span>
+					{/if}
+				</div>
+			</div>
 			<MapShell
 				height="460px"
 				legend={facilityLegend}
-				source="병의원 {facilities.HOSP.length.toLocaleString()}개 · 약국 {facilities.PHARM.length.toLocaleString()}개"
+				source="병의원 {facilities.HOSP.length.toLocaleString()}개 · 약국 {facilities.PHARM.length.toLocaleString()}개 · OpenStreetMap (266,780 노드) / 점선 = 직선 반경 · 채워진 폴리곤 = OSM 보행망 Dijkstra + Convex Hull 도달 범위 · 지도 클릭 시 클릭 지점 기준 재계산"
 			>
 				<div bind:this={mapEl} class="absolute inset-0 h-full w-full"></div>
+				{#if clickPoint}
+					<button type="button" class="map-reset-btn" onclick={resetToCenter}>중심점</button>
+				{/if}
 			</MapShell>
 		</Card>
 		<Card title="{cB === 0 ? `${cG} 동별 ${cF === 'all' ? '전체' : cF === 'hosp' ? '병의원' : '약국'} 시설 개수` : `${cG} 동별 도달가능점수`}">
@@ -991,16 +1121,23 @@
 				<table class="ktbl">
 					<thead>
 						<tr>
-							<th>자치구</th>
-							<th>의원</th>
-							<th>병원</th>
-							<th>보건소</th>
-							<th>종합병원</th>
-							<th>약국</th>
-							<th>병의원 점수</th>
-							<th>약국 점수</th>
-							<th>합산 점수</th>
-							<th>접근성</th>
+							{#each [
+								{ k: 'gu',         label: '자치구' },
+								{ k: 'uiwon',      label: '의원' },
+								{ k: 'byeong',     label: '병원' },
+								{ k: 'bogeon',     label: '보건소' },
+								{ k: 'jonghap',    label: '종합병원' },
+								{ k: 'pharm',      label: '약국' },
+								{ k: 'hospScore',  label: '병의원 점수' },
+								{ k: 'pharmScore', label: '약국 점수' },
+								{ k: 'avgScore',   label: '합산 점수' }
+							] as col (col.k)}
+								<th class="th-sort" class:active={sortKey === col.k} onclick={() => setSort(col.k)}>
+									{col.label}
+									{#if sortKey === col.k}<span class="sort-arr">{sortDir === 'desc' ? '▼' : '▲'}</span>{/if}
+								</th>
+							{/each}
+							<th>도달가능</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -1218,6 +1355,8 @@
 		font-weight: 500; color: var(--color-text2); border-bottom: 1px solid var(--color-border);
 		white-space: nowrap;
 	}
+	/* 정렬 화살표 공간 확보 — Svelte scoped CSS specificity 가 layout.css .th-sort 보다 높아 별도 처리 */
+	.ktbl th.th-sort { padding-right: 24px; position: relative; }
 	.ktbl th:first-child { text-align: left; }
 	.ktbl th:last-child { text-align: center; }
 	.ktbl td {
@@ -1237,6 +1376,49 @@
 	.pmd { background: #fff3cd; color: #856404; }
 	.plo { background: #f8d7da; color: #721c24; }
 	.pna { background: #ebebeb; color: #666; }
+
+	.iso-meta-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+	.iso-meta-spacer { flex: 1; }
+	.iso-meta {
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		color: var(--color-text3);
+		letter-spacing: 0.04em;
+		min-height: 16px;
+	}
+	.iso-loading {
+		color: var(--color-text3);
+		opacity: 0.85;
+	}
+	.iso-err { color: #c0392b; }
+	.iso-ok b {
+		color: var(--color-text);
+		font-weight: 600;
+	}
+	.map-reset-btn {
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		z-index: 1000;
+		padding: 5px 12px;
+		border-radius: 6px;
+		border: 0.5px solid var(--color-border);
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(4px);
+		font-size: 12px;
+		font-family: inherit;
+		color: var(--color-text);
+		cursor: pointer;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+		transition: background 0.14s;
+	}
+	.map-reset-btn:hover { background: #fff; }
 
 	:global(.leaflet-container) {
 		background: #e8e4db !important;

@@ -6,7 +6,7 @@
 	const ACC = cwData.ACC; // 노인 보행사고
 	const CW = cwData.CW; // 횡단보도
 
-	let { active = true } = $props();
+	let { active = true, cG = '전체' } = $props();
 
 	let mapEl = $state();
 	let map;
@@ -19,6 +19,11 @@
 	let showAcc = $state(true);
 	let showCw = $state(true);
 	let selectedGu = $state('전체');
+
+	// cG prop 변경 → 내부 selectedGu 동기화 (외부 자치구 선택 UI 와 연동)
+	$effect(() => {
+		if (cG !== selectedGu) selectedGu = cG;
+	});
 
 	const guList = (() => {
 		const s = new Set();
@@ -110,6 +115,26 @@
 		else if (!on && layer._map) map.removeLayer(layer);
 	}
 
+	function zoomToSelected() {
+		if (!L || !map) return;
+		if (selectedGu === '전체') {
+			map.setView([37.5665, 126.978], 11, { animate: true });
+			return;
+		}
+		const pts = [
+			...ACC.filter((a) => a.gu === selectedGu && a.lat && a.lon).map((a) => [a.lat, a.lon]),
+			...CW.filter((c) => c.gu === selectedGu && c.lat && c.lon).map((c) => [c.lat, c.lon])
+		];
+		if (pts.length === 0) return;
+		const lats = pts.map((p) => p[0]);
+		const lons = pts.map((p) => p[1]);
+		const bounds = L.latLngBounds([
+			[Math.min(...lats), Math.min(...lons)],
+			[Math.max(...lats), Math.max(...lons)]
+		]);
+		map.fitBounds(bounds.pad(0.1));
+	}
+
 	function setupChart() {
 		if (!canvasGu || !Chart) return;
 		const top = guStats.slice(0, 25);
@@ -180,7 +205,10 @@
 
 	$effect(() => {
 		void selectedGu;
-		if (map) buildLayers();
+		if (map) {
+			buildLayers();
+			zoomToSelected();
+		}
 	});
 
 	$effect(() => {
@@ -227,7 +255,7 @@
 		margin-bottom: 14px;
 	}
 	.card {
-		background: #fff;
+		background: var(--color-card);
 		border: 0.5px solid var(--color-border);
 		border-radius: 12px;
 		padding: 16px 18px;

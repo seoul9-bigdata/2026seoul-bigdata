@@ -6,12 +6,18 @@
 	const D = data.DATA;
 	const OD = D.od_stations;
 
-	let { active = true } = $props();
+	let { active = true, cG = '전체' } = $props();
 
 	let mapEl = $state();
 	let map;
 	let L;
 	let odLayer;
+
+	// cG 필터링 제거: 40건 전체 항상 표시, cG 와 관련된 OD 만 시각적 강조
+	function isRelated(o) {
+		return cG !== '전체' && (o.ride_gu === cG || o.goff_gu === cG);
+	}
+	const hasFilter = $derived(cG !== '전체');
 
 	function colorN(n) {
 		if (n >= 20) return '#ff5f5f';
@@ -43,7 +49,7 @@
 		return pts;
 	}
 
-	const sortedOD = [...OD].sort((a, b) => b.n - a.n);
+	const sortedOD = $derived([...OD].sort((a, b) => b.n - a.n));
 
 	function popupHtml(o) {
 		return `
@@ -68,36 +74,51 @@
 		if (odLayer) map.removeLayer(odLayer);
 		odLayer = L.layerGroup();
 
-		// 베지어 곡선 + 출발/도착 점
-		sortedOD.forEach((o) => {
+		// 베지어 곡선 — 비관련 먼저, 관련은 마지막에 그려 위에 올림
+		const dimOD = sortedOD.filter((o) => !isRelated(o));
+		const hotOD = sortedOD.filter((o) => isRelated(o));
+		const drawOrder = hasFilter ? [...dimOD, ...hotOD] : sortedOD;
+
+		drawOrder.forEach((o) => {
 			if (!o.ride_lat || !o.goff_lat) return;
 			const pts = bezier(o.ride_lat, o.ride_lon, o.goff_lat, o.goff_lon);
 			const col = colorN(o.n);
 			const w = widthN(o.n);
-			L.polyline(pts, {
-				color: col,
-				weight: w,
-				opacity: 0.7
-			})
+			const related = isRelated(o);
+			const style = hasFilter
+				? related
+					? { color: col, weight: w + 1.5, opacity: 1.0 }
+					: { color: col, weight: Math.max(1.2, w * 0.7), opacity: 0.22 }
+				: { color: col, weight: w, opacity: 0.7 };
+			L.polyline(pts, style)
 				.bindPopup(popupHtml(o))
 				.addTo(odLayer);
 		});
 
-		// 출발 점 (초록)
+		// 출발 점 (초록): 정류장 단위 집계 + 해당 정류장이 cG 관련 OD 에 포함되는지 표시
 		const rideMap = new Map();
 		sortedOD.forEach((o) => {
 			const k = `${o.ride_lat},${o.ride_lon}`;
-			if (!rideMap.has(k)) rideMap.set(k, { ...o, sumN: 0, count: 0 });
-			rideMap.get(k).sumN += o.n;
-			rideMap.get(k).count++;
+			if (!rideMap.has(k))
+				rideMap.set(k, { ...o, sumN: 0, count: 0, related: false });
+			const r = rideMap.get(k);
+			r.sumN += o.n;
+			r.count++;
+			if (isRelated(o)) r.related = true;
 		});
-		rideMap.forEach((r) => {
+		const rideArr = [...rideMap.values()];
+		const rideOrder = hasFilter
+			? [...rideArr.filter((r) => !r.related), ...rideArr.filter((r) => r.related)]
+			: rideArr;
+		rideOrder.forEach((r) => {
+			const dim = hasFilter && !r.related;
 			L.circleMarker([r.ride_lat, r.ride_lon], {
 				radius: Math.max(7, Math.min(15, 7 + r.sumN / 8)),
 				fillColor: '#3ecfa0',
 				color: '#fff',
-				weight: 1.5,
-				fillOpacity: 0.9
+				weight: dim ? 1 : 1.5,
+				fillOpacity: dim ? 0.3 : 0.9,
+				opacity: dim ? 0.4 : 1
 			})
 				.bindPopup(
 					`<div style="font-family:inherit"><b>🟢 ${r.ride_nm}</b><br><span style="font-size:11px;color:#888780">출발 ${r.count}건 · 합계 ${r.sumN}회</span></div>`
@@ -109,17 +130,26 @@
 		const goffMap = new Map();
 		sortedOD.forEach((o) => {
 			const k = `${o.goff_lat},${o.goff_lon}`;
-			if (!goffMap.has(k)) goffMap.set(k, { ...o, sumN: 0, count: 0 });
-			goffMap.get(k).sumN += o.n;
-			goffMap.get(k).count++;
+			if (!goffMap.has(k))
+				goffMap.set(k, { ...o, sumN: 0, count: 0, related: false });
+			const g = goffMap.get(k);
+			g.sumN += o.n;
+			g.count++;
+			if (isRelated(o)) g.related = true;
 		});
-		goffMap.forEach((g) => {
+		const goffArr = [...goffMap.values()];
+		const goffOrder = hasFilter
+			? [...goffArr.filter((g) => !g.related), ...goffArr.filter((g) => g.related)]
+			: goffArr;
+		goffOrder.forEach((g) => {
+			const dim = hasFilter && !g.related;
 			L.circleMarker([g.goff_lat, g.goff_lon], {
 				radius: Math.max(6, Math.min(12, 6 + g.sumN / 9)),
 				fillColor: '#f472b6',
 				color: '#fff',
-				weight: 1.2,
-				fillOpacity: 0.85
+				weight: dim ? 0.8 : 1.2,
+				fillOpacity: dim ? 0.28 : 0.85,
+				opacity: dim ? 0.4 : 1
 			})
 				.bindPopup(
 					`<div style="font-family:inherit"><b>🔴 ${g.goff_nm}</b><br><span style="font-size:11px;color:#888780">도착 ${g.count}건 · 합계 ${g.sumN}회</span></div>`
@@ -138,6 +168,28 @@
 		L.popup({ offset: [0, -6] }).setLatLng([midLat, midLon]).setContent(popupHtml(o)).openOn(map);
 	}
 
+	function zoomToFiltered() {
+		if (!L || !map) return;
+		if (cG === '전체') {
+			map.setView([37.5665, 126.978], 11, { animate: true });
+			return;
+		}
+		const pts = [];
+		sortedOD.forEach((o) => {
+			if (!isRelated(o)) return;
+			if (o.ride_lat && o.ride_lon) pts.push([o.ride_lat, o.ride_lon]);
+			if (o.goff_lat && o.goff_lon) pts.push([o.goff_lat, o.goff_lon]);
+		});
+		if (pts.length === 0) return;
+		const lats = pts.map((p) => p[0]);
+		const lons = pts.map((p) => p[1]);
+		const bounds = L.latLngBounds([
+			[Math.min(...lats), Math.min(...lons)],
+			[Math.max(...lats), Math.max(...lons)]
+		]);
+		map.fitBounds(bounds.pad(0.15));
+	}
+
 	onMount(async () => {
 		if (typeof window === 'undefined') return;
 		L = (await import('leaflet')).default;
@@ -154,6 +206,15 @@
 
 	$effect(() => {
 		if (active && map) setTimeout(() => map.invalidateSize(), 0);
+	});
+
+	// cG 변경 시: 베지어 곡선 재구성 + 지도 줌
+	$effect(() => {
+		void cG;
+		void sortedOD;
+		if (!map) return;
+		buildLayer();
+		zoomToFiltered();
 	});
 </script>
 
@@ -180,7 +241,7 @@
 		<div class="ct">TOP OD pair — 환승 노인수 정렬</div>
 		<ul class="rank">
 			{#each sortedOD as o, i}
-				<li>
+				<li class:related={isRelated(o)} class:dim={hasFilter && !isRelated(o)}>
 					<button type="button" class="rank-btn" onclick={() => panToOD(o)}>
 						<span class="rk">{i + 1}</span>
 						<span class="nm">
@@ -203,7 +264,7 @@
 		margin-bottom: 14px;
 	}
 	.card {
-		background: #fff;
+		background: var(--color-card);
 		border: 0.5px solid var(--color-border);
 		border-radius: 12px;
 		padding: 16px 18px;
@@ -272,9 +333,22 @@
 	}
 	.rank li {
 		border-bottom: 0.5px solid var(--color-border-soft);
+		transition: opacity 0.2s ease, background 0.2s ease;
 	}
 	.rank li:last-child {
 		border-bottom: none;
+	}
+	.rank li.related {
+		background: color-mix(in srgb, var(--pill-accent, #5aadff) 10%, transparent);
+	}
+	.rank li.related .rank-btn {
+		font-weight: 600;
+	}
+	.rank li.dim {
+		opacity: 0.4;
+	}
+	.rank li.dim .rank-btn:hover {
+		opacity: 1;
 	}
 	.rank-btn {
 		display: grid;

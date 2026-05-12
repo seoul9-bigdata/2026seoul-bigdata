@@ -128,3 +128,63 @@ textarea {
 	color: var(--color-dark-text);
 	border-color: var(--color-dark);
 }
+
+/* ── progress bar 공통 토큰 (theme.js BAR_STYLES 미러) ──
+   height 위계:  thin 5  /  medium 8  /  thick 12  /  fat 18
+   모든 막대 radius = 3px (rounded-full 금지).
+   width 는 inline style 로 전달. 애니메이션은 page-scoped .bar-fill 유지. */
+.bar-track {
+	background: rgba(0, 0, 0, 0.05);
+	border-radius: 3px;
+	overflow: hidden;
+	position: relative;
+}
+.bar-track-thin {
+	height: 5px;
+}
+.bar-track-medium {
+	height: 8px;
+}
+.bar-track-thick {
+	height: 12px;
+}
+.bar-track-fat {
+	height: 18px;
+}
+.bar-fill-inner {
+	height: 100%;
+	border-radius: 3px;
+	transform-origin: left center;
+	will-change: transform;
+}
+
+/* ── 표 헤더 클릭 정렬 (공통) ── */
+/* 정렬 화살표가 추가/제거될 때 컬럼 너비가 흔들리지 않도록
+   th 에 미리 화살표 자리를 padding 으로 확보 + .sort-arr 는 absolute 로 빼서 inline flow 영향 차단. */
+/* Leaflet SVG path/marker 클릭 시 브라우저 기본 focus outline (파란 박스) 차단 — 모든 지도 공통 */
+.leaflet-interactive:focus,
+.leaflet-interactive:focus-visible {
+	outline: none;
+}
+
+.th-sort {
+	cursor: pointer;
+	user-select: none;
+	position: relative;
+	padding-right: 24px;
+}
+.th-sort:hover {
+	color: var(--color-text);
+}
+.th-sort.active {
+	color: var(--color-text);
+}
+.sort-arr {
+	position: absolute;
+	right: 4px;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 10.5px;
+	color: var(--pill-accent, var(--color-accent));
+	pointer-events: none;
+}

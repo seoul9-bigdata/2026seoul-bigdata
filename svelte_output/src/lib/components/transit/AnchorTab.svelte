@@ -6,7 +6,7 @@
 	const D = data.DATA;
 	const ANCHORS = D.anchors;
 
-	let { active = true } = $props();
+	let { active = true, cG = '전체' } = $props();
 
 	let mapEl = $state();
 	let map;
@@ -27,11 +27,18 @@
 		Object.fromEntries(Object.keys(TYPE_META).map((k) => [k, true]))
 	);
 
-	// TOP 20 by elder_alights_300m
-	const top20 = [...ANCHORS]
-		.filter((a) => a.elder_alights_300m != null)
-		.sort((a, b) => (b.elder_alights_300m || 0) - (a.elder_alights_300m || 0))
-		.slice(0, 20);
+	// cG 필터링
+	const anchorsF = $derived(
+		cG === '전체' ? ANCHORS : ANCHORS.filter((a) => a.gu === cG)
+	);
+
+	// TOP 20 by elder_alights_300m — 필터된 데이터 기준
+	const top20 = $derived(
+		[...anchorsF]
+			.filter((a) => a.elder_alights_300m != null)
+			.sort((a, b) => (b.elder_alights_300m || 0) - (a.elder_alights_300m || 0))
+			.slice(0, 20)
+	);
 
 	function makeIcon(meta) {
 		return L.divIcon({
@@ -66,12 +73,29 @@
 			const meta = TYPE_META[t];
 			const icon = makeIcon(meta);
 			const lyr = L.layerGroup();
-			ANCHORS.filter((a) => a.anchor_type === t && a.lat).forEach((a) => {
+			anchorsF.filter((a) => a.anchor_type === t && a.lat).forEach((a) => {
 				L.marker([a.lat, a.lon], { icon }).bindPopup(popupHtml(a)).addTo(lyr);
 			});
 			layerByType[t] = lyr;
 			if (toggles[t]) lyr.addTo(map);
 		});
+	}
+
+	function zoomToFiltered() {
+		if (!L || !map) return;
+		if (cG === '전체') {
+			map.setView([37.5665, 126.978], 11, { animate: true });
+			return;
+		}
+		const pts = anchorsF.filter((a) => a.lat && a.lon).map((a) => [a.lat, a.lon]);
+		if (pts.length === 0) return;
+		const lats = pts.map((p) => p[0]);
+		const lons = pts.map((p) => p[1]);
+		const bounds = L.latLngBounds([
+			[Math.min(...lats), Math.min(...lons)],
+			[Math.max(...lats), Math.max(...lons)]
+		]);
+		map.fitBounds(bounds.pad(0.1));
 	}
 
 	function panTo(a) {
@@ -104,6 +128,15 @@
 
 	$effect(() => {
 		if (active && map) setTimeout(() => map.invalidateSize(), 0);
+	});
+
+	// cG 변경 시: 마커 재구성 + 지도 줌
+	$effect(() => {
+		void cG;
+		void anchorsF;
+		if (!map) return;
+		buildLayers();
+		zoomToFiltered();
 	});
 </script>
 
@@ -154,7 +187,7 @@
 		margin-bottom: 14px;
 	}
 	.card {
-		background: #fff;
+		background: var(--color-card);
 		border: 0.5px solid var(--color-border);
 		border-radius: 12px;
 		padding: 16px 18px;
@@ -193,9 +226,10 @@
 		gap: 5px;
 	}
 	.chk-btn.on {
-		background: var(--color-bg2);
-		border-color: var(--color-text2);
-		color: var(--color-text);
+		background: rgba(90, 173, 255, 0.18);
+		border-color: var(--color-blue);
+		color: var(--color-blue);
+		font-weight: 500;
 	}
 	.chk-dot {
 		width: 8px;
