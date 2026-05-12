@@ -865,11 +865,6 @@
 			</div>
 		</div>
 
-		<Note tone="warm" class="mt-4">
-			<strong>다음 분석 → 경사 보정.</strong>
-			Tobler's Hiking Function 기반 경사 감쇄를 적용하면 강북·도봉·관악·성북 등 구도심 가파른 구의 실질 도달가능성은 추가로 하락합니다.
-			도메인별 페이지에서 경사 보정 토글을 확인할 수 있습니다.
-		</Note>
 	</Card>
 
 </section>

@@ -697,7 +697,7 @@
 		<div class="hero-text">
 			<p class="hero-kicker">④ 복지/녹지 · 양석준</p>
 			<h1 class="hero-title">
-				노인 복지·<em>녹지</em> 접근성
+				노인 <em>복지·녹지</em> 접근성
 			</h1>
 			<div class="hero-chips">
 				<span class="chip purple">🏛 복지시설 {WELFARE.length}개소</span>

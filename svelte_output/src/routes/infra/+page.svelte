@@ -761,7 +761,7 @@
 		<div class="hero-text">
 			<p class="hero-kicker">③ 인프라 · 심재현</p>
 			<h1 class="hero-title">
-				노인 생활<em>인프라</em> 접근성
+				노인 <em>생활인프라</em> 접근성
 			</h1>
 			<div class="hero-chips">
 				<span class="chip teal">🛒 전통시장 195개소</span>
