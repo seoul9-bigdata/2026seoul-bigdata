@@ -702,8 +702,6 @@
 			<div class="hero-chips">
 				<span class="chip purple">🏛 복지시설 {WELFARE.length}개소</span>
 				<span class="chip purple">🌳 공원 {PARK.length}개소</span>
-				<span class="chip-sep">·</span>
-				<span class="chip muted">428개 행정동 · OSM 보행 네트워크 · Tobler 경사보정 · 서울시 2025</span>
 			</div>
 		</div>
 	</div>
