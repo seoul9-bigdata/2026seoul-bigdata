@@ -948,8 +948,6 @@
 			<div class="hero-chips">
 				<span class="chip pink">🏥 병의원 {facilities.HOSP.length.toLocaleString()}개</span>
 				<span class="chip pink">💊 약국 {facilities.PHARM.length.toLocaleString()}개</span>
-				<span class="chip-sep">·</span>
-				<span class="chip muted">서울 426개 행정동 · OSM 보행 네트워크 · Tobler 경사보정 · 건강보험심사평가원 2025</span>
 			</div>
 		</div>
 	</div>

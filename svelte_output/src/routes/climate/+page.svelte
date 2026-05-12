@@ -27,8 +27,6 @@
 				<span class="chip amber">☀️ 더위쉼터 4,107개</span>
 				<span class="chip blue">❄️ 한파쉼터 1,642개</span>
 				<span class="chip ice">🧊 결빙위험구역</span>
-				<span class="chip-sep">·</span>
-				<span class="chip muted">행정동 426개 · OSM 보행 네트워크 · 서울시 2025</span>
 			</div>
 		</div>
 	</div>

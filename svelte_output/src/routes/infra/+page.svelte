@@ -768,8 +768,6 @@
 				<span class="chip teal">🏦 은행 1,579개소</span>
 				<span class="chip teal">🏛 주민센터 426개소</span>
 				<span class="chip teal">🏪 슈퍼마켓 31,024개소</span>
-				<span class="chip-sep">·</span>
-				<span class="chip muted">428개 행정동 · OSM 보행 네트워크 · 서울시 2025</span>
 			</div>
 		</div>
 	</div>

@@ -415,11 +415,23 @@
 			<span style:color="var(--color-accent)">노인 도보 생활권</span> 종합 성적표
 		</h1>
 
-		<p class="mb-7 max-w-[640px] text-[13.5px] leading-[1.85]" style:color="var(--color-text2)">
+		<p class="mb-5 max-w-[640px] text-[13.5px] leading-[1.85]" style:color="var(--color-text2)">
 			기후·인프라·복지/녹지·의료 4개 도메인 도달가능 점수를 결합한 25개 자치구 종합 진단.<br />
-			일반 노인(1.12&nbsp;m/s) 기준, 경사 미보정 점수.
+			일반 노인(1.12&nbsp;m/s) 기준 · <span style:color={slopeOn ? 'var(--color-accent)' : 'var(--color-text3)'}>{slopeOn ? '경사 보정 적용' : '경사 미보정'}</span>.
 		</p>
 
+		<label class="toggle-item mb-6" title="Tobler 보행함수 기반 구별 경사도 보정">
+			<span class="toggle-switch" class:on={slopeOn}>
+				<input type="checkbox" bind:checked={slopeOn} />
+				<span class="toggle-slider"></span>
+			</span>
+			<span class="toggle-label">⛰ 경사 보정 (Tobler)</span>
+			{#if slopeOn}
+				<span class="slope-tag">반영 중</span>
+			{/if}
+		</label>
+
+		{#key scoreKey}
 		<StatGrid class="sm:grid-cols-4" cols={4}>
 			<StatCard label="분석 도메인" sub="기후·인프라·복지/녹지·의료·교통·이동">
 				{#snippet children()}
@@ -434,6 +446,7 @@
 			<StatCard label="최고 구" value={best.name} sub="{best.composite}점" tone="green" />
 			<StatCard label="최저 구" value={worst.name} sub="{worst.composite}점" tone="red" />
 		</StatGrid>
+		{/key}
 	</div>
 
 	<!-- ── 보행 속도별 손실 비교 ── -->
