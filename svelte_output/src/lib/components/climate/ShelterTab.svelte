@@ -1204,15 +1204,15 @@
 						<td>{r.heat}</td>
 						<td>{r.cold}</td>
 						<td>
-							<b style="color:#d46800">{fmtScore(r.hs)}</b>
+							<b style="color:#d46800">{fmtScore(r.hs)}점</b>
 							<span class="score-bar" style={scoreBarStyle(r.hs)}></span>
 						</td>
 						<td>
-							<b style="color:#1a5fa0">{fmtScore(r.cs)}</b>
+							<b style="color:#1a5fa0">{fmtScore(r.cs)}점</b>
 							<span class="score-bar" style={scoreBarStyle(r.cs)}></span>
 						</td>
 						<td>
-							<b>{fmtScore(r.avg)}</b>
+							<b>{fmtScore(r.avg)}점</b>
 							<span class="score-bar" style={scoreBarStyle(r.avg)}></span>
 						</td>
 						<td><span class="pill {gradePillClass(r.avg)}">{gradeText(r.avg)}</span></td>

@@ -1150,15 +1150,15 @@
 								<td>{r.jonghap}</td>
 								<td>{r.pharm.toLocaleString()}</td>
 								<td>
-									<b style="color:#db2777">{r.hospScore.toFixed(1)}</b>
+									<b style="color:#db2777">{r.hospScore.toFixed(1)}점</b>
 									<span class="score-bar" style={scoreBarStyle(r.hospScore)}></span>
 								</td>
 								<td>
-									<b style="color:#059669">{r.pharmScore.toFixed(1)}</b>
+									<b style="color:#059669">{r.pharmScore.toFixed(1)}점</b>
 									<span class="score-bar" style={scoreBarStyle(r.pharmScore)}></span>
 								</td>
 								<td>
-									<b>{r.avgScore.toFixed(1)}</b>
+									<b>{r.avgScore.toFixed(1)}점</b>
 									<span class="score-bar" style={scoreBarStyle(r.avgScore)}></span>
 								</td>
 								<td><span class="pill {r.grade}">{r.gradeText}</span></td>

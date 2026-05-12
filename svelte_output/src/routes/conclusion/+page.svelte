@@ -127,6 +127,44 @@
 	function setSort(/** @type {string} */ k) {
 		({ sortKey, sortDir } = applySort(k, sortKey, sortDir, ['name']));
 	}
+
+	/** 표 막대 width + 4분위 색상 정규화 — 컬럼별 min/max/quartile 로 극적 차이 표시.
+	 *  점수 범위가 좁아도 (예: 78~85) 25구를 4등분하면 색·길이 모두 분명. */
+	const colStats = $derived.by(() => {
+		/** @type {Record<string, {min:number, max:number, q1:number, q2:number, q3:number}>} */
+		const stats = {};
+		for (const c of ['climate', 'infra', 'bokji', 'medical', 'composite']) {
+			const vals = ranked
+				.map((r) => r[c])
+				.filter((v) => typeof v === 'number')
+				.slice()
+				.sort((a, b) => a - b);
+			const q = (p) => vals[Math.floor((vals.length - 1) * p)];
+			stats[c] = {
+				min: vals[0],
+				max: vals[vals.length - 1],
+				q1: q(0.25),
+				q2: q(0.5),
+				q3: q(0.75)
+			};
+		}
+		return stats;
+	});
+	function barWidth(/** @type {number} */ v, /** @type {string} */ k) {
+		const s = colStats[k];
+		if (!s || s.max === s.min) return 20;
+		const ratio = (v - s.min) / (s.max - s.min);
+		return Math.round(6 + ratio * 36); // 6~42px
+	}
+	/** 컬럼별 4분위 색상 — 하위 25% 빨강 → 상위 25% 진초록 */
+	function quartileColor(/** @type {number} */ v, /** @type {string} */ k) {
+		const s = colStats[k];
+		if (!s) return '#888';
+		if (v <= s.q1) return '#9B1C1C'; // 하위 25%
+		if (v <= s.q2) return '#D85A30'; // 25–50%
+		if (v <= s.q3) return '#1D9E75'; // 50–75%
+		return '#0f6e56'; // 상위 25%
+	}
 	const sortedTable = $derived([...ranked].sort(compareBy(sortKey, sortDir)));
 
 	/* ── Leaflet choropleth (종합 점수) + 클릭 시 detail card ── */
@@ -676,17 +714,17 @@
 							<td class="px-3 py-2 font-medium" style:color="var(--color-text)">{d.name}</td>
 							{#each ['climate', 'infra', 'bokji', 'medical'] as k}
 								<td class="px-3 py-2">
-									<b class="font-mono text-[11.5px] tabular-nums" style:color={scoreColor(d[k])}>
-										{d[k].toFixed(1)}
+									<b class="font-mono text-[11.5px] tabular-nums" style:color={quartileColor(d[k], k)}>
+										{d[k].toFixed(1)}점
 									</b>
-									<span class="score-bar" style="background:{scoreColor(d[k])};width:{Math.round(d[k] * 0.4)}px"></span>
+									<span class="score-bar" style="background:{quartileColor(d[k], k)};width:{barWidth(d[k], k)}px"></span>
 								</td>
 							{/each}
 							<td class="px-3 py-2">
-								<strong class="font-mono text-[13px] tabular-nums" style:color={scoreColor(d.composite)}>
-									{d.composite}
+								<strong class="font-mono text-[13px] tabular-nums" style:color={quartileColor(d.composite, 'composite')}>
+									{d.composite.toFixed(1)}점
 								</strong>
-								<span class="score-bar" style="background:{scoreColor(d.composite)};width:{Math.round(d.composite * 0.4)}px"></span>
+								<span class="score-bar" style="background:{quartileColor(d.composite, 'composite')};width:{barWidth(d.composite, 'composite')}px"></span>
 							</td>
 							<td class="px-3 py-2 text-[11.5px]" style:color="var(--color-text3)">
 								{d.weakest.emoji} {d.weakest.label}
