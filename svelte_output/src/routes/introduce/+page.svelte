@@ -179,6 +179,22 @@
 		return '#c0391b';
 	}
 
+	const LEGEND_2026 = [
+		{ c: '#fef3cd', l: '~18%' },
+		{ c: '#f5b740', l: '18~22%' },
+		{ c: '#e87f2a', l: '22~25%' },
+		{ c: '#c0391b', l: '25%+' }
+	];
+	const LEGEND_2040 = [
+		{ c: '#fef3cd', l: '~18%' },
+		{ c: '#f5b740', l: '18~22%' },
+		{ c: '#e87f2a', l: '22~25%' },
+		{ c: '#c0391b', l: '25~28%' },
+		{ c: '#7a1a08', l: '28~31%' },
+		{ c: '#4d1006', l: '31~34%' },
+		{ c: '#200703', l: '34%+' }
+	];
+
 	/* ── 토글: 2026 / 2040 ── */
 	let year = $state(2026);
 	const yearData = $derived(year === 2026 ? AGING_2026 : AGING_2040);
@@ -291,7 +307,7 @@
 				<div class="flex flex-col gap-[5px]" in:fade={{ duration: 220 }}>
 					{#each sortedByYear as d, i (d.name)}
 						{@const w = (d.value / combinedMax) * 100}
-						{@const bg = colorOf(d.value)}
+						{@const bg = (year === 2026 ? agingColor2026 : agingColor2040)(d.value)}
 						<div class="grid grid-cols-[80px_1fr_60px] items-center gap-2.5">
 							<div class="text-[11.5px] font-medium" style:color="var(--color-text)">{d.name}</div>
 							<div class="relative h-[12px] rounded-[3px]" style:background="rgba(0,0,0,0.04)">
@@ -315,10 +331,10 @@
 			</div>
 		</div>
 
-		<!-- 범례 -->
-		<div class="flex flex-wrap items-center gap-4">
+		<!-- 범례: 2026은 25%+ 까지, 2040은 그 뒤를 이어서 확장 -->
+		<div class="flex flex-wrap items-center gap-2">
 			<span class="kicker">고령화율 구간</span>
-			{#each [{ c: '#fef3cd', l: '~18%' }, { c: '#f5b740', l: '18~22%' }, { c: '#e87f2a', l: '22~25%' }, { c: '#c0391b', l: '25%+' }] as l}
+			{#each (year === 2026 ? LEGEND_2026 : LEGEND_2040) as l}
 				<div class="flex items-center gap-1.5">
 					<div class="h-3 w-3 rounded-[3px]" style:background={l.c}></div>
 					<span class="text-[11px]" style:color="var(--color-text2)">{l.l}</span>
