@@ -137,7 +137,7 @@
 	/** 4종 보행 유형 — introduce_ver2.html 동일 (출처 한음 외 2020) */
 	const SPEEDS = [
 		{ label: '일반인',           mps: 1.28, color: '#4a9eff', emoji: '🚶', score: 100, note: '기준선' },
-		{ label: '일반 노인',        mps: 1.12, color: '#3ecfa0', emoji: '🧓', score: 77,  note: '평균' },
+		{ label: '일반 노인',         mps: 1.12, color: '#3ecfa0', emoji: '🧓', score: 77,  note: '평균' },
 		{ label: '보행보조 노인',    mps: 0.88, color: '#f5b740', emoji: '🦯', score: 47,  note: '−53%' },
 		{ label: '보행보조 하위 15%', mps: 0.70, color: '#ef5555', emoji: '🦽', score: 30, note: '−70%' }
 	];
@@ -250,8 +250,8 @@
 					서울, 이미 고령사회 — 2040년 초고령사회 진입
 				</h2>
 				<p class="text-[12.5px] leading-[1.7]" style:color="var(--color-text2)">
-					서울시 노인 인구는 2026년 기준 약 194만 명. 강북·도봉 등 구도심 고령화율은 26%를 상회한다.
-					2040년에는 서울 전체 평균이 28.8%까지 상승할 것으로 전망된다.
+					서울시 노인 인구는 2026년 기준 약 194만 명. 강북·도봉 등 구도심 고령화율은 26%를 상회합니다.
+					2040년에는 서울 전체 평균이 28.8%까지 상승할 것으로 전망됩니다.
 				</p>
 			</div>
 
@@ -400,19 +400,129 @@
 		</p>
 	</Card>
 
+	<!-- ── 도달가능점수 정의 ── -->
+	<Card title="지표 정의 · 도달가능점수" class="mb-3">
+		<h2 class="mb-2 font-sans text-[22px] font-medium leading-[1.3]" style:color="var(--color-text)">
+			모든 분석의 기준 — 일반인 대비 접근 비율
+		</h2>
+		<p class="mb-5 max-w-[660px] text-[12.5px] leading-[1.85]" style:color="var(--color-text2)">
+			뒤에 이어지는 기후·인프라·복지/녹지·의료 각 분야의 점수는 모두 <strong style:color="var(--color-text)">도달가능점수</strong>로 표시됩니다.
+			같은 출발지에서 같은 시간 안에 — <strong>일반인(1.28 m/s)</strong>이 도달할 수 있는 시설 수를 기준(100점)으로 삼고,
+			각 보행자 유형의 접근 가능 비율을 점수로 환산합니다.
+		</p>
+
+		<div class="grid gap-5 md:grid-cols-[auto_1fr]">
+			<!-- 공식 박스 -->
+			<div class="sdef-box">
+				<div class="sdef-label">계산 공식</div>
+				<div class="sdef-formula">
+					<div class="sdef-frac">
+						<div class="sdef-num">선택 보행자의 도달 시설 수</div>
+						<div class="sdef-line"></div>
+						<div class="sdef-den">일반인의 도달 시설 수</div>
+					</div>
+					<div class="sdef-rest">&nbsp;× 100 &nbsp;=&nbsp; <strong>도달가능점수</strong></div>
+				</div>
+				<ul class="sdef-notes">
+					<li>일반인 선택 시 = 항상 <strong>100점</strong> (기준선)</li>
+					<li>점수가 낮을수록 접근 가능 시설 적음</li>
+					<li>분야·보행자·시간대별로 독립 계산</li>
+				</ul>
+			</div>
+
+			<!-- 점수 스케일 바 -->
+			<div>
+				<p class="ct-label mb-3">보행자 유형별 대표 점수</p>
+				<div class="flex flex-col gap-2.5">
+					{#each SPEEDS as s}
+						<div class="flex items-center gap-2.5">
+							<div class="w-[148px] shrink-0 text-[12px]">
+								<span class="mr-1.5">{s.emoji}</span>
+								<span style:color="var(--color-text)">{s.label}</span>
+							</div>
+							<div class="relative h-[8px] flex-1 rounded-full" style:background="rgba(0,0,0,0.06)">
+								<div
+									class="h-full rounded-full"
+									style:width="{s.score}%"
+									style:background={s.color}
+								></div>
+							</div>
+							<div class="w-[42px] shrink-0 text-right font-mono text-[12px]" style:color={s.color}>
+								{s.score}점
+							</div>
+						</div>
+					{/each}
+				</div>
+				<p class="mt-2.5 text-[11px]" style:color="var(--color-text3)">
+					* 30분 보행 기준, 평지(Tobler 보정 없음). 분야별 실제 점수는 시설 분포에 따라 달라집니다.
+				</p>
+			</div>
+		</div>
+	</Card>
+
+	<!-- ── 도달가능점수 예시 ── -->
+	<Card title="점수 해석 · 예시로 이해하기" class="mb-3.5">
+		<h2 class="mb-2 font-sans text-[22px] font-medium leading-[1.3]" style:color="var(--color-text)">
+			47점이란 무슨 뜻일까?
+		</h2>
+		<p class="mb-4 text-[12.5px] leading-[1.85]" style:color="var(--color-text2)">
+			복지/녹지 분야, 30분 보행 기준을 예시로 봅시다.
+			일반인이 도달할 수 있는 공원 10개를 ● 10개로 표시하면 — 각 보행자 유형은 그 중 몇 개에 닿을 수 있을까요?
+		</p>
+
+		<div class="ex-rows">
+			{#each SPEEDS as s}
+				{@const filled = Math.round(s.score / 10)}
+				<div class="ex-row">
+					<div class="ex-who">
+						<span class="ex-emoji">{s.emoji}</span>
+						<span class="ex-name" style:color="var(--color-text)">{s.label}</span>
+						<span class="ex-speed font-mono" style:color={s.color}>{s.mps} m/s</span>
+					</div>
+					<div class="ex-dots">
+						{#each { length: 10 } as _, di}
+							<span
+								class="ex-dot"
+								style:background={di < filled ? s.color : 'var(--color-border)'}
+								style:opacity={di < filled ? 1 : 0.4}
+							></span>
+						{/each}
+						<span class="ex-count font-mono" style:color={s.color}>
+							{filled}/10개
+						</span>
+					</div>
+					<div class="ex-badge" style:color={s.color} style:background="{s.color}18">
+						{s.score}점
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<div class="ex-callout mt-4">
+			<strong style:color="var(--color-accent)">보행보조 노인 47점</strong> —
+			일반인이 갈 수 있는 공원·복지시설의 <strong>절반 남짓</strong>에만 접근 가능합니다.
+			점수가 낮을수록 일상 이동 반경에서 사라지는 시설이 많아집니다.
+		</div>
+
+		<Note tone="warm" class="mt-3">
+			도달 시설 수는 직선거리가 아닌 <strong>OSM 실제 보행 네트워크</strong>를 기반으로,
+			자치구별 경사(Tobler)를 반영하여 계산합니다.
+		</Note>
+	</Card>
+
 	<!-- ── SECTION 3: 왜 노인 도보 생활권인가 (문제 정의) ── -->
 	<Card title="문제 정의 · 왜 노인 도보 생활권인가" class="mb-3.5">
 		<div class="grid gap-3.5 md:grid-cols-3">
 			<div class="rounded-[8px] p-4" style:background="var(--color-card-soft)">
 				<div class="kicker mb-2">2040 비전의 균열</div>
 				<p class="text-[12.5px] leading-[1.7]" style:color="var(--color-text2)">
-					서울시 2040 도시기본계획은 <strong style:color="var(--color-accent)">'도보 30분 생활권'</strong>을 핵심 비전으로 제시한다. 그러나 그 30분은 청장년 1.28&nbsp;m/s의 시간으로 설계되었다.
+					서울시 2040 도시기본계획은 <strong style:color="var(--color-accent)">'도보 30분 생활권'</strong>을 핵심 비전으로 제시합니다. 그러나 그 30분은 청장년 1.28&nbsp;m/s의 시간으로 설계되었습니다.
 				</p>
 			</div>
 			<div class="rounded-[8px] p-4" style:background="var(--color-card-soft)">
 				<div class="kicker mb-2">시간의 격차</div>
 				<p class="text-[12.5px] leading-[1.7]" style:color="var(--color-text2)">
-					청년이 30분에 닿는 거리를 보행보조 노인은 <strong style:color="var(--color-accent)">약 44분</strong>, 하위 15% 노인은 <strong style:color="var(--color-accent)">약 55분</strong>이 걸린다. 같은 동네 같은 지도 위 시간이 다르다.
+					청년이 30분에 닿는 거리를 보행보조 노인은 <strong style:color="var(--color-accent)">약 44분</strong>, 하위 15% 노인은 <strong style:color="var(--color-accent)">약 55분</strong>이 걸립니다. 같은 동네 같은 지도 위 시간이 다릅니다.
 				</p>
 			</div>
 			<div class="rounded-[8px] p-4" style:background="var(--color-card-soft)">
@@ -457,6 +567,152 @@
 </section>
 
 <style>
+	/* ── 도달가능점수 정의 카드 ── */
+	.sdef-box {
+		background: var(--color-card-soft);
+		border: 0.5px solid var(--color-border);
+		border-radius: 10px;
+		padding: 18px 22px;
+		min-width: 260px;
+		align-self: start;
+	}
+	.sdef-label {
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-text3);
+		margin-bottom: 14px;
+	}
+	.sdef-formula {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+		margin-bottom: 14px;
+	}
+	.sdef-frac {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 2px;
+	}
+	.sdef-num {
+		font-size: 11.5px;
+		font-weight: 500;
+		color: var(--color-text);
+		white-space: nowrap;
+	}
+	.sdef-line {
+		height: 0.5px;
+		width: 100%;
+		background: var(--color-border);
+	}
+	.sdef-den {
+		font-size: 11.5px;
+		color: var(--color-text2);
+		white-space: nowrap;
+	}
+	.sdef-rest {
+		font-size: 13px;
+		color: var(--color-text2);
+		white-space: nowrap;
+	}
+	.sdef-rest strong {
+		color: var(--color-accent);
+		font-weight: 600;
+	}
+	.sdef-notes {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		border-top: 0.5px solid var(--color-border);
+		padding-top: 12px;
+	}
+	.sdef-notes li {
+		font-size: 11.5px;
+		color: var(--color-text2);
+		line-height: 1.6;
+		padding-left: 10px;
+		position: relative;
+	}
+	.sdef-notes li::before {
+		content: '·';
+		position: absolute;
+		left: 2px;
+		color: var(--color-text3);
+	}
+	.sdef-notes li strong { color: var(--color-text); }
+
+	/* ── 예시 카드 ── */
+	.ex-rows {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.ex-row {
+		display: grid;
+		grid-template-columns: 200px 1fr 54px;
+		align-items: center;
+		gap: 14px;
+		padding: 10px 16px;
+		background: var(--color-card-soft);
+		border-radius: 8px;
+	}
+	@media (max-width: 640px) {
+		.ex-row { grid-template-columns: 1fr; gap: 8px; }
+	}
+	.ex-who {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		flex-wrap: wrap;
+	}
+	.ex-emoji { font-size: 17px; }
+	.ex-name { font-size: 12px; font-weight: 500; }
+	.ex-speed { font-size: 11px; opacity: 0.8; }
+	.ex-dots {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		flex-wrap: wrap;
+	}
+	.ex-dot {
+		display: inline-block;
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		flex-shrink: 0;
+		transition: background 0.2s;
+	}
+	.ex-count {
+		font-size: 11px;
+		margin-left: 4px;
+		opacity: 0.85;
+	}
+	.ex-badge {
+		font-family: var(--font-mono);
+		font-size: 14px;
+		font-weight: 600;
+		padding: 4px 9px;
+		border-radius: 6px;
+		text-align: center;
+		white-space: nowrap;
+	}
+	.ex-callout {
+		padding: 12px 16px;
+		background: rgba(216, 90, 48, 0.06);
+		border-left: 2.5px solid var(--color-accent);
+		border-radius: 0 8px 8px 0;
+		font-size: 12.5px;
+		line-height: 1.75;
+		color: var(--color-text2);
+	}
+	.ex-callout strong { color: var(--color-text); }
+
 	/* 고령화 choropleth 지도 */
 	.aging-map {
 		height: 380px;
