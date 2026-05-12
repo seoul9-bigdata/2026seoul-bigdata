@@ -8,6 +8,8 @@
 	import CountUp from '$lib/components/CountUp.svelte';
 	import { viewport } from '$lib/actions/viewport.js';
 	import { fade } from 'svelte/transition';
+	import { flip } from 'svelte/animate';
+	import { cubicOut } from 'svelte/easing';
 	import { onMount, onDestroy } from 'svelte';
 
 	/* ── Leaflet choropleth (서울 25구 고령화율) ── */
@@ -301,14 +303,16 @@
 				<div bind:this={mapEl} class="aging-map rounded-[6px]"></div>
 			</div>
 
-			<!-- 25구 막대 그래프 (year 토글 시 전체 재애니메이션) -->
+			<!-- 25구 막대 그래프 -->
 			<div class="rounded-[8px] p-3" style:background="var(--color-card-soft)">
-			{#key year}
-				<div class="flex flex-col gap-[5px]" in:fade={{ duration: 220 }}>
+				<div class="flex flex-col gap-[5px]">
 					{#each sortedByYear as d, i (d.name)}
 						{@const w = (d.value / combinedMax) * 100}
 						{@const bg = (year === 2026 ? agingColor2026 : agingColor2040)(d.value)}
-						<div class="grid grid-cols-[80px_1fr_60px] items-center gap-2.5">
+						<div
+							class="grid grid-cols-[80px_1fr_60px] items-center gap-2.5"
+							animate:flip={{ duration: 500, easing: cubicOut }}
+						>
 							<div class="text-[11.5px] font-medium" style:color="var(--color-text)">{d.name}</div>
 							<div class="relative h-[12px] rounded-[3px]" style:background="rgba(0,0,0,0.04)">
 								<div
@@ -327,7 +331,6 @@
 						</div>
 					{/each}
 				</div>
-			{/key}
 			</div>
 		</div>
 
@@ -894,9 +897,10 @@
 		animation: bar-reveal 0.85s cubic-bezier(0.16, 0.84, 0.36, 1) both;
 		animation-delay: var(--ad, 0ms);
 		transform-origin: left center;
-		will-change: transform;
+		will-change: transform, width;
 		backface-visibility: hidden;
 		transform: translateZ(0);
+		transition: width 0.65s cubic-bezier(0.16, 0.84, 0.36, 1), background-color 0.45s ease;
 	}
 	@keyframes bar-reveal {
 		from {
