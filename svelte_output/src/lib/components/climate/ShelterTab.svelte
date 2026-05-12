@@ -42,7 +42,8 @@
 		cUnit === 'gu' ? (cSlope ? HULLS_SG : HULLS_G) : (cSlope ? HULLS_SD : HULLS_D);
 
 	function calcScore(cnt, cnt0) {
-		if (!cnt0) return null;
+		if (cnt0 == null) return null;  // 데이터 자체가 없을 때만 null
+		if (!cnt0) return 0;            // 일반인도 도달 불가(분모=0) → 0점
 		if (!cnt) return 0;
 		return Math.min(100, (cnt / cnt0) * 100);
 	}
