@@ -845,7 +845,7 @@
 		</Card>
 		<ChartCard
 			title={`${cG} 속도별 도달가능점수 드롭오프`}
-			height="100%"
+			height="380px"
 			onmount={setupDropoffChart}
 		/>
 	</div>
