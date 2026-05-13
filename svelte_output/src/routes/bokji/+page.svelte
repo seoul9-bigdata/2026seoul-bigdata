@@ -714,7 +714,7 @@
 			<span class="lbl">보행자 유형</span>
 			{#each SPEEDS as s, i}
 				<button type="button" class="btn bw" class:on={cW === i} onclick={() => (cW = i)}>
-					{['🚶', '🧓', '🦽', '♿'][i]} {s.key} &nbsp;{s.mps} m/s
+					{['🚶', '🧓', '🦯', '🦽'][i]} {['일반인', '일반 노인', '보행보조 노인', '보행보조 하위15%'][i]} &nbsp;{s.mps.toFixed(2)} m/s
 				</button>
 			{/each}
 		</div>
@@ -791,8 +791,8 @@
 		</div>
 	</div>
 
-	<!-- ── 지도 (단독 full-width) ── -->
-	<div class="mt-3.5">
+	<!-- ── 지도 + 드롭오프 차트 ── -->
+	<div class="r-map mt-3.5">
 		<Card title="서울시 복지·녹지 시설 분포 지도">
 			<div class="map-top-row mb-2.5">
 				<div class="map-tabs">
@@ -826,7 +826,7 @@
 				</div>
 			</div>
 			<MapShell
-				height="420px"
+				height="380px"
 				legend={[
 					{ color: '#185FA5', label: '노인복지관', shape: 'circle' },
 					{ color: '#E8A838', label: '노인교실', shape: 'circle' },
@@ -843,15 +843,15 @@
 				{/if}
 			</MapShell>
 		</Card>
-	</div>
-
-	<!-- ── 3개 시각화 차트 ── -->
-	<div class="r3 mt-3.5">
 		<ChartCard
 			title={`${cG} 속도별 도달가능점수 드롭오프`}
-			height="260px"
+			height="100%"
 			onmount={setupDropoffChart}
 		/>
+	</div>
+
+	<!-- ── 2개 시각화 차트 ── -->
+	<div class="r2b mt-3.5">
 		<ChartCard
 			title={`${cG} 행정동 복지·공원 도달 분포`}
 			height="260px"
@@ -1083,6 +1083,11 @@
 		padding: 8px 14px;
 	}
 	/* ── 그리드 ── */
+	.r-map {
+		display: grid;
+		grid-template-columns: 1.4fr 1fr;
+		gap: 14px;
+	}
 	.r2 {
 		display: grid;
 		grid-template-columns: 1.45fr 1fr;
@@ -1291,6 +1296,7 @@
 		color: rgba(241,239,232,0.25);
 		font-size: 11px;
 	}
+	@media (max-width: 1100px) { .r-map { grid-template-columns: 1fr; } }
 	@media (max-width: 900px) {
 		.r2,
 		.r2b,

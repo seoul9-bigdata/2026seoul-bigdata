@@ -961,7 +961,7 @@
 <div class="ctrl">
 	<div class="crow">
 		<span class="lbl">보행자 유형</span>
-		{#each ['🚶 일반인 1.28 m/s', '🧓 일반 노인 1.12 m/s', '🦽 보행보조 노인 0.88 m/s', '🦽 보행보조 하위 15% 0.70 m/s'] as label, i}
+		{#each ['🚶 일반인 1.28 m/s', '🧓 일반 노인 1.12 m/s', '🦯 보행보조 노인 0.88 m/s', '🦽 보행보조 하위15% 0.70 m/s'] as label, i}
 			<button
 				type="button"
 				class="btn bw"

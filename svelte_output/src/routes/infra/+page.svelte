@@ -780,7 +780,7 @@
 			{#each WS as w, i}
 				<button type="button" class="btn bw" class:on={cW === i} onclick={() => (cW = i)}>
 					{i === 0 ? '🚶' : i === 1 ? '🧓' : i === 2 ? '🦯' : '🦽'}
-					{w.label} {w.speed} m/s
+					{w.label} {w.speed.toFixed(2)} m/s
 				</button>
 			{/each}
 		</div>

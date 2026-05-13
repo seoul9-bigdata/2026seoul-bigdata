@@ -867,8 +867,8 @@
 	const compareLabels = [
 		{ idx: 0, emoji: '🚶', text: '일반인', speed: '1.28 m/s' },
 		{ idx: 1, emoji: '🧓', text: '일반 노인', speed: '1.12 m/s' },
-		{ idx: 2, emoji: '🦽', text: '보행보조 노인', speed: '0.88 m/s' },
-		{ idx: 3, emoji: '♿', text: '보행보조 노인 하위15%', speed: '0.70 m/s' }
+		{ idx: 2, emoji: '🦯', text: '보행보조 노인', speed: '0.88 m/s' },
+		{ idx: 3, emoji: '🦽', text: '보행보조 하위15%', speed: '0.70 m/s' }
 	];
 
 	/** 80점 이상 녹색, 50점 이상 황색, 그 이하 적색
@@ -957,13 +957,12 @@
 	<!-- 컨트롤 -->
 	<div class="ctrl">
 		<div class="crow">
-			<span class="lbl">비교 속도</span>
+			<span class="lbl">보행자 유형</span>
 			{#each compareLabels as c (c.idx)}
 				<button type="button" class="btn bw" class:on={cB === c.idx} onclick={() => (cB = c.idx)}>
 					{c.emoji} {c.text} &nbsp;{c.speed}
 				</button>
 			{/each}
-			{#if cB !== 0}<span class="text-[11px] ml-1.5" style:color="var(--color-text4)">기준: 일반인 1.28 m/s 고정</span>{/if}
 		</div>
 		<div class="crow">
 			<span class="lbl">경사 보정</span>
