@@ -63,16 +63,24 @@
 
 ## 대시보드 미리보기
 
-|                                                                       |                                                                    |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **소개 · 방법론**                                                     | **대중교통 동선**                                                  |
-| ![소개](output-image/2_seniorwalkseoul.site_introduce.png)            | ![대중교통](output-image/3_seniorwalkseoul.site_trans.png)         |
-| **기후안전권**                                                        | **생활인프라**                                                     |
-| ![기후](output-image/4_seniorwalkseoul.site_introduce_climate.png)    | ![인프라](output-image/5_seniorwalkseoul.site_introduce_infra.png) |
-| **복지·녹지**                                                         | **병의원·약국**                                                    |
-| ![복지](output-image/6_seniorwalkseoul.site_introduce_bokji.png)      | ![의료](output-image/7_seniorwalkseoul.site_introduce_medical.png) |
-| **결론·정책 제언**                                                    |                                                                    |
-| ![결론](output-image/8_seniorwalkseoul.site_introduce_conclusion.png) |                                                                    |
+<table>
+  <tr>
+    <td valign="top" width="50%"><b>소개 · 방법론</b><br><img src="output-image/2_seniorwalkseoul2.site_introduce.png" width="100%"></td>
+    <td valign="top" width="50%"><b>대중교통 동선</b><br><img src="output-image/3_seniorwalkseoul.site_trans.png" width="100%"></td>
+  </tr>
+  <tr>
+    <td valign="top" width="50%"><b>기후안전권</b><br><img src="output-image/4_seniorwalkseoul.site_introduce_climate.png" width="100%"></td>
+    <td valign="top" width="50%"><b>생활인프라</b><br><img src="output-image/5_seniorwalkseoul.site_introduce_infra.png" width="100%"></td>
+  </tr>
+  <tr>
+    <td valign="top" width="50%"><b>복지·녹지</b><br><img src="output-image/6_seniorwalkseoul.site_introduce_bokji.png" width="100%"></td>
+    <td valign="top" width="50%"><b>병의원·약국</b><br><img src="output-image/7_seniorwalkseoul.site_introduce_medical.png" width="100%"></td>
+  </tr>
+  <tr>
+    <td valign="top" width="50%"><b>결론·정책 제언</b><br><img src="output-image/8_seniorwalkseoul.site_introduce_conclusion.png" width="100%"></td>
+    <td valign="top" width="50%"></td>
+  </tr>
+</table>
 
 ---
 
