@@ -13,8 +13,8 @@
 - 강수(비·눈) 여부에 따른 대중교통 이용 히트맵
 - 황금연휴 / 주말 / 평일 24시간 이동 패턴 비교 차트
 
-![](image.png)
-![](image-1.png)
+![](meeting-image.png)
+![](meeting-image-1.png)
 
 ### 김성령
 
@@ -24,7 +24,7 @@
   - 청년 대비 노인 보행 속도를 기준으로 도달 가능 거리의 격차 시각화
   - 노인 보행 속도로 접근 불가한 폭염쉼터·한파쉼터, 지하철 엘리베이터 시각화
 
-![](image-2.png)
+![](meeting-image-2.png)
 
 ### 이정태
 
@@ -40,9 +40,9 @@
   - **상세 추이**: 시간대별 소음 및 진동(X·Z축)의 평균/최대 변화 그래프
   - 전처리 데이터셋: `sdot_hourly_preprocessed.csv`로 저장, 향후 추가 분석 대비
 
-![](image-3.png)
-![](image-4.png)
-![](image-5.png)
+![](meeting-image-3.png)
+![](meeting-image-4.png)
+![](meeting-image-5.png)
 
 ### 유호준
 
