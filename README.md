@@ -65,7 +65,7 @@
 
 <table>
   <tr>
-    <td valign="top" width="50%"><b>소개 · 방법론</b><br><img src="output-image/2_seniorwalkseoul2.site_introduce.png" width="100%"></td>
+    <td valign="top" width="50%"><b>소개 · 방법론</b><br><img src="output-image/2_seniorwalkseoul.site_introduce.png" width="100%"></td>
     <td valign="top" width="50%"><b>대중교통 동선</b><br><img src="output-image/3_seniorwalkseoul.site_trans.png" width="100%"></td>
   </tr>
   <tr>
