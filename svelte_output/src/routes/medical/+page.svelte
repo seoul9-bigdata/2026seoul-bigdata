@@ -1,4 +1,5 @@
 <script>
+	import { cartoTiles } from '$lib/util/carto.js';
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import medical from '$lib/data/medical.json';
 	import facilities from '$lib/data/medical_facilities.json';
@@ -367,7 +368,7 @@
 
 		map = L.map(mapEl, { zoomControl: true, attributionControl: false })
 			.setView([37.5665, 126.978], 11);
-		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+		L.tileLayer(cartoTiles('light_all'), {
 			subdomains: 'abcd',
 			maxZoom: 18
 		}).addTo(map);

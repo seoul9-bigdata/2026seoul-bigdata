@@ -1,4 +1,5 @@
 <script>
+	import { cartoTiles } from '$lib/util/carto.js';
 	import { onMount, onDestroy } from 'svelte';
 	import data from '$lib/data/transit.json';
 	import 'leaflet/dist/leaflet.css';
@@ -116,7 +117,7 @@
 		if (typeof window === 'undefined') return;
 		L = (await import('leaflet')).default;
 		map = L.map(mapEl, { zoomControl: true }).setView([37.5665, 126.978], 11);
-		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+		L.tileLayer(cartoTiles('light_all'), {
 			attribution: '© CARTO',
 			subdomains: 'abcd',
 			maxZoom: 19

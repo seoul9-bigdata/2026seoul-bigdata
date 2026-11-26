@@ -1,4 +1,5 @@
 <script>
+	import { cartoTiles } from '$lib/util/carto.js';
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import { loadGraph, computeIsochrone } from '$lib/util/isochrone.js';
 	import { applySort, compareBy } from '$lib/util/sortable.js';
@@ -140,7 +141,7 @@
 		await import('leaflet/dist/leaflet.css');
 		L = (await import('leaflet')).default;
 		map = L.map(mapEl, { zoomControl: true }).setView([37.5665, 126.978], 11);
-		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+		L.tileLayer(cartoTiles('light_all'), {
 			subdomains: 'abcd',
 			maxZoom: 19,
 			attribution: '&copy; OSM &copy; CARTO'

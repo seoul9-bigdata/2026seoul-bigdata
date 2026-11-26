@@ -1,4 +1,5 @@
 <script>
+	import { cartoTiles } from '$lib/util/carto.js';
 	import { onMount, onDestroy } from 'svelte';
 	import data from '$lib/data/climate.json';
 	import CountUp from '$lib/components/CountUp.svelte';
@@ -385,7 +386,7 @@
 		const leaflet = await import('leaflet');
 		L = leaflet.default;
 		map = L.map(mapEl, { center: [37.5665, 126.978], zoom: 11 });
-		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+		L.tileLayer(cartoTiles('light_all'), {
 			attribution: '© OSM · © CartoDB',
 			maxZoom: 19,
 			subdomains: 'abcd'

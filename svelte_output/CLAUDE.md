@@ -179,8 +179,9 @@ async function initMap() {
   await import('leaflet/dist/leaflet.css');
   const L = (await import('leaflet')).default;
   const map = L.map(mapEl, { ... }).setView([37.555, 127.0], 11);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    { subdomains: 'abcd', maxZoom: 19 }).addTo(map);
+  // CARTO 타일은 API 키 필수 → 반드시 헬퍼 사용 (키: .env 의 PUBLIC_CARTO_KEY)
+  // import { cartoTiles } from '$lib/util/carto.js';
+  L.tileLayer(cartoTiles('light_all'), { maxZoom: 19 }).addTo(map);
 }
 $effect(() => {
   if (mapEl && !mapInited && typeof window !== 'undefined') initMap();

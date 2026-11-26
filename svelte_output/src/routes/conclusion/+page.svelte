@@ -1,4 +1,5 @@
 <script>
+	import { cartoTiles } from '$lib/util/carto.js';
 	import { base } from '$app/paths';
 	import Card from '$lib/components/Card.svelte';
 	import StatCard from '$lib/components/StatCard.svelte';
@@ -350,7 +351,7 @@
 			attributionControl: false,
 			scrollWheelZoom: false
 		}).setView([37.555, 127.0], 11);
-		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+		L.tileLayer(cartoTiles('light_nolabels'), {
 			subdomains: 'abcd',
 			maxZoom: 18
 		}).addTo(lmap);
